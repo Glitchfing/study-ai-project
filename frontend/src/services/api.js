@@ -5,8 +5,9 @@
  */
 
 const BASE_URL =
-  window.location.hostname === "localhost" ? "http://localhost:8000" : "/api";
-
+  window.location.hostname === "localhost"
+    ? "http://localhost:8000"
+    : import.meta.env.VITE_API_URL;
 export const getAssetUrl = (path) => {
   if (!path) return "";
   if (path.startsWith("http")) return path;
