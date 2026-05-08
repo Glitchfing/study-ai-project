@@ -63,3 +63,10 @@ tmp/
 dist/
 build/
 out/
+
+backend/data/generated_notes.json
+backend/data/quiz_attempts.json
+backend/static/diagrams/
+uploads/
+generated_notes/
+.env
