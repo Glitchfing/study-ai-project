@@ -5,6 +5,9 @@ from copy import deepcopy
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from quiz_attempt_store import list_quiz_attempts
+from session_store import list_sessions
+
 BASE_USER = {
     "name": "RUTU",
     "initials": "RU",
@@ -174,6 +177,7 @@ def _recent_quizzes() -> list[dict[str, Any]]:
         score = int(entry.get("score", 0))
         difficulty = "Easy" if score >= 85 else "Medium" if score >= 65 else "Hard"
         variant = "green" if score >= 85 else "teal" if score >= 65 else "coral"
+        performance = entry.get("performance") or {}
         recent.append(
             {
                 "title": entry.get("topic_label") or entry.get("topic", "Quiz").title(),
@@ -181,6 +185,7 @@ def _recent_quizzes() -> list[dict[str, Any]]:
                 "difficulty": difficulty,
                 "icon": "✓" if score >= 60 else "~",
                 "variant": variant,
+                "feedback": performance.get("feedback"),
             }
         )
     return recent
@@ -280,9 +285,37 @@ def build_dashboard_payload() -> dict[str, Any]:
     streak = _streak_from_days(days)
     study_minutes = _study_minutes_from_activity()
     quiz_completed = sum(1 for entry in ACTIVITY_LOG if entry["kind"] == "quiz_completed")
+    sessions = list_sessions()
+    attempts = list_quiz_attempts(limit=1000)
+    uploaded_files_count = sum(len(session.get("uploaded_files") or []) for session in sessions)
+    diagrams_generated = sum(
+        int(file_info.get("diagram_count") or 0)
+        for session in sessions
+        for file_info in session.get("uploaded_files") or []
+    )
+    scores = [int(attempt.get("score", 0)) for attempt in attempts]
+    highest_score = max(scores) if scores else 0
+    average_score = round(sum(scores) / len(scores), 1) if scores else 0
+    weak_counter = Counter()
+    emoji_history = []
+    for attempt in attempts:
+        weak_counter.update(attempt.get("weak_topics") or [])
+        performance = attempt.get("performance") or {}
+        if performance:
+            emoji_history.append(
+                {
+                    "attempt_id": attempt.get("id"),
+                    "created_at": attempt.get("created_at"),
+                    "score": attempt.get("correct", 0),
+                    "total": attempt.get("total", 0),
+                    "percentage": attempt.get("score", 0),
+                    "emoji": performance.get("emoji"),
+                    "feedback": performance.get("feedback"),
+                }
+            )
     topic_summary = _topic_summary()
     mastered_topics = sum(1 for topic in topic_summary if topic["pct"] >= 80)
-    mastery = min(99, len(ACTIVITY_LOG) * 2 + mastered_topics * 3)
+    mastery = int(average_score) if scores else min(99, len(ACTIVITY_LOG) * 2 + mastered_topics * 3)
 
     month_counts = Counter()
     for entry in ACTIVITY_LOG:
@@ -360,4 +393,18 @@ def build_dashboard_payload() -> dict[str, Any]:
         "heatmap_weeks": 18,
         "activity_heatmap": _activity_heatmap(18),
         "recent_activity": list(reversed(ACTIVITY_LOG[-8:])),
+        "analytics": {
+            "total_sessions": len(sessions),
+            "uploaded_files_count": uploaded_files_count,
+            "quizzes_attempted": len(attempts) or quiz_completed,
+            "highest_score": highest_score,
+            "average_score": average_score,
+            "weak_topics": [{"topic": topic, "count": count} for topic, count in weak_counter.most_common(6)],
+            "most_difficult_topics": [{"topic": topic, "count": count} for topic, count in weak_counter.most_common(3)],
+            "diagrams_generated": diagrams_generated,
+            "learning_progress": mastery,
+            "study_minutes": study_minutes,
+            "topics_mastered": mastered_topics,
+            "emoji_performance_history": emoji_history[-8:],
+        },
     }

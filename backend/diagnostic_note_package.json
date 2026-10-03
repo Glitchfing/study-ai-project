@@ -1,0 +1,2005 @@
+{
+  "document_title": "Computer Networks: Media Access Control, Routing Protocols, Transport/Network Layer Fundamentals",
+  "source_filename": "test_pdf.pdf",
+  "document_intelligence": {
+    "document_title": "Computer Networks: Media Access Control, Routing Protocols, Transport/Network Layer Fundamentals",
+    "document_summary": "Comprehensive overview of core computer network concepts across multiple layers including medium access control (CSMA, FDMA, TDMA, CDMA), routing algorithms (Distance Vector, Link State), transport protocols (TCP vs UDP), communication types (Unicast, Broadcast, Multicast), congestion control (Leaky Bucket vs Token Bucket), Internet Protocol (IPv4 vs IPv6), and network diagnostics (ARP, RARP, ICMP).",
+    "major_topics": [
+      "Medium Access Control Protocols",
+      "Multiple Access Schemes",
+      "Routing Algorithms",
+      "Transport Layer Protocols",
+      "Cast Communication Types",
+      "Traffic Shaping and Congestion Control",
+      "Internet Protocol (IP)",
+      "Network Layer Utility Protocols"
+    ],
+    "subtopics": [
+      "1-Persistent, Non-Persistent, and P-Persistent CSMA",
+      "FDMA vs TDMA vs CDMA",
+      "Distance Vector Routing and Bellman-Ford Algorithm",
+      "Link State Routing and Dijkstra Algorithm",
+      "TCP vs UDP Comparison",
+      "Unicast, Broadcast, and Multicast Transmission",
+      "Leaky Bucket vs Token Bucket Algorithm",
+      "IPv4 vs IPv6 Addressing",
+      "ARP, RARP, and ICMP Operation"
+    ],
+    "concept_relationships": [
+      "CSMA reduces collisions on shared media via carrier sensing, whereas CDMA/TDMA/FDMA allocate channel access via codes, time slots, or frequencies.",
+      "Distance Vector routing relies on neighbor table exchanges and Bellman-Ford, whereas Link State uses link status flooding and Dijkstra for full topology maps.",
+      "TCP ensures ordered, reliable delivery over IP, whereas UDP provides low-latency, connectionless delivery over IP.",
+      "Leaky Bucket enforces a rigid output rate for traffic shaping, whereas Token Bucket provides flexibility for bursty traffic.",
+      "ARP resolves IPv4 addresses to MAC addresses for LAN delivery, whereas RARP reverses this process for diskless hosts."
+    ],
+    "workflow_sections": [
+      "CSMA Channel Sensing and Backoff Process",
+      "Distance Vector Table Exchange and Bellman-Ford Route Calculation",
+      "Link State LSP Flooding and Dijkstra Shortest Path Computation",
+      "TCP 3-Way Handshake Connection Establishment",
+      "ARP Request-Reply Resolution Flow",
+      "Token Bucket Token Generation and Packet Transmission"
+    ],
+    "architecture_sections": [
+      "Data Link Layer MAC Sublayer Access Methods",
+      "Network Layer Routing and Protocol Stack (IP, ICMP, ARP, RARP)",
+      "Transport Layer Multiplexing (TCP vs UDP)",
+      "Traffic Shaping Queue Management Systems"
+    ],
+    "exam_priority_topics": [
+      "CSMA Persistent Variant Differences",
+      "FDMA vs TDMA vs CDMA Mechanisms and Examples",
+      "Distance Vector vs Link State Routing (Algorithms, Convergence, Count-to-Infinity)",
+      "TCP vs UDP Characteristics and Use Cases",
+      "Leaky Bucket vs Token Bucket Algorithm Mechanisms",
+      "IPv4 vs IPv6 Structural Differences",
+      "ARP vs RARP vs ICMP Protocol Functions"
+    ],
+    "definition_sections": [
+      "Carrier Sense Multiple Access (CSMA)",
+      "Code Division Multiple Access (CDMA)",
+      "Distance Vector Routing",
+      "Link State Routing",
+      "Leaky Bucket Algorithm",
+      "Token Bucket Algorithm",
+      "Address Resolution Protocol (ARP)",
+      "Internet Control Message Protocol (ICMP)"
+    ],
+    "diagram_sections": [
+      "CSMA/CD vs CSMA/CA Comparison Diagram",
+      "Unicast, Broadcast, and Multicast Transmission Flow Diagrams",
+      "Leaky Bucket vs Token Bucket Traffic Flow Diagram"
+    ],
+    "topic_dependencies": [
+      "Understanding Network Layers precedes protocol classification",
+      "IP Addressing fundamentals precede ARP/RARP operation",
+      "Graph Theory/Hop Count concepts precede Distance Vector and Link State Routing algorithms",
+      "Packet Switching principles precede Traffic Shaping (Leaky/Token Bucket) analysis"
+    ],
+    "quiz_candidate_topics": [
+      "1-Persistent vs Non-Persistent vs P-Persistent CSMA",
+      "Count-to-Infinity Problem in Distance Vector Routing",
+      "TCP 3-Way Handshake vs UDP Connectionless Model",
+      "Leaky Bucket Constant Output vs Token Bucket Bursty Support",
+      "IPv4 32-bit Decimal vs IPv6 128-bit Hexadecimal",
+      "ARP Request (Broadcast) vs ARP Reply (Unicast)"
+    ],
+    "revision_priority_order": [
+      "Distance Vector vs Link State Routing",
+      "CSMA Variants and CDMA/TDMA/FDMA Comparison",
+      "TCP vs UDP Differences and Applications",
+      "Leaky Bucket vs Token Bucket Traffic Shaping",
+      "ARP, RARP, ICMP, and IP (IPv4 vs IPv6) Fundamentals",
+      "Unicast, Broadcast, Multicast Communication Modes"
+    ],
+    "source_quality": {
+      "level": "usable",
+      "word_count": 2056,
+      "page_count": 7,
+      "words_per_page": 293.7,
+      "alpha_ratio": 0.747,
+      "replacement_characters": 0
+    },
+    "analysis_mode": "llm"
+  },
+  "topic_map": {
+    "document_title": "Computer Networks: Media Access Control, Routing Protocols, Transport/Network Layer Fundamentals",
+    "document_summary": "Comprehensive overview of core computer network concepts across multiple layers including medium access control (CSMA, FDMA, TDMA, CDMA), routing algorithms (Distance Vector, Link State), transport protocols (TCP vs UDP), communication types (Unicast, Broadcast, Multicast), congestion control (Leaky Bucket vs Token Bucket), Internet Protocol (IPv4 vs IPv6), and network diagnostics (ARP, RARP, ICMP).",
+    "major_topics": [
+      "Medium Access Control Protocols",
+      "Multiple Access Schemes",
+      "Routing Algorithms",
+      "Transport Layer Protocols",
+      "Cast Communication Types",
+      "Traffic Shaping and Congestion Control",
+      "Internet Protocol (IP)",
+      "Network Layer Utility Protocols"
+    ],
+    "subtopics": [
+      "1-Persistent, Non-Persistent, and P-Persistent CSMA",
+      "FDMA vs TDMA vs CDMA",
+      "Distance Vector Routing and Bellman-Ford Algorithm",
+      "Link State Routing and Dijkstra Algorithm",
+      "TCP vs UDP Comparison",
+      "Unicast, Broadcast, and Multicast Transmission",
+      "Leaky Bucket vs Token Bucket Algorithm",
+      "IPv4 vs IPv6 Addressing",
+      "ARP, RARP, and ICMP Operation"
+    ],
+    "concept_relationships": [
+      "CSMA reduces collisions on shared media via carrier sensing, whereas CDMA/TDMA/FDMA allocate channel access via codes, time slots, or frequencies.",
+      "Distance Vector routing relies on neighbor table exchanges and Bellman-Ford, whereas Link State uses link status flooding and Dijkstra for full topology maps.",
+      "TCP ensures ordered, reliable delivery over IP, whereas UDP provides low-latency, connectionless delivery over IP.",
+      "Leaky Bucket enforces a rigid output rate for traffic shaping, whereas Token Bucket provides flexibility for bursty traffic.",
+      "ARP resolves IPv4 addresses to MAC addresses for LAN delivery, whereas RARP reverses this process for diskless hosts."
+    ],
+    "workflow_sections": [
+      "CSMA Channel Sensing and Backoff Process",
+      "Distance Vector Table Exchange and Bellman-Ford Route Calculation",
+      "Link State LSP Flooding and Dijkstra Shortest Path Computation",
+      "TCP 3-Way Handshake Connection Establishment",
+      "ARP Request-Reply Resolution Flow",
+      "Token Bucket Token Generation and Packet Transmission"
+    ],
+    "architecture_sections": [
+      "Data Link Layer MAC Sublayer Access Methods",
+      "Network Layer Routing and Protocol Stack (IP, ICMP, ARP, RARP)",
+      "Transport Layer Multiplexing (TCP vs UDP)",
+      "Traffic Shaping Queue Management Systems"
+    ],
+    "exam_priority_topics": [
+      "CSMA Persistent Variant Differences",
+      "FDMA vs TDMA vs CDMA Mechanisms and Examples",
+      "Distance Vector vs Link State Routing (Algorithms, Convergence, Count-to-Infinity)",
+      "TCP vs UDP Characteristics and Use Cases",
+      "Leaky Bucket vs Token Bucket Algorithm Mechanisms",
+      "IPv4 vs IPv6 Structural Differences",
+      "ARP vs RARP vs ICMP Protocol Functions"
+    ],
+    "definition_sections": [
+      "Carrier Sense Multiple Access (CSMA)",
+      "Code Division Multiple Access (CDMA)",
+      "Distance Vector Routing",
+      "Link State Routing",
+      "Leaky Bucket Algorithm",
+      "Token Bucket Algorithm",
+      "Address Resolution Protocol (ARP)",
+      "Internet Control Message Protocol (ICMP)"
+    ],
+    "diagram_sections": [
+      "CSMA/CD vs CSMA/CA Comparison Diagram",
+      "Unicast, Broadcast, and Multicast Transmission Flow Diagrams",
+      "Leaky Bucket vs Token Bucket Traffic Flow Diagram"
+    ],
+    "topic_dependencies": [
+      "Understanding Network Layers precedes protocol classification",
+      "IP Addressing fundamentals precede ARP/RARP operation",
+      "Graph Theory/Hop Count concepts precede Distance Vector and Link State Routing algorithms",
+      "Packet Switching principles precede Traffic Shaping (Leaky/Token Bucket) analysis"
+    ],
+    "quiz_candidate_topics": [
+      "1-Persistent vs Non-Persistent vs P-Persistent CSMA",
+      "Count-to-Infinity Problem in Distance Vector Routing",
+      "TCP 3-Way Handshake vs UDP Connectionless Model",
+      "Leaky Bucket Constant Output vs Token Bucket Bursty Support",
+      "IPv4 32-bit Decimal vs IPv6 128-bit Hexadecimal",
+      "ARP Request (Broadcast) vs ARP Reply (Unicast)"
+    ],
+    "revision_priority_order": [
+      "Distance Vector vs Link State Routing",
+      "CSMA Variants and CDMA/TDMA/FDMA Comparison",
+      "TCP vs UDP Differences and Applications",
+      "Leaky Bucket vs Token Bucket Traffic Shaping",
+      "ARP, RARP, ICMP, and IP (IPv4 vs IPv6) Fundamentals",
+      "Unicast, Broadcast, Multicast Communication Modes"
+    ],
+    "source_quality": {
+      "level": "usable",
+      "word_count": 2056,
+      "page_count": 7,
+      "words_per_page": 293.7,
+      "alpha_ratio": 0.747,
+      "replacement_characters": 0
+    },
+    "analysis_mode": "llm"
+  },
+  "sections": [
+    {
+      "section_id": "section-1",
+      "title": "Medium Access Control Protocols and IP Characteristics",
+      "raw_text": " Delay Increases During Heavy Traffic\nWhen many devices try to access the medium, waiting times increase significantly.\n\n5. Efficient Spectrum Usage\n8.   Uses more battery due to continuous power control\n\nCharacteristics of IP\n-No error control and no flow control (these are handled by upper-layer protocols like TCP).",
+      "page_numbers": [
+        1,
+        2,
+        6
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Medium Access Control Protocols",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Medium Access Control Protocols clearly in exam language.",
+        "Connect Medium Access Control Protocols with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "control",
+        "medium",
+        "access",
+        "protocols",
+        "delay",
+        "increases",
+        "during",
+        "heavy",
+        "traffic",
+        "many",
+        "devices",
+        "try"
+      ],
+      "exam_priority_topics": [],
+      "order_index": 0,
+      "content": "In network communication, managing shared channels involves key trade-offs and functional divisions. When many devices try to access the medium simultaneously, delay increases significantly as waiting times grow during heavy traffic. While system designs aim for efficient spectrum usage, employing continuous power control results in higher battery consumption for devices. Additionally, fundamental protocols operate with distinct boundaries; for instance, the Internet Protocol (IP) features no error control and no flow control. Instead, these essential tasks are left to be handled entirely by upper-layer protocols, such as TCP. Understanding these core characteristics helps clarify how lower-level access mechanisms and network-layer protocols divide operational responsibilities across a network stack.",
+      "educational_explanation": "In network communication, managing shared channels involves key trade-offs and functional divisions. When many devices try to access the medium simultaneously, delay increases significantly as waiting times grow during heavy traffic. While system designs aim for efficient spectrum usage, employing continuous power control results in higher battery consumption for devices. Additionally, fundamental protocols operate with distinct boundaries; for instance, the Internet Protocol (IP) features no error control and no flow control. Instead, these essential tasks are left to be handled entirely by upper-layer protocols, such as TCP. Understanding these core characteristics helps clarify how lower-level access mechanisms and network-layer protocols divide operational responsibilities across a network stack.",
+      "explanation": "In network communication, managing shared channels involves key trade-offs and functional divisions. When many devices try to access the medium simultaneously, delay increases significantly as waiting times grow during heavy traffic. While system designs aim for efficient spectrum usage, employing continuous power control results in higher battery consumption for devices. Additionally, fundamental protocols operate with distinct boundaries; for instance, the Internet Protocol (IP) features no error control and no flow control. Instead, these essential tasks are left to be handled entirely by upper-layer protocols, such as TCP. Understanding these core characteristics helps clarify how lower-level access mechanisms and network-layer protocols divide operational responsibilities across a network stack.",
+      "topics": [
+        "control",
+        "medium",
+        "access",
+        "protocols",
+        "delay",
+        "increases"
+      ],
+      "key_points": [
+        "Delay increases significantly during heavy traffic when many devices try to access the medium.",
+        "Efficient spectrum usage using continuous power control consumes more battery power.",
+        "IP features no error control and no flow control.",
+        "Upper-layer protocols like TCP handle error control and flow control instead of IP.",
+        " Delay Increases During Heavy Traffic",
+        "When many devices try to access the medium, waiting times increase significantly.",
+        "8.  Uses more battery due to continuous power control"
+      ],
+      "definitions": [
+        "Internet Protocol (IP): A network layer protocol characterized by having no error control and no flow control.",
+        "No error control and no flow control (these: handled by upper-layer protocols like TCP)"
+      ],
+      "examples": [
+        "TCP serving as an upper-layer protocol to handle the error control and flow control omitted by IP.",
+        " Uses more battery due to continuous power control Characteristics of IP -No error control and no flow control (these are handled by upper-layer protocols like TCP)."
+      ],
+      "use_cases": [
+        "Managing spectrum efficiently through continuous power control in wireless communications."
+      ],
+      "important_notes": [
+        "IP relies on higher-layer protocols like TCP because it lacks built-in flow and error control.",
+        "Continuous power control trades off battery life to maintain spectrum efficiency.",
+        " Delay Increases During Heavy Traffic",
+        "When many devices try to access the medium, waiting times increase significantly.",
+        "Use exact source terminology for Medium Access Control Protocols and IP Characteristics before adding explanation."
+      ],
+      "why_this_matters": "Understanding protocol trade-offs and layer responsibilities is essential for analyzing network performance under heavy traffic and power constraints.",
+      "common_mistakes": [
+        "Mistakenly assuming that IP provides native error control or flow control.",
+        "Expecting access delays to remain low when many devices attempt to transmit at once.",
+        "Writing only the definition of Medium Access Control Protocols and IP Characteristics without explaining how it works.",
+        "Listing Control, Medium, Access as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "Heavy traffic increases waiting times significantly on shared access media.",
+        "IP has no flow or error control; TCP handles them.",
+        "Continuous power control leads to higher battery usage.",
+        "First define Medium Access Control Protocols and IP Characteristics in one clear sentence.",
+        "Then explain the working flow or relationship using Control, Medium, Access."
+      ],
+      "memory_tricks": [
+        "IP = Incomplete Protection: No error control, no flow control (TCP handles both).",
+        "Remember Medium Access Control Protocols and IP Characteristics through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Control, Medium, Access, Protocols."
+      ],
+      "concept_comparisons": [
+        "IP vs TCP: IP provides no error or flow control, whereas TCP (an upper-layer protocol) handles both.",
+        "Compare Medium Access Control Protocols and IP Characteristics with Medium by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What happens to waiting times when many devices attempt to access the medium during heavy traffic?",
+        "Which protocols handle error control and flow control given that IP lacks both?",
+        "What is Medium Access Control Protocols and IP Characteristics?",
+        "How does Medium Access Control Protocols and IP Characteristics work in the source material?",
+        "Why is Medium Access Control Protocols and IP Characteristics important for an exam answer?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Medium Access Control Protocols and IP Characteristics?",
+            "Why is Medium Access Control Protocols and IP Characteristics important?",
+            "What happens to waiting times when many devices attempt to access the medium during heavy traffic?",
+            "Which protocols handle error control and flow control given that IP lacks both?",
+            "What is Medium Access Control Protocols and IP Characteristics?",
+            "How does Medium Access Control Protocols and IP Characteristics work in the source material?"
+          ],
+          "notes": "In network communication, managing shared channels involves key trade-offs and functional divisions. When many devices try to access the medium simultaneously, delay increases significantly as waiting times grow during heavy traffic. While system designs aim for efficient spectrum usage, employing continuous power control results in higher battery consumption for devices. Additionally, fundamental protocols operate with distinct boundaries; for instance, the Internet Protocol (IP) features no error control and no flow control. Instead, these essential tasks are left to be handled entirely by upper-layer protocols, such as TCP. Understanding these core characteristics helps clarify how lower-level access mechanisms and network-layer protocols divide operational responsibilities across a network stack.\n\nExam-ready points:\n- Delay increases significantly during heavy traffic when many devices try to access the medium.\n- Efficient spectrum usage using continuous power control consumes more battery power.\n- IP features no error control and no flow control.\n- Upper-layer protocols like TCP handle error control and flow control instead of IP.\n-  Delay Increases During Heavy Traffic\n\nDefinitions to know:\n- Internet Protocol (IP): A network layer protocol characterized by having no error control and no flow control.\n- No error control and no flow control (these: handled by upper-layer protocols like TCP)",
+          "summary": "In network communication, managing shared channels involves key trade-offs and functional divisions."
+        },
+        "outline": {
+          "title": "Medium Access Control Protocols and IP Characteristics",
+          "sections": [
+            {
+              "heading": "Medium Access Control Protocols and IP Characteristics",
+              "points": [
+                "Definition: Internet Protocol (IP): A network layer protocol characterized by having no error control and no flow control.",
+                "Definition: No error control and no flow control (these: handled by upper-layer protocols like TCP)",
+                "Delay increases significantly during heavy traffic when many devices try to access the medium.",
+                "Efficient spectrum usage using continuous power control consumes more battery power.",
+                "IP features no error control and no flow control.",
+                "Upper-layer protocols like TCP handle error control and flow control instead of IP.",
+                " Delay Increases During Heavy Traffic",
+                "Example/use: TCP serving as an upper-layer protocol to handle the error control and flow control omitted by IP.",
+                "Example/use:  Uses more battery due to continuous power control Characteristics of IP -No error control and no flow control (these are handled by upper-layer protocols like TCP).",
+                "Revision: Heavy traffic increases waiting times significantly on shared access media.",
+                "Revision: IP has no flow or error control; TCP handles them."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Medium Access Control Protocols and IP Characteristics",
+          "mermaid": "mindmap\n  root((Medium Access Control Protocols and IP Characteristics))\n    Control\n    Medium\n    Access\n    Protocols",
+          "branches": [
+            {
+              "name": "Control",
+              "sub_branches": []
+            },
+            {
+              "name": "Medium",
+              "sub_branches": []
+            },
+            {
+              "name": "Access",
+              "sub_branches": []
+            },
+            {
+              "name": "Protocols",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Medium Access Control Protocols and IP Characteristics",
+            "In network communication, managing shared channels involves key trade-offs and functional divisions.",
+            "Control, Medium, Access"
+          ]
+        ],
+        "sentence": "In network communication, managing shared channels involves key trade-offs and functional divisions. When many devices try to access the medium simultaneously, delay increases significantly as waiting times grow during heavy traffic. While system designs aim for efficient spectrum usage, employing continuous power control results in higher battery consumption for devices. Additionally, fundamental protocols operate with distinct boundaries; for instance, the Internet Protocol (IP) features no error control and no flow control. Instead, these essential tasks are left to be handled entirely by upper-layer protocols, such as TCP. Understanding these core characteristics helps clarify how lower-level access mechanisms and network-layer protocols divide operational responsibilities across a network stack."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [],
+      "diagrams": [],
+      "questions": []
+    },
+    {
+      "section_id": "section-2",
+      "title": "Multiple Access Schemes",
+      "raw_text": "Module2\n~Multiple devices access the medium  ~Each one senses channel before transmitting.\n\nEfficient Channel Utilization\nCSMA allows multiple devices to share the same communication medium efficiently by\n\nFull Form: Code Division Multiple Access\nUsed In: Mobile communication (like 2G/3G networks), wireless systems\n\nFull Form: Code Division Multiple Access\nCDMA is a multiple access technique in which many users can send data at the same time over the\n\nFull Form: Code Division Multiple Access\nsame radio frequency channel. But still, their data does not mix because:\n\nFull Form: Code Division Multiple Access\n➡️ Each user is given a special unique code\n\nFull Form: Code Division Multiple Access\n➡️ The receiver uses the same code to separate the message\n\n1⃣ FDMA (Frequency Division Multiple Access)\nEach user is given a separate frequency band.\n\n1⃣ FDMA (Frequency Division Multiple Access)\nAll users communicate at the same time but on different frequencies.\n\n1⃣ FDMA (Frequency Division Multiple Access)\nUsed in 1G analog mobile systems.\n\nFrequency planning required\n📌 2️⃣ TDMA (Time Division Multiple Access)\n\nFrequency planning required\n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required \n3. csma cd/ca diff\n\n📌 Real-life Example\nIt helps data travel from the source (sender) to the destination (receiver) across multiple nw.",
+      "page_numbers": [
+        1,
+        2,
+        3,
+        6
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Multiple Access Schemes",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Multiple Access Schemes clearly in exam language.",
+        "Connect Multiple Access Schemes with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "multiple",
+        "access",
+        "code",
+        "division",
+        "frequency",
+        "same",
+        "full",
+        "form",
+        "users",
+        "time",
+        "channel",
+        "used"
+      ],
+      "exam_priority_topics": [],
+      "order_index": 1,
+      "content": "Module2\n~Multiple devices access the medium  ~Each one senses channel before transmitting. Efficient Channel Utilization\nCSMA allows multiple devices to share the same communication medium efficiently by\n\nFull Form: Code Division Multiple Access\nUsed In: Mobile communication (like 2G/3G networks), wireless systems\n\nFull Form: Code Division Multiple Access\nCDMA is a multiple access technique in which many users can send data at the same time over the\n\nFull Form: Code Division Multiple Access\nsame radio frequency channel. But still, their data does not mix because:\n\nFull Form: Code Division Multiple Access\n➡️ Each user is given a special unique code\n\nFull Form: Code Division Multiple Access\n➡️ The receiver uses the same code to separate the message\n\n1⃣ FDMA (Frequency Division Multiple Access)\nEach user is given a separate frequency band. 1⃣ FDMA (Frequency Division Multiple Access)\nAll users communicate at the same time but on different frequencies. 1⃣ FDMA (Frequency Division Multiple Access)\nUsed in 1G analog mobile systems. Frequency planning required\n📌 2️⃣ TDMA (Time Division Multiple Access)\n\nFrequency planning required\n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. Each user is assigned a unique code, so signals don’t mix. Used in 2G/3G and later technologies. 📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). ✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required \n3. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu. It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "educational_explanation": "Module2\n~Multiple devices access the medium  ~Each one senses channel before transmitting. Efficient Channel Utilization\nCSMA allows multiple devices to share the same communication medium efficiently by\n\nFull Form: Code Division Multiple Access\nUsed In: Mobile communication (like 2G/3G networks), wireless systems\n\nFull Form: Code Division Multiple Access\nCDMA is a multiple access technique in which many users can send data at the same time over the\n\nFull Form: Code Division Multiple Access\nsame radio frequency channel. But still, their data does not mix because:\n\nFull Form: Code Division Multiple Access\n➡️ Each user is given a special unique code\n\nFull Form: Code Division Multiple Access\n➡️ The receiver uses the same code to separate the message\n\n1⃣ FDMA (Frequency Division Multiple Access)\nEach user is given a separate frequency band. 1⃣ FDMA (Frequency Division Multiple Access)\nAll users communicate at the same time but on different frequencies. 1⃣ FDMA (Frequency Division Multiple Access)\nUsed in 1G analog mobile systems. Frequency planning required\n📌 2️⃣ TDMA (Time Division Multiple Access)\n\nFrequency planning required\n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. Each user is assigned a unique code, so signals don’t mix. Used in 2G/3G and later technologies. 📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). ✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required \n3. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu. It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "explanation": "Module2\n~Multiple devices access the medium  ~Each one senses channel before transmitting. Efficient Channel Utilization\nCSMA allows multiple devices to share the same communication medium efficiently by\n\nFull Form: Code Division Multiple Access\nUsed In: Mobile communication (like 2G/3G networks), wireless systems\n\nFull Form: Code Division Multiple Access\nCDMA is a multiple access technique in which many users can send data at the same time over the\n\nFull Form: Code Division Multiple Access\nsame radio frequency channel. But still, their data does not mix because:\n\nFull Form: Code Division Multiple Access\n➡️ Each user is given a special unique code\n\nFull Form: Code Division Multiple Access\n➡️ The receiver uses the same code to separate the message\n\n1⃣ FDMA (Frequency Division Multiple Access)\nEach user is given a separate frequency band. 1⃣ FDMA (Frequency Division Multiple Access)\nAll users communicate at the same time but on different frequencies. 1⃣ FDMA (Frequency Division Multiple Access)\nUsed in 1G analog mobile systems. Frequency planning required\n📌 2️⃣ TDMA (Time Division Multiple Access)\n\nFrequency planning required\n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. Each user is assigned a unique code, so signals don’t mix. Used in 2G/3G and later technologies. 📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). ✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required \n3. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu. It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "topics": [
+        "multiple",
+        "access",
+        "code",
+        "division",
+        "frequency",
+        "same"
+      ],
+      "key_points": [
+        "~Multiple devices access the medium ~Each one senses channel before transmitting.",
+        "CSMA allows multiple devices to share the same communication medium efficiently by",
+        "Full Form: Code Division Multiple Access",
+        "Used In: Mobile communication (like 2G/3G networks), wireless systems",
+        "CDMA is a multiple access technique in which many users can send data at the same time over the",
+        "same radio frequency channel. But still, their data does not mix because",
+        "➡️ Each user is given a special unique code"
+      ],
+      "definitions": [
+        "CDMA: a multiple access technique in which many users can send data at the same time over the",
+        "Each user: given a special unique code",
+        "Each user: given a separate frequency band",
+        "Each user: assigned a unique code, so signals don’t mix",
+        "Full Form: Code Division Multiple Access"
+      ],
+      "examples": [
+        "Efficient Channel Utilization CSMA allows multiple devices to share the same communication medium efficiently by Full Form: Code Division Multiple Access Used In: Mobile communication (like 2G/3G networks), wireless systems Full Form: Code Division Multiple Access CDMA is a multiple access...",
+        "📌 Example: Many people talking together in different languages — you hear only the one speaking your language (your code).",
+        "csma cd/ca diff 📌 Real-life Example It helps data travel from the source (sender) to the destination (receiver) across multiple nw."
+      ],
+      "use_cases": [
+        "Efficient Channel Utilization CSMA allows multiple devices to share the same communication medium efficiently by Full Form: Code Division Multiple Access Used In: Mobile communication (like 2G/3G networks), wireless systems Full Form: Code Division Multiple Access CDMA is a multiple access...",
+        "1⃣ FDMA (Frequency Division Multiple Access) Used in 1G analog mobile systems.",
+        "Used in 2G/3G and later technologies.",
+        "csma cd/ca diff 📌 Real-life Example It helps data travel from the source (sender) to the destination (receiver) across multiple nw."
+      ],
+      "important_notes": [
+        "~Multiple devices access the medium ~Each one senses channel before transmitting.",
+        "CSMA allows multiple devices to share the same communication medium efficiently by",
+        "Use exact source terminology for Multiple Access Schemes before adding explanation.",
+        "Connect Multiple Access Schemes with Multiple, Access, Code when writing answers."
+      ],
+      "why_this_matters": "Efficient Channel Utilization CSMA allows multiple devices to share the same communication medium efficiently by Full Form: Code Division Multiple Access Used In: Mobile communication (like 2G/3G networks), wireless systems Full Form: Code Division Multiple...",
+      "common_mistakes": [
+        "Writing only the definition of Multiple Access Schemes without explaining how it works.",
+        "Listing Multiple, Access, Code as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "First define Multiple Access Schemes in one clear sentence.",
+        "Then explain the working flow or relationship using Multiple, Access, Code.",
+        "Finish revision by answering one application or comparison question without looking at the notes."
+      ],
+      "memory_tricks": [
+        "Remember Multiple Access Schemes through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Multiple, Access, Code, Division."
+      ],
+      "concept_comparisons": [
+        "Compare Multiple Access Schemes with Access by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What is Multiple Access Schemes?",
+        "How does Multiple Access Schemes work in the source material?",
+        "Why is Multiple Access Schemes important for an exam answer?",
+        "Give one example or use case for Multiple Access Schemes.",
+        "How is Multiple Access Schemes related to Access?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Multiple Access Schemes?",
+            "Why is Multiple Access Schemes important?",
+            "What is Multiple Access Schemes?",
+            "How does Multiple Access Schemes work in the source material?",
+            "Why is Multiple Access Schemes important for an exam answer?",
+            "Give one example or use case for Multiple Access Schemes."
+          ],
+          "notes": "Module2\n~Multiple devices access the medium  ~Each one senses channel before transmitting. Efficient Channel Utilization\nCSMA allows multiple devices to share the same communication medium efficiently by\n\nFull Form: Code Division Multiple Access\nUsed In: Mobile communication (like 2G/3G networks), wireless systems\n\nFull Form: Code Division Multiple Access\nCDMA is a multiple access technique in which many users can send data at the same time over the\n\nFull Form: Code Division Multiple Access\nsame radio frequency channel. But still, their data does not mix because:\n\nFull Form: Code Division Multiple Access\n➡️ Each user is given a special unique code\n\nFull Form: Code Division Multiple Access\n➡️ The receiver uses the same code to separate the message\n\n1⃣ FDMA (Frequency Division Multiple Access)\nEach user is given a separate frequency band. 1⃣ FDMA (Frequency Division Multiple Access)\nAll users communicate at the same time but on different frequencies. 1⃣ FDMA (Frequency Division Multiple Access)\nUsed in 1G analog mobile systems. Frequency planning required\n📌 2️⃣ TDMA (Time Division Multiple Access)\n\nFrequency planning required\n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. Each user is assigned a unique code, so signals don’t mix. Used in 2G/3G and later technologies. 📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). ✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required \n3. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu. It belongs inside the same explanation because it shows how the idea is organized visually.\n\nExam-ready points:\n- ~Multiple devices access the medium ~Each one senses channel before transmitting.\n- CSMA allows multiple devices to share the same communication medium efficiently by\n- Full Form: Code Division Multiple Access\n- Used In: Mobile communication (like 2G/3G networks), wireless systems\n- CDMA is a multiple access technique in which many users can send data at the same time over the\n\nDefinitions to know:\n- CDMA: a multiple access technique in which many users can send data at the same time over the\n- Each user: given a special unique code\n- Each user: given a separate frequency band\n- Each user: assigned a unique code, so signals don’t mix",
+          "summary": "Module2 ~Multiple devices access the medium ~Each one senses channel before transmitting."
+        },
+        "outline": {
+          "title": "Multiple Access Schemes",
+          "sections": [
+            {
+              "heading": "Multiple Access Schemes",
+              "points": [
+                "Definition: CDMA: a multiple access technique in which many users can send data at the same time over the",
+                "Definition: Each user: given a special unique code",
+                "~Multiple devices access the medium ~Each one senses channel before transmitting.",
+                "CSMA allows multiple devices to share the same communication medium efficiently by",
+                "Full Form: Code Division Multiple Access",
+                "Used In: Mobile communication (like 2G/3G networks), wireless systems",
+                "CDMA is a multiple access technique in which many users can send data at the same time over the",
+                "Example/use: Efficient Channel Utilization CSMA allows multiple devices to share the same communication medium efficiently by Full Form: Code Division Multiple Access Used In: Mobile communication (like 2G/3G networks), wireless systems Full Form: Code Division Multiple Access CDMA is a multiple access...",
+                "Example/use: 📌 Example: Many people talking together in different languages — you hear only the one speaking your language (your code).",
+                "Revision: First define Multiple Access Schemes in one clear sentence.",
+                "Revision: Then explain the working flow or relationship using Multiple, Access, Code."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Multiple Access Schemes",
+          "mermaid": "mindmap\n  root((Multiple Access Schemes))\n    Multiple\n    Access\n    Code\n    Division",
+          "branches": [
+            {
+              "name": "Multiple",
+              "sub_branches": []
+            },
+            {
+              "name": "Access",
+              "sub_branches": []
+            },
+            {
+              "name": "Code",
+              "sub_branches": []
+            },
+            {
+              "name": "Division",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Multiple Access Schemes",
+            "Module2 ~Multiple devices access the medium ~Each one senses channel before transmitting.",
+            "Multiple, Access, Code"
+          ]
+        ],
+        "sentence": "Module2\n~Multiple devices access the medium  ~Each one senses channel before transmitting. Efficient Channel Utilization\nCSMA allows multiple devices to share the same communication medium efficiently by\n\nFull Form: Code Division Multiple Access\nUsed In: Mobile communication (like 2G/3G networks), wireless systems\n\nFull Form: Code Division Multiple Access\nCDMA is a multiple access technique in which many users can send data at the same time over the\n\nFull Form: Code Division Multiple Access\nsame radio frequency channel. But still, their data does not mix because:\n\nFull Form: Code Division Multiple Access\n➡️ Each user is given a special unique code\n\nFull Form: Code Division Multiple Access\n➡️ The receiver uses the same code to separate the message\n\n1⃣ FDMA (Frequency Division Multiple Access)\nEach user is given a separate frequency band. 1⃣ FDMA (Frequency Division Multiple Access)\nAll users communicate at the same time but on different frequencies. 1⃣ FDMA (Frequency Division Multiple Access)\nUsed in 1G analog mobile systems. Frequency planning required\n📌 2️⃣ TDMA (Time Division Multiple Access)\n\nFrequency planning required\n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. Each user is assigned a unique code, so signals don’t mix. Used in 2G/3G and later technologies. 📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). ✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required \n3. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu. It belongs inside the same explanation because it shows how the idea is organized visually."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [
+        {
+          "page_number": 3,
+          "caption": "3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu"
+        }
+      ],
+      "diagrams": [
+        {
+          "id": "332225ab05af44a5b6e33b0234e47e68",
+          "type": "image",
+          "content": "",
+          "image_path": "static/diagrams/diagnostic_test_p3_1_0640d5807d1b45bb82eb8959312125f8.png",
+          "image_url": "/static/diagrams/diagnostic_test_p3_1_0640d5807d1b45bb82eb8959312125f8.png",
+          "page_number": 3,
+          "caption": "3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu",
+          "context_text": "3. csma cd/ca diff 3. Module Users take turns to transmit data. \nUsed in 2G GSM systems. \n📌 Example: \nStudents use a single computer turn by turn → No clash. \n✔ Advantages: \nBetter bandwidth utilization than FDMA \nSupports digital data \n✖ Disadvantages: \nHigh synchronization required \nMore delay when many users increase \n \n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required",
+          "ocr_text": "3. csma cd/ca diff 3. Module Users take turns to transmit data. \nUsed in 2G GSM systems. \n📌 Example: \nStudents use a single computer turn by turn → No clash. \n✔ Advantages: \nBetter bandwidth utilization than FDMA \nSupports digital data \n✖ Disadvantages: \nHigh synchronization required \nMore delay when many users increase \n \n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required",
+          "diagram_type": "document_diagram",
+          "mermaid_code": "",
+          "explanation": "This visual supports Multiple Access Schemes by showing structure, relationships, or process flow.",
+          "workflow_description": "Use 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu to trace the flow of Multiple Access Schemes: identify the starting point, components, relationship arrows, and final output.",
+          "connected_topics": [
+            "multiple",
+            "access",
+            "code",
+            "division",
+            "frequency",
+            "same"
+          ],
+          "exam_use": "In an exam answer, redraw or describe the diagram before explaining the concept in words.",
+          "section_id": "section-2"
+        }
+      ],
+      "questions": []
+    },
+    {
+      "section_id": "section-3",
+      "title": "Routing Algorithms: Distance Vector vs. Link State",
+      "raw_text": "5. Efficient Spectrum Usage\n10.   Capacity reduces when distance increases between mobile and tow\n\nFrequency planning required\n3. Module \n1.explain distance vector and link state routing in detail \nDistance Vector Routing is a dynamic routing protocol where each router shares its routing table with its \ndirectly connected neighbors periodically. \nWorking (Easy Points) \n1.Each router maintains a table (distance vector) containing: \n-Destination network \n-Distance (hop count) \n-Next-hop router \n2.Routers exchange tables regularly (e.g., every 30 seconds). \n3.A router updates its table if it finds a shorter path through a neighbor. \n4.Uses Bellman-Ford algorithm for route calculation.\n\nFrequency planning required\n  Slow convergence → routing updates take time to spread \n  Count-to-infinity problem \n(Routers keep increasing hop count for unreachable networks) \n  Higher bandwidth usage due to periodic updates \n  Less accurate routing information \nLink State Routing is a dynamic routing protocol where each router shares information about the \nstate of its links with all routers in the network. \nWorking (Easy Points) \n1.Each router discovers its neighbors using HELLO messages. \n2.It measures link cost (bandwidth, delay). \n3.It creates a Link State Packet (LSP) with link info. \n4.LSPs are flooded to all routers in the network. \n5.Each router builds a complete network map. \n6.It calculates the shortest path using Dijkstra’s Algorithm. \nADV- DIS ADV \n  Fast convergence \n(Routers quickly learn changes in network) \n  No count-to-infinity issue \n  Routing information is more accurate \n  Good for large networks\n\n⭐ Token Bucket Algorithm\nMore flexible and efficient for real-time communication like audio/video streaming.",
+      "page_numbers": [
+        2,
+        3,
+        4,
+        6
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Routing Algorithms",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Routing Algorithms clearly in exam language.",
+        "Connect Routing Algorithms with its related concepts, examples and practical use."
+      ],
+      "related_topics": [
+        "Distance Vector Routing and Bellman-Ford Algorithm",
+        "Link State Routing and Dijkstra Algorithm"
+      ],
+      "concept_keywords": [
+        "routing",
+        "router",
+        "distance",
+        "link",
+        "network",
+        "routers",
+        "state",
+        "vector",
+        "table",
+        "updates",
+        "algorithm",
+        "information"
+      ],
+      "exam_priority_topics": [
+        "Distance Vector vs Link State Routing (Algorithms, Convergence, Count-to-Infinity)"
+      ],
+      "order_index": 2,
+      "content": "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router. Every 30 seconds (or similar interval) each router sends its entire table to its directly‑connected neighbours. When a router receives a neighbour’s table it applies the Bellman‑Ford algorithm: if a shorter path appears through that neighbour, the router updates its own entry. This simplicity brings slow convergence, higher bandwidth use for periodic updates, and the infamous count‑to‑infinity problem where unreachable networks keep increasing their hop count.\\n\\nLink State Routing works differently. A router first discovers its neighbours with HELLO messages, measures each link’s cost (bandwidth, delay), and builds a Link State Packet (LSP) describing those costs. The LSP is flooded to every router in the network, so each router ends up with a complete map of the topology. Using Dijkstra’s algorithm each router independently computes the shortest‑path tree. The result is fast convergence, no count‑to‑infinity, and more accurate routes, making link‑state suitable for large networks.",
+      "educational_explanation": "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router. Every 30 seconds (or similar interval) each router sends its entire table to its directly‑connected neighbours. When a router receives a neighbour’s table it applies the Bellman‑Ford algorithm: if a shorter path appears through that neighbour, the router updates its own entry. This simplicity brings slow convergence, higher bandwidth use for periodic updates, and the infamous count‑to‑infinity problem where unreachable networks keep increasing their hop count.\\n\\nLink State Routing works differently. A router first discovers its neighbours with HELLO messages, measures each link’s cost (bandwidth, delay), and builds a Link State Packet (LSP) describing those costs. The LSP is flooded to every router in the network, so each router ends up with a complete map of the topology. Using Dijkstra’s algorithm each router independently computes the shortest‑path tree. The result is fast convergence, no count‑to‑infinity, and more accurate routes, making link‑state suitable for large networks.",
+      "explanation": "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router. Every 30 seconds (or similar interval) each router sends its entire table to its directly‑connected neighbours. When a router receives a neighbour’s table it applies the Bellman‑Ford algorithm: if a shorter path appears through that neighbour, the router updates its own entry. This simplicity brings slow convergence, higher bandwidth use for periodic updates, and the infamous count‑to‑infinity problem where unreachable networks keep increasing their hop count.\\n\\nLink State Routing works differently. A router first discovers its neighbours with HELLO messages, measures each link’s cost (bandwidth, delay), and builds a Link State Packet (LSP) describing those costs. The LSP is flooded to every router in the network, so each router ends up with a complete map of the topology. Using Dijkstra’s algorithm each router independently computes the shortest‑path tree. The result is fast convergence, no count‑to‑infinity, and more accurate routes, making link‑state suitable for large networks.",
+      "topics": [
+        "Distance Vector Routing and Bellman-Ford Algorithm",
+        "Link State Routing and Dijkstra Algorithm"
+      ],
+      "key_points": [
+        "Distance Vector shares entire routing tables with direct neighbours periodically.",
+        "Uses Bellman‑Ford; updates when a shorter hop‑count path is found.",
+        "Problems: slow convergence, high update bandwidth, count‑to‑infinity.",
+        "Link State discovers neighbours, measures link cost, floods LSPs to all routers.",
+        "Uses Dijkstra’s algorithm; each router builds a full network map.",
+        "Advantages: fast convergence, accurate routes, no count‑to‑infinity, scales to large networks.",
+        "10.  Capacity reduces when distance increases between mobile and tow"
+      ],
+      "definitions": [
+        "Distance Vector Routing: protocol where routers exchange complete routing tables with neighbours.",
+        "Link State Routing: protocol where routers broadcast link‑cost information to all routers.",
+        "Bellman‑Ford Algorithm: iterative method that updates shortest paths based on neighbour information.",
+        "Dijkstra’s Algorithm: computes the shortest‑path tree from a single source using a complete network map.",
+        "Count‑to‑Infinity Problem: situation in distance‑vector where unreachable destinations keep increasing hop count indefinitely."
+      ],
+      "examples": [
+        "A router sends its distance vector every 30 seconds to directly connected routers.",
+        "Router A creates an LSP containing links to B (cost 2) and C (cost 5) and floods it network‑wide.",
+        "ADV- DIS ADV  Fast convergence (Routers quickly learn changes in network)  No count-to-infinity issue  Routing information is more accurate  Good for large networks ⭐ Token Bucket Algorithm More flexible and efficient for real-time communication like audio/video streaming."
+      ],
+      "use_cases": [
+        "Small office or campus networks often use Distance Vector because of its simplicity.",
+        "Large ISP backbones and enterprise WANs prefer Link State for rapid convergence and accurate routing."
+      ],
+      "important_notes": [
+        "Periodic distance‑vector updates consume bandwidth even when topology is stable.",
+        "Link‑state flooding can generate bursts of traffic but occurs only on topology change.",
+        "Both protocols are dynamic; they react to link failures without manual reconfiguration.",
+        "10.  Capacity reduces when distance increases between mobile and tow",
+        "1.explain distance vector and link state routing in detail"
+      ],
+      "why_this_matters": "Routing algorithms decide the path packets travel; their speed of convergence and accuracy directly affect network reliability, latency, and overall performance.",
+      "common_mistakes": [
+        "Assuming hop count always reflects true cost; link‑state uses metrics like bandwidth or delay.",
+        "Believing Link State never generates overhead; LSP flooding still uses bandwidth.",
+        "Thinking count‑to‑infinity occurs in Link State; it is specific to Distance Vector.",
+        "Writing only the definition of Routing Algorithms: Distance Vector vs. Link State without explaining how it works.",
+        "Listing Routing, Router, Distance as isolated terms instead of connecting them."
+      ],
+      "revision_notes": [
+        "Memorise the six steps of Link State (HELLO → cost → LSP → flood → map → Dijkstra).",
+        "Recall that Distance Vector updates are periodic and neighbour‑centric.",
+        "Compare convergence speed: slow for DV, fast for LS.",
+        "First define Routing Algorithms: Distance Vector vs. Link State in one clear sentence.",
+        "Then explain the working flow or relationship using Routing, Router, Distance."
+      ],
+      "memory_tricks": [
+        "DV = \"Distant Voices\" – routers only talk to neighbours.",
+        "LS = \"Loudspeaker\" – every router broadcasts its link info to all.",
+        "Remember Routing Algorithms: Distance Vector vs. Link State through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Routing, Router, Distance, Link."
+      ],
+      "concept_comparisons": [
+        "Information shared: DV shares whole tables with neighbours; LS shares link costs with everyone.",
+        "Algorithm: DV uses Bellman‑Ford; LS uses Dijkstra.",
+        "Convergence: DV is slow; LS is fast.",
+        "Scalability: DV fits small networks; LS fits large, complex topologies.",
+        "Compare Routing Algorithms: Distance Vector vs. Link State with Distance Vector Routing and Bellman-Ford Algorithm by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What three fields are stored in a distance‑vector table?",
+        "Explain how the count‑to‑infinity problem arises.",
+        "Describe the sequence of actions a router performs in Link State routing.",
+        "Why does Link State avoid the count‑to‑infinity issue?",
+        "What is Routing Algorithms: Distance Vector vs. Link State?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Routing Algorithms: Distance Vector vs. Link State?",
+            "Why is Routing Algorithms: Distance Vector vs. Link State important?",
+            "What three fields are stored in a distance‑vector table?",
+            "Explain how the count‑to‑infinity problem arises.",
+            "Describe the sequence of actions a router performs in Link State routing.",
+            "Why does Link State avoid the count‑to‑infinity issue?"
+          ],
+          "notes": "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router. Every 30 seconds (or similar interval) each router sends its entire table to its directly‑connected neighbours. When a router receives a neighbour’s table it applies the Bellman‑Ford algorithm: if a shorter path appears through that neighbour, the router updates its own entry. This simplicity brings slow convergence, higher bandwidth use for periodic updates, and the infamous count‑to‑infinity problem where unreachable networks keep increasing their hop count.\\n\\nLink State Routing works differently. A router first discovers its neighbours with HELLO messages, measures each link’s cost (bandwidth, delay), and builds a Link State Packet (LSP) describing those costs. The LSP is flooded to every router in the network, so each router ends up with a complete map of the topology. Using Dijkstra’s algorithm each router independently computes the shortest‑path tree. The result is fast convergence, no count‑to‑infinity, and more accurate routes, making link‑state suitable for large networks.\n\nExam-ready points:\n- Distance Vector shares entire routing tables with direct neighbours periodically.\n- Uses Bellman‑Ford; updates when a shorter hop‑count path is found.\n- Problems: slow convergence, high update bandwidth, count‑to‑infinity.\n- Link State discovers neighbours, measures link cost, floods LSPs to all routers.\n- Uses Dijkstra’s algorithm; each router builds a full network map.\n\nDefinitions to know:\n- Distance Vector Routing: protocol where routers exchange complete routing tables with neighbours.\n- Link State Routing: protocol where routers broadcast link‑cost information to all routers.\n- Bellman‑Ford Algorithm: iterative method that updates shortest paths based on neighbour information.\n- Dijkstra’s Algorithm: computes the shortest‑path tree from a single source using a complete network map.",
+          "summary": "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router."
+        },
+        "outline": {
+          "title": "Routing Algorithms: Distance Vector vs. Link State",
+          "sections": [
+            {
+              "heading": "Routing Algorithms: Distance Vector vs. Link State",
+              "points": [
+                "Definition: Distance Vector Routing: protocol where routers exchange complete routing tables with neighbours.",
+                "Definition: Link State Routing: protocol where routers broadcast link‑cost information to all routers.",
+                "Distance Vector shares entire routing tables with direct neighbours periodically.",
+                "Uses Bellman‑Ford; updates when a shorter hop‑count path is found.",
+                "Problems: slow convergence, high update bandwidth, count‑to‑infinity.",
+                "Link State discovers neighbours, measures link cost, floods LSPs to all routers.",
+                "Uses Dijkstra’s algorithm; each router builds a full network map.",
+                "Example/use: A router sends its distance vector every 30 seconds to directly connected routers.",
+                "Example/use: Router A creates an LSP containing links to B (cost 2) and C (cost 5) and floods it network‑wide.",
+                "Revision: Memorise the six steps of Link State (HELLO → cost → LSP → flood → map → Dijkstra).",
+                "Revision: Recall that Distance Vector updates are periodic and neighbour‑centric."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Routing Algorithms: Distance Vector vs. Link State",
+          "mermaid": "mindmap\n  root((Routing Algorithms: Distance Vector vs. Link State))\n    Routing\n    Router\n    Distance\n    Link",
+          "branches": [
+            {
+              "name": "Routing",
+              "sub_branches": []
+            },
+            {
+              "name": "Router",
+              "sub_branches": []
+            },
+            {
+              "name": "Distance",
+              "sub_branches": []
+            },
+            {
+              "name": "Link",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Routing Algorithms: Distance Vector vs. Link State",
+            "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router.",
+            "Routing, Router, Distance"
+          ]
+        ],
+        "sentence": "Distance Vector Routing is a dynamic protocol where each router keeps a table – the distance vector – listing every destination network, the hop‑count distance, and the next‑hop router. Every 30 seconds (or similar interval) each router sends its entire table to its directly‑connected neighbours. When a router receives a neighbour’s table it applies the Bellman‑Ford algorithm: if a shorter path appears through that neighbour, the router updates its own entry. This simplicity brings slow convergence, higher bandwidth use for periodic updates, and the infamous count‑to‑infinity problem where unreachable networks keep increasing their hop count.\\n\\nLink State Routing works differently. A router first discovers its neighbours with HELLO messages, measures each link’s cost (bandwidth, delay), and builds a Link State Packet (LSP) describing those costs. The LSP is flooded to every router in the network, so each router ends up with a complete map of the topology. Using Dijkstra’s algorithm each router independently computes the shortest‑path tree. The result is fast convergence, no count‑to‑infinity, and more accurate routes, making link‑state suitable for large networks."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [
+        {
+          "page_number": 3,
+          "caption": "3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu"
+        }
+      ],
+      "diagrams": [
+        {
+          "id": "332225ab05af44a5b6e33b0234e47e68",
+          "type": "image",
+          "content": "",
+          "image_path": "static/diagrams/diagnostic_test_p3_1_0640d5807d1b45bb82eb8959312125f8.png",
+          "image_url": "/static/diagrams/diagnostic_test_p3_1_0640d5807d1b45bb82eb8959312125f8.png",
+          "page_number": 3,
+          "caption": "3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu",
+          "context_text": "3. csma cd/ca diff 3. Module Users take turns to transmit data. \nUsed in 2G GSM systems. \n📌 Example: \nStudents use a single computer turn by turn → No clash. \n✔ Advantages: \nBetter bandwidth utilization than FDMA \nSupports digital data \n✖ Disadvantages: \nHigh synchronization required \nMore delay when many users increase \n \n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required",
+          "ocr_text": "3. csma cd/ca diff 3. Module Users take turns to transmit data. \nUsed in 2G GSM systems. \n📌 Example: \nStudents use a single computer turn by turn → No clash. \n✔ Advantages: \nBetter bandwidth utilization than FDMA \nSupports digital data \n✖ Disadvantages: \nHigh synchronization required \nMore delay when many users increase \n \n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required",
+          "diagram_type": "document_diagram",
+          "mermaid_code": "",
+          "explanation": "This visual supports Routing Algorithms: Distance Vector vs. Link State by showing structure, relationships, or process flow.",
+          "workflow_description": "Use 3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu to trace the flow of Routing Algorithms: Distance Vector vs. Link State: identify the starting point, components, relationship arrows, and final output.",
+          "connected_topics": [
+            "Distance Vector Routing and Bellman-Ford Algorithm",
+            "Link State Routing and Dijkstra Algorithm"
+          ],
+          "exam_use": "In an exam answer, redraw or describe the diagram before explaining the concept in words.",
+          "section_id": "section-3"
+        }
+      ],
+      "questions": []
+    },
+    {
+      "section_id": "section-4",
+      "title": "Transport Layer Protocols",
+      "raw_text": "Module2\nTo reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+      "page_numbers": [
+        1
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Transport Layer Protocols",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Transport Layer Protocols clearly in exam language.",
+        "Connect Transport Layer Protocols with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "layer",
+        "transport",
+        "protocols",
+        "module2",
+        "reduce",
+        "collision",
+        "mac",
+        "sublayer",
+        "data",
+        "link",
+        "uses",
+        "csma"
+      ],
+      "exam_priority_topics": [],
+      "order_index": 3,
+      "content": "Module2\nTo reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "educational_explanation": "Module2\nTo reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "explanation": "Module2\nTo reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "topics": [
+        "layer",
+        "transport",
+        "protocols",
+        "module2",
+        "reduce",
+        "collision"
+      ],
+      "key_points": [
+        "To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+        "Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA"
+      ],
+      "definitions": [],
+      "examples": [],
+      "use_cases": [],
+      "important_notes": [
+        "To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+        "Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+        "Use exact source terminology for Transport Layer Protocols before adding explanation.",
+        "Connect Transport Layer Protocols with Layer, Transport, Protocols when writing answers."
+      ],
+      "why_this_matters": "Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or...",
+      "common_mistakes": [
+        "Writing only the definition of Transport Layer Protocols without explaining how it works.",
+        "Listing Layer, Transport, Protocols as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "First define Transport Layer Protocols in one clear sentence.",
+        "Then explain the working flow or relationship using Layer, Transport, Protocols.",
+        "Finish revision by answering one application or comparison question without looking at the notes."
+      ],
+      "memory_tricks": [
+        "Remember Transport Layer Protocols through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Layer, Transport, Protocols, Module2."
+      ],
+      "concept_comparisons": [
+        "Compare Transport Layer Protocols with Transport by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What is Transport Layer Protocols?",
+        "How does Transport Layer Protocols work in the source material?",
+        "Why is Transport Layer Protocols important for an exam answer?",
+        "How is Transport Layer Protocols related to Transport?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Transport Layer Protocols?",
+            "Why is Transport Layer Protocols important?",
+            "What is Transport Layer Protocols?",
+            "How does Transport Layer Protocols work in the source material?",
+            "Why is Transport Layer Protocols important for an exam answer?",
+            "How is Transport Layer Protocols related to Transport?"
+          ],
+          "notes": "Module2\nTo reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nExam-ready points:\n- To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA\n- Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+          "summary": "Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the s"
+        },
+        "outline": {
+          "title": "Transport Layer Protocols",
+          "sections": [
+            {
+              "heading": "Transport Layer Protocols",
+              "points": [
+                "To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+                "Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA",
+                "Revision: First define Transport Layer Protocols in one clear sentence.",
+                "Revision: Then explain the working flow or relationship using Layer, Transport, Protocols."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Transport Layer Protocols",
+          "mermaid": "mindmap\n  root((Transport Layer Protocols))\n    Layer\n    Transport\n    Protocols\n    Module2",
+          "branches": [
+            {
+              "name": "Layer",
+              "sub_branches": []
+            },
+            {
+              "name": "Transport",
+              "sub_branches": []
+            },
+            {
+              "name": "Protocols",
+              "sub_branches": []
+            },
+            {
+              "name": "Module2",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Transport Layer Protocols",
+            "Module2 To reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the s",
+            "Layer, Transport, Protocols"
+          ]
+        ],
+        "sentence": "Module2\nTo reduce Collision, the MAC sublayer of Data Link Layer uses CSMA Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [],
+      "diagrams": [],
+      "questions": []
+    },
+    {
+      "section_id": "section-5",
+      "title": "Cast Communication Types",
+      "raw_text": "Module2\n1.CSMA its types\n\nModule2\nIn computer networks, when many devices share the same communication medium (like Ethernet\n\nFrequency planning required\n \nSuitable for real-time communication \n📌 Used in: Video streaming, Online gaming, VoIP, DNS \n3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication.\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n5.ARP RARP DHCP-DELIVER ICMP \n1.ARP is used to find the MAC address of a device from its IP address inside a local network. \nWhen a device wants to send data: \n-It knows the IP address of the destination \n-But the frame needs MAC address \n-ARP sends a broadcast request: “Who has this IP?” \n-The device with that IP replies with its MAC address \nUses of ARP \n-Mapping IP address → MAC address \n-Helps devices communicate in a LAN \n-Maintains ARP table/cache for quick lookups \nEssential for Ethernet communication \nShort Example: \nLaptop wants to send message to 192.168.1.8 \n→ ARP request broadcast \n→ That device replies with its MAC \n→ Communication starts",
+      "page_numbers": [
+        1,
+        5,
+        7
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Cast Communication Types",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Cast Communication Types clearly in exam language.",
+        "Connect Cast Communication Types with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "communication",
+        "broadcast",
+        "arp",
+        "address",
+        "devices",
+        "multicast",
+        "data",
+        "unicast",
+        "one",
+        "sender",
+        "example",
+        "mac"
+      ],
+      "exam_priority_topics": [],
+      "order_index": 4,
+      "content": "Module2\n1.CSMA its types\n\nModule2\nIn computer networks, when many devices share the same communication medium (like Ethernet\n\nFrequency planning required\n \nSuitable for real-time communication \n📌 Used in: Video streaming, Online gaming, VoIP, DNS \n3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. It is known as one-to-one communication. Example: Sending a message to a single person or browsing a website. Unicast is reliable and secure for individual communication. But if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. Broadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. It is known as one-to-all communication. Example: ARP request in a LAN reaches all devices. Broadcast makes it easy to send information to everyone at once. However, it increases network traffic and sends data even to devices that do not need it. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "educational_explanation": "Module2\n1.CSMA its types\n\nModule2\nIn computer networks, when many devices share the same communication medium (like Ethernet\n\nFrequency planning required\n \nSuitable for real-time communication \n📌 Used in: Video streaming, Online gaming, VoIP, DNS \n3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. It is known as one-to-one communication. Example: Sending a message to a single person or browsing a website. Unicast is reliable and secure for individual communication. But if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. Broadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. It is known as one-to-all communication. Example: ARP request in a LAN reaches all devices. Broadcast makes it easy to send information to everyone at once. However, it increases network traffic and sends data even to devices that do not need it. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "explanation": "Module2\n1.CSMA its types\n\nModule2\nIn computer networks, when many devices share the same communication medium (like Ethernet\n\nFrequency planning required\n \nSuitable for real-time communication \n📌 Used in: Video streaming, Online gaming, VoIP, DNS \n3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. It is known as one-to-one communication. Example: Sending a message to a single person or browsing a website. Unicast is reliable and secure for individual communication. But if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. Broadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. It is known as one-to-all communication. Example: ARP request in a LAN reaches all devices. Broadcast makes it easy to send information to everyone at once. However, it increases network traffic and sends data even to devices that do not need it. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "topics": [
+        "communication",
+        "broadcast",
+        "arp",
+        "address",
+        "devices",
+        "multicast"
+      ],
+      "key_points": [
+        "In computer networks, when many devices share the same communication medium (like Ethernet",
+        "Suitable for real-time communication",
+        "📌 Used in: Video streaming, Online gaming, VoIP, DNS",
+        "Unicast is a type of communication where data is sent from one sender to one specific receiver.",
+        "It is known as one-to-one communication.",
+        "Example: Sending a message to a single person or browsing a website.",
+        "Unicast is reliable and secure for individual communication."
+      ],
+      "definitions": [
+        "Unicast is a type of communication where data: sent from one sender to one specific receiver",
+        "Unicast: reliable and secure for individual communication",
+        "Broadcast is a type of communication where data: sent from one sender to all devices in the",
+        "Multicast is a type of communication where data: sent from one sender to a specific group of",
+        "It is more complex because the network must manage which devices: in the multicast group"
+      ],
+      "examples": [
+        "Module2 1.CSMA its types Module2 In computer networks, when many devices share the same communication medium (like Ethernet Frequency planning required  Suitable for real-time communication 📌 Used in: Video streaming, Online gaming, VoIP, DNS 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a...",
+        "Example: Sending a message to a single person or browsing a website.",
+        "Example: ARP request in a LAN reaches all devices.",
+        "Example: Online live streaming where only subscribed users receive the content."
+      ],
+      "use_cases": [
+        "Module2 1.CSMA its types Module2 In computer networks, when many devices share the same communication medium (like Ethernet Frequency planning required  Suitable for real-time communication 📌 Used in: Video streaming, Online gaming, VoIP, DNS 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a...",
+        "Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334 5.ARP RARP DHCP-DELIVER ICMP 1.ARP is used to find the MAC address of a device from its IP address inside a local network.",
+        "When a device wants to send data: -It knows the IP address of the destination -But the frame needs MAC address -ARP sends a broadcast request: “Who has this IP?” -The device with that IP replies with its MAC address Uses of ARP -Mapping IP address → MAC address -Helps devices communicate in a LAN..."
+      ],
+      "important_notes": [
+        "In computer networks, when many devices share the same communication medium (like Ethernet",
+        "Suitable for real-time communication",
+        "Use exact source terminology for Cast Communication Types before adding explanation.",
+        "Connect Cast Communication Types with Communication, Broadcast, Arp when writing answers."
+      ],
+      "why_this_matters": "Unicast is reliable and secure for individual communication.",
+      "common_mistakes": [
+        "Writing only the definition of Cast Communication Types without explaining how it works.",
+        "Listing Communication, Broadcast, Arp as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "First define Cast Communication Types in one clear sentence.",
+        "Then explain the working flow or relationship using Communication, Broadcast, Arp.",
+        "Finish revision by answering one application or comparison question without looking at the notes."
+      ],
+      "memory_tricks": [
+        "Remember Cast Communication Types through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Communication, Broadcast, Arp, Address."
+      ],
+      "concept_comparisons": [
+        "Compare Cast Communication Types with Broadcast by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What is Cast Communication Types?",
+        "How does Cast Communication Types work in the source material?",
+        "Why is Cast Communication Types important for an exam answer?",
+        "Give one example or use case for Cast Communication Types.",
+        "How is Cast Communication Types related to Broadcast?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Cast Communication Types?",
+            "Why is Cast Communication Types important?",
+            "What is Cast Communication Types?",
+            "How does Cast Communication Types work in the source material?",
+            "Why is Cast Communication Types important for an exam answer?",
+            "Give one example or use case for Cast Communication Types."
+          ],
+          "notes": "Module2\n1.CSMA its types\n\nModule2\nIn computer networks, when many devices share the same communication medium (like Ethernet\n\nFrequency planning required\n \nSuitable for real-time communication \n📌 Used in: Video streaming, Online gaming, VoIP, DNS \n3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. It is known as one-to-one communication. Example: Sending a message to a single person or browsing a website. Unicast is reliable and secure for individual communication. But if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. Broadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. It is known as one-to-all communication. Example: ARP request in a LAN reaches all devices. Broadcast makes it easy to send information to everyone at once. However, it increases network traffic and sends data even to devices that do not need it. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.\n\nExam-ready points:\n- In computer networks, when many devices share the same communication medium (like Ethernet\n- Suitable for real-time communication\n- 📌 Used in: Video streaming, Online gaming, VoIP, DNS\n- Unicast is a type of communication where data is sent from one sender to one specific receiver.\n- It is known as one-to-one communication.\n\nDefinitions to know:\n- Unicast is a type of communication where data: sent from one sender to one specific receiver\n- Unicast: reliable and secure for individual communication\n- Broadcast is a type of communication where data: sent from one sender to all devices in the\n- Multicast is a type of communication where data: sent from one sender to a specific group of",
+          "summary": "Module2 1.CSMA its types Module2 In computer networks, when many devices share the same communication medium (like Ethernet Frequency planning required  Suitable for real-time communication 📌 Used in: Video streaming, O"
+        },
+        "outline": {
+          "title": "Cast Communication Types",
+          "sections": [
+            {
+              "heading": "Cast Communication Types",
+              "points": [
+                "Definition: Unicast is a type of communication where data: sent from one sender to one specific receiver",
+                "Definition: Unicast: reliable and secure for individual communication",
+                "In computer networks, when many devices share the same communication medium (like Ethernet",
+                "Suitable for real-time communication",
+                "📌 Used in: Video streaming, Online gaming, VoIP, DNS",
+                "Unicast is a type of communication where data is sent from one sender to one specific receiver.",
+                "It is known as one-to-one communication.",
+                "Example/use: Module2 1.CSMA its types Module2 In computer networks, when many devices share the same communication medium (like Ethernet Frequency planning required  Suitable for real-time communication 📌 Used in: Video streaming, Online gaming, VoIP, DNS 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a...",
+                "Example/use: Example: Sending a message to a single person or browsing a website.",
+                "Revision: First define Cast Communication Types in one clear sentence.",
+                "Revision: Then explain the working flow or relationship using Communication, Broadcast, Arp."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Cast Communication Types",
+          "mermaid": "mindmap\n  root((Cast Communication Types))\n    Communication\n    Broadcast\n    Arp\n    Address",
+          "branches": [
+            {
+              "name": "Communication",
+              "sub_branches": []
+            },
+            {
+              "name": "Broadcast",
+              "sub_branches": []
+            },
+            {
+              "name": "Arp",
+              "sub_branches": []
+            },
+            {
+              "name": "Address",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Cast Communication Types",
+            "Module2 1.CSMA its types Module2 In computer networks, when many devices share the same communication medium (like Ethernet Frequency planning required  Suitable for real-time communication 📌 Used in: Video streaming, O",
+            "Communication, Broadcast, Arp"
+          ]
+        ],
+        "sentence": "Module2\n1.CSMA its types\n\nModule2\nIn computer networks, when many devices share the same communication medium (like Ethernet\n\nFrequency planning required\n \nSuitable for real-time communication \n📌 Used in: Video streaming, Online gaming, VoIP, DNS \n3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. It is known as one-to-one communication. Example: Sending a message to a single person or browsing a website. Unicast is reliable and secure for individual communication. But if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. Broadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. It is known as one-to-all communication. Example: ARP request in a LAN reaches all devices. Broadcast makes it easy to send information to everyone at once. However, it increases network traffic and sends data even to devices that do not need it. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [
+        {
+          "page_number": 5,
+          "caption": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to "
+        }
+      ],
+      "diagrams": [
+        {
+          "id": "de328b725fb848eba5c714220c166517",
+          "type": "image",
+          "content": "",
+          "image_path": "static/diagrams/diagnostic_test_p5_1_f7e1eb5413704fa4a4558a3061bb590b.png",
+          "image_url": "/static/diagrams/diagnostic_test_p5_1_f7e1eb5413704fa4a4558a3061bb590b.png",
+          "page_number": 5,
+          "caption": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to ",
+          "context_text": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication. Leaky Bucket Algorithm",
+          "ocr_text": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication. Leaky Bucket Algorithm",
+          "diagram_type": "document_diagram",
+          "mermaid_code": "",
+          "explanation": "This diagram text introduces the three primary data transmission modes in computer networks: Unicast (one-to-one communication between a single sender and a single receiver), Broadcast (one-to-all communication sent to every node on the local network segment), and Multicast (one-to-many communication delivered only to a targeted group of subscribed receivers). Each mode balances efficiency, bandwidth usage, and network processing overhead differently depending on the application context.",
+          "workflow_description": "1. Unicast Workflow: A sender transmits data directly to a single destination host using a specific IP address (e.g., standard web browsing or file transfers). 2. Broadcast Workflow: A sender emits a single packet targeting all network endpoints (e.g., ARP requests), requiring every interface on the local network to process it. 3. Multicast Workflow: A sender transmits a single stream to a designated multicast group address; intermediate network devices replicate the data packets only along paths leading to actively subscribed group members (e.g., live streaming).",
+          "connected_topics": [
+            "Unicast Communication",
+            "Broadcast Communication",
+            "Multicast Groups",
+            "Address Resolution Protocol (ARP)",
+            "Traffic Management (Leaky Bucket / Token Bucket)"
+          ],
+          "exam_use": "Frequently tested in computer networking fundamentals. Questions often ask to define and differentiate between Unicast, Broadcast, and Multicast with practical examples (e.g., web browsing vs. ARP request vs. video streaming) or to analyze bandwidth utilization and efficiency across these transmission methods.",
+          "section_id": "section-5"
+        }
+      ],
+      "questions": []
+    },
+    {
+      "section_id": "section-6",
+      "title": "Traffic Shaping and Congestion Control",
+      "raw_text": "Frequency planning required\n2. tcp vs udp \n \nConnection-oriented protocol \n \nEstablishes connection using 3-way handshake before data transfer \n \nEnsures reliable communication \n \nData is delivered in correct order \n \nProvides error checking, flow control, retransmission \n \nSlower but more accurate \n📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP) \n \nConnectionless protocol \n \nNo handshake before sending data \n \nNo guarantee of delivery or order \n \nNo retransmission, less error control \n \nVery fast and low delay\n\nFrequency planning required\n3.LEAKY BUCKET TOKEN BUCKET \nLeaky Bucket Algorithm \n \nIt is a traffic shaping technique used to control network congestion. \n \nWorks like a bucket with a small hole at the bottom. \n \nData packets enter the bucket (input) at any rate. \n \nPackets leave (output) at a constant, fixed rate only. \n \nIf the bucket becomes full due to high incoming traffic, extra packets are discarded. \n \nMaintains a smooth and uniform data flow in the network. \n \nPrevents congestion by avoiding sudden bursts of traffic.\n\nFrequency planning required\nLimitation: Does not support bursty traffic — output rate always remains fixed.\n\n⭐ Token Bucket Algorithm\nIt is also a traffic shaping method used in high-performance networks.\n\n⭐ Token Bucket Algorithm\nIf enough tokens are available, packets are sent immediately → burst traffic",
+      "page_numbers": [
+        4,
+        5,
+        6
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Traffic Shaping and Congestion Control",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Traffic Shaping and Congestion Control clearly in exam language.",
+        "Connect Traffic Shaping and Congestion Control with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "bucket",
+        "traffic",
+        "data",
+        "control",
+        "packets",
+        "shaping",
+        "congestion",
+        "frequency",
+        "planning",
+        "required",
+        "used",
+        "token"
+      ],
+      "exam_priority_topics": [],
+      "order_index": 5,
+      "content": "Frequency planning required\n2. tcp vs udp \n \nConnection-oriented protocol \n \nEstablishes connection using 3-way handshake before data transfer \n \nEnsures reliable communication \n \nData is delivered in correct order \n \nProvides error checking, flow control, retransmission \n \nSlower but more accurate \n📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP) \n \nConnectionless protocol \n \nNo handshake before sending data \n \nNo guarantee of delivery or order \n \nNo retransmission, less error control \n \nVery fast and low delay\n\nFrequency planning required\n3.LEAKY BUCKET TOKEN BUCKET \nLeaky Bucket Algorithm \n \nIt is a traffic shaping technique used to control network congestion.  \nWorks like a bucket with a small hole at the bottom.  \nData packets enter the bucket (input) at any rate.  \nPackets leave (output) at a constant, fixed rate only.  \nIf the bucket becomes full due to high incoming traffic, extra packets are discarded.  \nMaintains a smooth and uniform data flow in the network.  \nPrevents congestion by avoiding sudden bursts of traffic. Frequency planning required\nLimitation: Does not support bursty traffic — output rate always remains fixed. ⭐ Token Bucket Algorithm\nIt is also a traffic shaping method used in high-performance networks. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "educational_explanation": "Frequency planning required\n2. tcp vs udp \n \nConnection-oriented protocol \n \nEstablishes connection using 3-way handshake before data transfer \n \nEnsures reliable communication \n \nData is delivered in correct order \n \nProvides error checking, flow control, retransmission \n \nSlower but more accurate \n📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP) \n \nConnectionless protocol \n \nNo handshake before sending data \n \nNo guarantee of delivery or order \n \nNo retransmission, less error control \n \nVery fast and low delay\n\nFrequency planning required\n3.LEAKY BUCKET TOKEN BUCKET \nLeaky Bucket Algorithm \n \nIt is a traffic shaping technique used to control network congestion.  \nWorks like a bucket with a small hole at the bottom.  \nData packets enter the bucket (input) at any rate.  \nPackets leave (output) at a constant, fixed rate only.  \nIf the bucket becomes full due to high incoming traffic, extra packets are discarded.  \nMaintains a smooth and uniform data flow in the network.  \nPrevents congestion by avoiding sudden bursts of traffic. Frequency planning required\nLimitation: Does not support bursty traffic — output rate always remains fixed. ⭐ Token Bucket Algorithm\nIt is also a traffic shaping method used in high-performance networks. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "explanation": "Frequency planning required\n2. tcp vs udp \n \nConnection-oriented protocol \n \nEstablishes connection using 3-way handshake before data transfer \n \nEnsures reliable communication \n \nData is delivered in correct order \n \nProvides error checking, flow control, retransmission \n \nSlower but more accurate \n📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP) \n \nConnectionless protocol \n \nNo handshake before sending data \n \nNo guarantee of delivery or order \n \nNo retransmission, less error control \n \nVery fast and low delay\n\nFrequency planning required\n3.LEAKY BUCKET TOKEN BUCKET \nLeaky Bucket Algorithm \n \nIt is a traffic shaping technique used to control network congestion.  \nWorks like a bucket with a small hole at the bottom.  \nData packets enter the bucket (input) at any rate.  \nPackets leave (output) at a constant, fixed rate only.  \nIf the bucket becomes full due to high incoming traffic, extra packets are discarded.  \nMaintains a smooth and uniform data flow in the network.  \nPrevents congestion by avoiding sudden bursts of traffic. Frequency planning required\nLimitation: Does not support bursty traffic — output rate always remains fixed. ⭐ Token Bucket Algorithm\nIt is also a traffic shaping method used in high-performance networks. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.",
+      "topics": [
+        "bucket",
+        "traffic",
+        "data",
+        "control",
+        "packets",
+        "shaping"
+      ],
+      "key_points": [
+        "Establishes connection using 3-way handshake before data transfer",
+        "Data is delivered in correct order",
+        "Provides error checking, flow control, retransmission",
+        "Slower but more accurate",
+        "📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP)",
+        "No handshake before sending data",
+        "No guarantee of delivery or order"
+      ],
+      "definitions": [
+        "Data: delivered in correct order",
+        "If enough tokens: available, packets are sent immediately → burst traffic",
+        "Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP)",
+        "Limitation: Does not support bursty traffic — output rate always remains fixed"
+      ],
+      "examples": [
+        " Works like a bucket with a small hole at the bottom."
+      ],
+      "use_cases": [
+        "tcp vs udp  Connection-oriented protocol  Establishes connection using 3-way handshake before data transfer  Ensures reliable communication  Data is delivered in correct order  Provides error checking, flow control, retransmission  Slower but more accurate 📌 Used in: Web browsing (HTTP,...",
+        "⭐ Token Bucket Algorithm It is also a traffic shaping method used in high-performance networks."
+      ],
+      "important_notes": [
+        "Establishes connection using 3-way handshake before data transfer",
+        "Data is delivered in correct order",
+        "Use exact source terminology for Traffic Shaping and Congestion Control before adding explanation.",
+        "Connect Traffic Shaping and Congestion Control with Bucket, Traffic, Data when writing answers."
+      ],
+      "why_this_matters": "Frequency planning required 2.",
+      "common_mistakes": [
+        "Writing only the definition of Traffic Shaping and Congestion Control without explaining how it works.",
+        "Listing Bucket, Traffic, Data as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "First define Traffic Shaping and Congestion Control in one clear sentence.",
+        "Then explain the working flow or relationship using Bucket, Traffic, Data.",
+        "Finish revision by answering one application or comparison question without looking at the notes."
+      ],
+      "memory_tricks": [
+        "Remember Traffic Shaping and Congestion Control through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Bucket, Traffic, Data, Control."
+      ],
+      "concept_comparisons": [
+        "Compare Traffic Shaping and Congestion Control with Traffic by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What is Traffic Shaping and Congestion Control?",
+        "How does Traffic Shaping and Congestion Control work in the source material?",
+        "Why is Traffic Shaping and Congestion Control important for an exam answer?",
+        "Give one example or use case for Traffic Shaping and Congestion Control.",
+        "How is Traffic Shaping and Congestion Control related to Traffic?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Traffic Shaping and Congestion Control?",
+            "Why is Traffic Shaping and Congestion Control important?",
+            "What is Traffic Shaping and Congestion Control?",
+            "How does Traffic Shaping and Congestion Control work in the source material?",
+            "Why is Traffic Shaping and Congestion Control important for an exam answer?",
+            "Give one example or use case for Traffic Shaping and Congestion Control."
+          ],
+          "notes": "Frequency planning required\n2. tcp vs udp \n \nConnection-oriented protocol \n \nEstablishes connection using 3-way handshake before data transfer \n \nEnsures reliable communication \n \nData is delivered in correct order \n \nProvides error checking, flow control, retransmission \n \nSlower but more accurate \n📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP) \n \nConnectionless protocol \n \nNo handshake before sending data \n \nNo guarantee of delivery or order \n \nNo retransmission, less error control \n \nVery fast and low delay\n\nFrequency planning required\n3.LEAKY BUCKET TOKEN BUCKET \nLeaky Bucket Algorithm \n \nIt is a traffic shaping technique used to control network congestion.  \nWorks like a bucket with a small hole at the bottom.  \nData packets enter the bucket (input) at any rate.  \nPackets leave (output) at a constant, fixed rate only.  \nIf the bucket becomes full due to high incoming traffic, extra packets are discarded.  \nMaintains a smooth and uniform data flow in the network.  \nPrevents congestion by avoiding sudden bursts of traffic. Frequency planning required\nLimitation: Does not support bursty traffic — output rate always remains fixed. ⭐ Token Bucket Algorithm\nIt is also a traffic shaping method used in high-performance networks. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually.\n\nExam-ready points:\n- Establishes connection using 3-way handshake before data transfer\n- Data is delivered in correct order\n- Provides error checking, flow control, retransmission\n- Slower but more accurate\n- 📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP)\n\nDefinitions to know:\n- Data: delivered in correct order\n- If enough tokens: available, packets are sent immediately → burst traffic\n- Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP)\n- Limitation: Does not support bursty traffic — output rate always remains fixed",
+          "summary": "Frequency planning required 2."
+        },
+        "outline": {
+          "title": "Traffic Shaping and Congestion Control",
+          "sections": [
+            {
+              "heading": "Traffic Shaping and Congestion Control",
+              "points": [
+                "Definition: Data: delivered in correct order",
+                "Definition: If enough tokens: available, packets are sent immediately → burst traffic",
+                "Establishes connection using 3-way handshake before data transfer",
+                "Data is delivered in correct order",
+                "Provides error checking, flow control, retransmission",
+                "Slower but more accurate",
+                "📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP)",
+                "Example/use:  Works like a bucket with a small hole at the bottom.",
+                "Revision: First define Traffic Shaping and Congestion Control in one clear sentence.",
+                "Revision: Then explain the working flow or relationship using Bucket, Traffic, Data."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Traffic Shaping and Congestion Control",
+          "mermaid": "mindmap\n  root((Traffic Shaping and Congestion Control))\n    Bucket\n    Traffic\n    Data\n    Control",
+          "branches": [
+            {
+              "name": "Bucket",
+              "sub_branches": []
+            },
+            {
+              "name": "Traffic",
+              "sub_branches": []
+            },
+            {
+              "name": "Data",
+              "sub_branches": []
+            },
+            {
+              "name": "Control",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Traffic Shaping and Congestion Control",
+            "Frequency planning required 2.",
+            "Bucket, Traffic, Data"
+          ]
+        ],
+        "sentence": "Frequency planning required\n2. tcp vs udp \n \nConnection-oriented protocol \n \nEstablishes connection using 3-way handshake before data transfer \n \nEnsures reliable communication \n \nData is delivered in correct order \n \nProvides error checking, flow control, retransmission \n \nSlower but more accurate \n📌 Used in: Web browsing (HTTP, HTTPS), Emails (SMTP), File transfer (FTP) \n \nConnectionless protocol \n \nNo handshake before sending data \n \nNo guarantee of delivery or order \n \nNo retransmission, less error control \n \nVery fast and low delay\n\nFrequency planning required\n3.LEAKY BUCKET TOKEN BUCKET \nLeaky Bucket Algorithm \n \nIt is a traffic shaping technique used to control network congestion.  \nWorks like a bucket with a small hole at the bottom.  \nData packets enter the bucket (input) at any rate.  \nPackets leave (output) at a constant, fixed rate only.  \nIf the bucket becomes full due to high incoming traffic, extra packets are discarded.  \nMaintains a smooth and uniform data flow in the network.  \nPrevents congestion by avoiding sudden bursts of traffic. Frequency planning required\nLimitation: Does not support bursty traffic — output rate always remains fixed. ⭐ Token Bucket Algorithm\nIt is also a traffic shaping method used in high-performance networks. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nBefore moving further, look at the diagram from the material: 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to . It belongs inside the same explanation because it shows how the idea is organized visually."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [
+        {
+          "page_number": 5,
+          "caption": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to "
+        }
+      ],
+      "diagrams": [
+        {
+          "id": "de328b725fb848eba5c714220c166517",
+          "type": "image",
+          "content": "",
+          "image_path": "static/diagrams/diagnostic_test_p5_1_f7e1eb5413704fa4a4558a3061bb590b.png",
+          "image_url": "/static/diagrams/diagnostic_test_p5_1_f7e1eb5413704fa4a4558a3061bb590b.png",
+          "page_number": 5,
+          "caption": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to ",
+          "context_text": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication. Leaky Bucket Algorithm",
+          "ocr_text": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication. Leaky Bucket Algorithm",
+          "diagram_type": "document_diagram",
+          "mermaid_code": "",
+          "explanation": "This visual supports Traffic Shaping and Congestion Control by showing structure, relationships, or process flow.",
+          "workflow_description": "Use 3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to  to trace the flow of Traffic Shaping and Congestion Control: identify the starting point, components, relationship arrows, and final output.",
+          "connected_topics": [
+            "bucket",
+            "traffic",
+            "data",
+            "control",
+            "packets",
+            "shaping"
+          ],
+          "exam_use": "In an exam answer, redraw or describe the diagram before explaining the concept in words.",
+          "section_id": "section-6"
+        }
+      ],
+      "questions": []
+    },
+    {
+      "section_id": "section-7",
+      "title": "Internet Protocol (IP)",
+      "raw_text": "Simple and Low-Cost Implementation\nThe protocol does not require complex hardware or high processing capabilities, making it\n\n📌 Real-life Example\n4.explain internet protocol in detail\n\n📌 Real-life Example\nInternet Protocol is a network layer protocol that is responsible for addressing and routing data\n\n📌 Real-life Example\nbetween devices across the internet.\n\nCharacteristics of IP\n-Connectionless protocol – No fixed connection before sending data.\n\nCharacteristics of IP\n1.Pv4 (Internet Protocol version 4)\n\nExample → 192.168.1.5\nDue to internet growth, addresses started running out\n\nExample → 192.168.1.5\n2. Pv6(Internet Protocol version 6)\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n3. ICMP (Internet Control Message Protocol) \nUsed by network devices to send error messages and status information. \nIt works with IP to improve communication reliability. \nFunctions of ICMP \n1.Reports errors like: \n-Destination unreachable \n-Time exceeded (TTL expired) \n2.Network diagnostics \n3.Used by tools like: \nPing → tests reachability \nTraceroute → shows network path \nExample: \nIf a router cannot deliver a packet → sends ICMP error back to source.",
+      "page_numbers": [
+        1,
+        6,
+        7
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Internet Protocol (IP)",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Internet Protocol (IP) clearly in exam language.",
+        "Connect Internet Protocol (IP) with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "protocol",
+        "internet",
+        "example",
+        "network",
+        "real-life",
+        "icmp",
+        "data",
+        "devices",
+        "characteristics",
+        "version",
+        "used",
+        "error"
+      ],
+      "exam_priority_topics": [
+        "ARP vs RARP vs ICMP Protocol Functions"
+      ],
+      "order_index": 6,
+      "content": "Simple and Low-Cost Implementation\nThe protocol does not require complex hardware or high processing capabilities, making it\n\n📌 Real-life Example\n4.explain internet protocol in detail\n\n📌 Real-life Example\nInternet Protocol is a network layer protocol that is responsible for addressing and routing data\n\n📌 Real-life Example\nbetween devices across the internet. Characteristics of IP\n-Connectionless protocol – No fixed connection before sending data. Characteristics of IP\n1.Pv4 (Internet Protocol version 4)\n\nExample → 192.168.1.5\nDue to internet growth, addresses started running out\n\nExample → 192.168.1.5\n2. Pv6(Internet Protocol version 6)\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n3. ICMP (Internet Control Message Protocol) \nUsed by network devices to send error messages and status information. It works with IP to improve communication reliability. Functions of ICMP \n1.Reports errors like: \n-Destination unreachable \n-Time exceeded (TTL expired) \n2.Network diagnostics \n3.Used by tools like: \nPing → tests reachability \nTraceroute → shows network path \nExample: \nIf a router cannot deliver a packet → sends ICMP error back to source. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "educational_explanation": "Simple and Low-Cost Implementation\nThe protocol does not require complex hardware or high processing capabilities, making it\n\n📌 Real-life Example\n4.explain internet protocol in detail\n\n📌 Real-life Example\nInternet Protocol is a network layer protocol that is responsible for addressing and routing data\n\n📌 Real-life Example\nbetween devices across the internet. Characteristics of IP\n-Connectionless protocol – No fixed connection before sending data. Characteristics of IP\n1.Pv4 (Internet Protocol version 4)\n\nExample → 192.168.1.5\nDue to internet growth, addresses started running out\n\nExample → 192.168.1.5\n2. Pv6(Internet Protocol version 6)\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n3. ICMP (Internet Control Message Protocol) \nUsed by network devices to send error messages and status information. It works with IP to improve communication reliability. Functions of ICMP \n1.Reports errors like: \n-Destination unreachable \n-Time exceeded (TTL expired) \n2.Network diagnostics \n3.Used by tools like: \nPing → tests reachability \nTraceroute → shows network path \nExample: \nIf a router cannot deliver a packet → sends ICMP error back to source. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "explanation": "Simple and Low-Cost Implementation\nThe protocol does not require complex hardware or high processing capabilities, making it\n\n📌 Real-life Example\n4.explain internet protocol in detail\n\n📌 Real-life Example\nInternet Protocol is a network layer protocol that is responsible for addressing and routing data\n\n📌 Real-life Example\nbetween devices across the internet. Characteristics of IP\n-Connectionless protocol – No fixed connection before sending data. Characteristics of IP\n1.Pv4 (Internet Protocol version 4)\n\nExample → 192.168.1.5\nDue to internet growth, addresses started running out\n\nExample → 192.168.1.5\n2. Pv6(Internet Protocol version 6)\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n3. ICMP (Internet Control Message Protocol) \nUsed by network devices to send error messages and status information. It works with IP to improve communication reliability. Functions of ICMP \n1.Reports errors like: \n-Destination unreachable \n-Time exceeded (TTL expired) \n2.Network diagnostics \n3.Used by tools like: \nPing → tests reachability \nTraceroute → shows network path \nExample: \nIf a router cannot deliver a packet → sends ICMP error back to source. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "topics": [
+        "protocol",
+        "internet",
+        "example",
+        "network",
+        "real-life",
+        "icmp"
+      ],
+      "key_points": [
+        "Simple and Low-Cost Implementation",
+        "The protocol does not require complex hardware or high processing capabilities, making it",
+        "4.explain internet protocol in detail",
+        "Internet Protocol is a network layer protocol that is responsible for addressing and routing data",
+        "between devices across the internet.",
+        "Connectionless protocol – No fixed connection before sending data.",
+        "1.Pv4 (Internet Protocol version 4)"
+      ],
+      "definitions": [
+        "Internet Protocol is a network layer protocol that: responsible for addressing and routing data",
+        "Reports errors like: -Destination unreachable",
+        "Used by tools like: Ping → tests reachability",
+        "Example: If a router cannot deliver a packet → sends ICMP error back to source"
+      ],
+      "examples": [
+        "Simple and Low-Cost Implementation The protocol does not require complex hardware or high processing capabilities, making it 📌 Real-life Example 4.explain internet protocol in detail 📌 Real-life Example Internet Protocol is a network layer protocol that is responsible for addressing and routing...",
+        "Characteristics of IP 1.Pv4 (Internet Protocol version 4) Example → 192.168.1.5 Due to internet growth, addresses started running out Example → 192.168.1.5 2.",
+        "Pv6(Internet Protocol version 6) Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334 3.",
+        "Functions of ICMP 1.Reports errors like: -Destination unreachable -Time exceeded (TTL expired) 2.Network diagnostics 3.Used by tools like: Ping → tests reachability Traceroute → shows network path Example: If a router cannot deliver a packet → sends ICMP error back to source."
+      ],
+      "use_cases": [
+        "ICMP (Internet Control Message Protocol) Used by network devices to send error messages and status information.",
+        "Functions of ICMP 1.Reports errors like: -Destination unreachable -Time exceeded (TTL expired) 2.Network diagnostics 3.Used by tools like: Ping → tests reachability Traceroute → shows network path Example: If a router cannot deliver a packet → sends ICMP error back to source."
+      ],
+      "important_notes": [
+        "Simple and Low-Cost Implementation",
+        "The protocol does not require complex hardware or high processing capabilities, making it",
+        "Use exact source terminology for Internet Protocol (IP) before adding explanation.",
+        "Connect Internet Protocol (IP) with Protocol, Internet, Example when writing answers."
+      ],
+      "why_this_matters": "Simple and Low-Cost Implementation The protocol does not require complex hardware or high processing capabilities, making it 📌 Real-life Example 4.explain internet protocol in detail 📌 Real-life Example Internet Protocol is a network layer protocol that is...",
+      "common_mistakes": [
+        "Writing only the definition of Internet Protocol (IP) without explaining how it works.",
+        "Listing Protocol, Internet, Example as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "First define Internet Protocol (IP) in one clear sentence.",
+        "Then explain the working flow or relationship using Protocol, Internet, Example.",
+        "Finish revision by answering one application or comparison question without looking at the notes."
+      ],
+      "memory_tricks": [
+        "Remember Internet Protocol (IP) through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Protocol, Internet, Example, Network."
+      ],
+      "concept_comparisons": [
+        "Compare Internet Protocol (IP) with ARP vs RARP vs ICMP Protocol Functions by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What is Internet Protocol (IP)?",
+        "How does Internet Protocol (IP) work in the source material?",
+        "Why is Internet Protocol (IP) important for an exam answer?",
+        "Give one example or use case for Internet Protocol (IP).",
+        "How is Internet Protocol (IP) related to ARP vs RARP vs ICMP Protocol Functions?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Internet Protocol (IP)?",
+            "Why is Internet Protocol (IP) important?",
+            "What is Internet Protocol (IP)?",
+            "How does Internet Protocol (IP) work in the source material?",
+            "Why is Internet Protocol (IP) important for an exam answer?",
+            "Give one example or use case for Internet Protocol (IP)."
+          ],
+          "notes": "Simple and Low-Cost Implementation\nThe protocol does not require complex hardware or high processing capabilities, making it\n\n📌 Real-life Example\n4.explain internet protocol in detail\n\n📌 Real-life Example\nInternet Protocol is a network layer protocol that is responsible for addressing and routing data\n\n📌 Real-life Example\nbetween devices across the internet. Characteristics of IP\n-Connectionless protocol – No fixed connection before sending data. Characteristics of IP\n1.Pv4 (Internet Protocol version 4)\n\nExample → 192.168.1.5\nDue to internet growth, addresses started running out\n\nExample → 192.168.1.5\n2. Pv6(Internet Protocol version 6)\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n3. ICMP (Internet Control Message Protocol) \nUsed by network devices to send error messages and status information. It works with IP to improve communication reliability. Functions of ICMP \n1.Reports errors like: \n-Destination unreachable \n-Time exceeded (TTL expired) \n2.Network diagnostics \n3.Used by tools like: \nPing → tests reachability \nTraceroute → shows network path \nExample: \nIf a router cannot deliver a packet → sends ICMP error back to source. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nExam-ready points:\n- Simple and Low-Cost Implementation\n- The protocol does not require complex hardware or high processing capabilities, making it\n- 4.explain internet protocol in detail\n- Internet Protocol is a network layer protocol that is responsible for addressing and routing data\n- between devices across the internet.\n\nDefinitions to know:\n- Internet Protocol is a network layer protocol that: responsible for addressing and routing data\n- Reports errors like: -Destination unreachable\n- Used by tools like: Ping → tests reachability\n- Example: If a router cannot deliver a packet → sends ICMP error back to source",
+          "summary": "Simple and Low-Cost Implementation The protocol does not require complex hardware or high processing capabilities, making it 📌 Real-life Example 4.explain internet protocol in detail 📌 Real-life Example Internet Protocol"
+        },
+        "outline": {
+          "title": "Internet Protocol (IP)",
+          "sections": [
+            {
+              "heading": "Internet Protocol (IP)",
+              "points": [
+                "Definition: Internet Protocol is a network layer protocol that: responsible for addressing and routing data",
+                "Definition: Reports errors like: -Destination unreachable",
+                "Simple and Low-Cost Implementation",
+                "The protocol does not require complex hardware or high processing capabilities, making it",
+                "4.explain internet protocol in detail",
+                "Internet Protocol is a network layer protocol that is responsible for addressing and routing data",
+                "between devices across the internet.",
+                "Example/use: Simple and Low-Cost Implementation The protocol does not require complex hardware or high processing capabilities, making it 📌 Real-life Example 4.explain internet protocol in detail 📌 Real-life Example Internet Protocol is a network layer protocol that is responsible for addressing and routing...",
+                "Example/use: Characteristics of IP 1.Pv4 (Internet Protocol version 4) Example → 192.168.1.5 Due to internet growth, addresses started running out Example → 192.168.1.5 2.",
+                "Revision: First define Internet Protocol (IP) in one clear sentence.",
+                "Revision: Then explain the working flow or relationship using Protocol, Internet, Example."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Internet Protocol (IP)",
+          "mermaid": "mindmap\n  root((Internet Protocol IP))\n    Protocol\n    Internet\n    Example\n    Network",
+          "branches": [
+            {
+              "name": "Protocol",
+              "sub_branches": []
+            },
+            {
+              "name": "Internet",
+              "sub_branches": []
+            },
+            {
+              "name": "Example",
+              "sub_branches": []
+            },
+            {
+              "name": "Network",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Internet Protocol (IP)",
+            "Simple and Low-Cost Implementation The protocol does not require complex hardware or high processing capabilities, making it 📌 Real-life Example 4.explain internet protocol in detail 📌 Real-life Example Internet Protocol",
+            "Protocol, Internet, Example"
+          ]
+        ],
+        "sentence": "Simple and Low-Cost Implementation\nThe protocol does not require complex hardware or high processing capabilities, making it\n\n📌 Real-life Example\n4.explain internet protocol in detail\n\n📌 Real-life Example\nInternet Protocol is a network layer protocol that is responsible for addressing and routing data\n\n📌 Real-life Example\nbetween devices across the internet. Characteristics of IP\n-Connectionless protocol – No fixed connection before sending data. Characteristics of IP\n1.Pv4 (Internet Protocol version 4)\n\nExample → 192.168.1.5\nDue to internet growth, addresses started running out\n\nExample → 192.168.1.5\n2. Pv6(Internet Protocol version 6)\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n3. ICMP (Internet Control Message Protocol) \nUsed by network devices to send error messages and status information. It works with IP to improve communication reliability. Functions of ICMP \n1.Reports errors like: \n-Destination unreachable \n-Time exceeded (TTL expired) \n2.Network diagnostics \n3.Used by tools like: \nPing → tests reachability \nTraceroute → shows network path \nExample: \nIf a router cannot deliver a packet → sends ICMP error back to source. Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [],
+      "diagrams": [],
+      "questions": []
+    },
+    {
+      "section_id": "section-8",
+      "title": "Network Layer Utility Protocols",
+      "raw_text": "Efficient Channel Utilization\nSince every device first listens to the network, the probability of collisions is lower.\n\nExample → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n2️⃣ RARP (Reverse Address Resolution Protocol) \nOpposite of ARP \nRARP is used to find IP address when only MAC address is known. \nWhy used? \nSome devices (like diskless workstations, network printers) do not have memory to store IP. \nSo they ask a RARP server: \n“My MAC is XYZ. What is my IP?” \nLimitations: \n-Needs a RARP server in network \n-Works only in local network (LAN) \n-Replaced today by better protocols like BOOTP & DHCP",
+      "page_numbers": [
+        1,
+        7
+      ],
+      "source_filename": "test_pdf.pdf",
+      "concept_group": "Network Layer Utility Protocols",
+      "section_type": "concept",
+      "learning_objectives": [
+        "Explain Network Layer Utility Protocols clearly in exam language.",
+        "Connect Network Layer Utility Protocols with its related concepts, examples and practical use."
+      ],
+      "related_topics": [],
+      "concept_keywords": [
+        "network",
+        "rarp",
+        "address",
+        "protocols",
+        "used",
+        "only",
+        "mac",
+        "like",
+        "server",
+        "layer",
+        "utility",
+        "efficient"
+      ],
+      "exam_priority_topics": [],
+      "order_index": 7,
+      "content": "Efficient Channel Utilization\nSince every device first listens to the network, the probability of collisions is lower. Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n2️⃣ RARP (Reverse Address Resolution Protocol) \nOpposite of ARP \nRARP is used to find IP address when only MAC address is known. Why used? Some devices (like diskless workstations, network printers) do not have memory to store IP. So they ask a RARP server: \n“My MAC is XYZ. What is my IP?” \nLimitations: \n-Needs a RARP server in network \n-Works only in local network (LAN) \n-Replaced today by better protocols like BOOTP & DHCP Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "educational_explanation": "Efficient Channel Utilization\nSince every device first listens to the network, the probability of collisions is lower. Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n2️⃣ RARP (Reverse Address Resolution Protocol) \nOpposite of ARP \nRARP is used to find IP address when only MAC address is known. Why used? Some devices (like diskless workstations, network printers) do not have memory to store IP. So they ask a RARP server: \n“My MAC is XYZ. What is my IP?” \nLimitations: \n-Needs a RARP server in network \n-Works only in local network (LAN) \n-Replaced today by better protocols like BOOTP & DHCP Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "explanation": "Efficient Channel Utilization\nSince every device first listens to the network, the probability of collisions is lower. Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n2️⃣ RARP (Reverse Address Resolution Protocol) \nOpposite of ARP \nRARP is used to find IP address when only MAC address is known. Why used? Some devices (like diskless workstations, network printers) do not have memory to store IP. So they ask a RARP server: \n“My MAC is XYZ. What is my IP?” \nLimitations: \n-Needs a RARP server in network \n-Works only in local network (LAN) \n-Replaced today by better protocols like BOOTP & DHCP Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.",
+      "topics": [
+        "network",
+        "rarp",
+        "address",
+        "protocols",
+        "used",
+        "only"
+      ],
+      "key_points": [
+        "Since every device first listens to the network, the probability of collisions is lower.",
+        "Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334",
+        "2️⃣ RARP (Reverse Address Resolution Protocol)",
+        "RARP is used to find IP address when only MAC address is known.",
+        "Some devices (like diskless workstations, network printers) do not have memory to store IP.",
+        "So they ask a RARP server",
+        "“My MAC is XYZ. What is my IP?”"
+      ],
+      "definitions": [
+        "RARP: used to find IP address when only MAC address is known",
+        "Limitations: -Needs a RARP server in network"
+      ],
+      "examples": [
+        "Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334 2️⃣ RARP (Reverse Address Resolution Protocol) Opposite of ARP RARP is used to find IP address when only MAC address is known.",
+        "Some devices (like diskless workstations, network printers) do not have memory to store IP.",
+        "What is my IP?” Limitations: -Needs a RARP server in network -Works only in local network (LAN) -Replaced today by better protocols like BOOTP & DHCP"
+      ],
+      "use_cases": [
+        "Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334 2️⃣ RARP (Reverse Address Resolution Protocol) Opposite of ARP RARP is used to find IP address when only MAC address is known."
+      ],
+      "important_notes": [
+        "Since every device first listens to the network, the probability of collisions is lower.",
+        "Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334",
+        "Use exact source terminology for Network Layer Utility Protocols before adding explanation.",
+        "Connect Network Layer Utility Protocols with Network, Rarp, Address when writing answers."
+      ],
+      "why_this_matters": "Efficient Channel Utilization Since every device first listens to the network, the probability of collisions is lower.",
+      "common_mistakes": [
+        "Writing only the definition of Network Layer Utility Protocols without explaining how it works.",
+        "Listing Network, Rarp, Address as isolated terms instead of connecting them.",
+        "Skipping examples or use cases when the question asks for application."
+      ],
+      "revision_notes": [
+        "First define Network Layer Utility Protocols in one clear sentence.",
+        "Then explain the working flow or relationship using Network, Rarp, Address.",
+        "Finish revision by answering one application or comparison question without looking at the notes."
+      ],
+      "memory_tricks": [
+        "Remember Network Layer Utility Protocols through this chain: purpose -> terms -> working -> example.",
+        "Anchor the section around: Network, Rarp, Address, Protocols."
+      ],
+      "concept_comparisons": [
+        "Compare Network Layer Utility Protocols with Rarp by separating purpose, role, and example."
+      ],
+      "test_yourself": [
+        "What is Network Layer Utility Protocols?",
+        "How does Network Layer Utility Protocols work in the source material?",
+        "Why is Network Layer Utility Protocols important for an exam answer?",
+        "Give one example or use case for Network Layer Utility Protocols.",
+        "How is Network Layer Utility Protocols related to Rarp?"
+      ],
+      "notes": {
+        "cornell": {
+          "cue": [
+            "What is Network Layer Utility Protocols?",
+            "Why is Network Layer Utility Protocols important?",
+            "What is Network Layer Utility Protocols?",
+            "How does Network Layer Utility Protocols work in the source material?",
+            "Why is Network Layer Utility Protocols important for an exam answer?",
+            "Give one example or use case for Network Layer Utility Protocols."
+          ],
+          "notes": "Efficient Channel Utilization\nSince every device first listens to the network, the probability of collisions is lower. Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n2️⃣ RARP (Reverse Address Resolution Protocol) \nOpposite of ARP \nRARP is used to find IP address when only MAC address is known. Why used? Some devices (like diskless workstations, network printers) do not have memory to store IP. So they ask a RARP server: \n“My MAC is XYZ. What is my IP?” \nLimitations: \n-Needs a RARP server in network \n-Works only in local network (LAN) \n-Replaced today by better protocols like BOOTP & DHCP Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example.\n\nExam-ready points:\n- Since every device first listens to the network, the probability of collisions is lower.\n- Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n- 2️⃣ RARP (Reverse Address Resolution Protocol)\n- RARP is used to find IP address when only MAC address is known.\n- Some devices (like diskless workstations, network printers) do not have memory to store IP.\n\nDefinitions to know:\n- RARP: used to find IP address when only MAC address is known\n- Limitations: -Needs a RARP server in network",
+          "summary": "Efficient Channel Utilization Since every device first listens to the network, the probability of collisions is lower."
+        },
+        "outline": {
+          "title": "Network Layer Utility Protocols",
+          "sections": [
+            {
+              "heading": "Network Layer Utility Protocols",
+              "points": [
+                "Definition: RARP: used to find IP address when only MAC address is known",
+                "Definition: Limitations: -Needs a RARP server in network",
+                "Since every device first listens to the network, the probability of collisions is lower.",
+                "Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334",
+                "2️⃣ RARP (Reverse Address Resolution Protocol)",
+                "RARP is used to find IP address when only MAC address is known.",
+                "Some devices (like diskless workstations, network printers) do not have memory to store IP.",
+                "Example/use: Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334 2️⃣ RARP (Reverse Address Resolution Protocol) Opposite of ARP RARP is used to find IP address when only MAC address is known.",
+                "Example/use: Some devices (like diskless workstations, network printers) do not have memory to store IP.",
+                "Revision: First define Network Layer Utility Protocols in one clear sentence.",
+                "Revision: Then explain the working flow or relationship using Network, Rarp, Address."
+              ]
+            }
+          ]
+        },
+        "mindmap": {
+          "root": "Network Layer Utility Protocols",
+          "mermaid": "mindmap\n  root((Network Layer Utility Protocols))\n    Network\n    Rarp\n    Address\n    Protocols",
+          "branches": [
+            {
+              "name": "Network",
+              "sub_branches": []
+            },
+            {
+              "name": "Rarp",
+              "sub_branches": []
+            },
+            {
+              "name": "Address",
+              "sub_branches": []
+            },
+            {
+              "name": "Protocols",
+              "sub_branches": []
+            }
+          ]
+        },
+        "chart": [
+          [
+            "Network Layer Utility Protocols",
+            "Efficient Channel Utilization Since every device first listens to the network, the probability of collisions is lower.",
+            "Network, Rarp, Address"
+          ]
+        ],
+        "sentence": "Efficient Channel Utilization\nSince every device first listens to the network, the probability of collisions is lower. Example → 2001:0db8:0000:85a3:0000:8a2e:0370:7334\n2️⃣ RARP (Reverse Address Resolution Protocol) \nOpposite of ARP \nRARP is used to find IP address when only MAC address is known. Why used? Some devices (like diskless workstations, network printers) do not have memory to store IP. So they ask a RARP server: \n“My MAC is XYZ. What is my IP?” \nLimitations: \n-Needs a RARP server in network \n-Works only in local network (LAN) \n-Replaced today by better protocols like BOOTP & DHCP Read these ideas as a connected explanation: first notice what the concept does, then how the surrounding terms support it, and finally how the same idea would be used in an answer or practical example."
+      },
+      "narrative_style": "natural-teaching",
+      "inline_diagram_refs": [],
+      "diagrams": [],
+      "questions": []
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "332225ab05af44a5b6e33b0234e47e68",
+      "type": "image",
+      "content": "",
+      "image_path": "static/diagrams/diagnostic_test_p3_1_0640d5807d1b45bb82eb8959312125f8.png",
+      "image_url": "/static/diagrams/diagnostic_test_p3_1_0640d5807d1b45bb82eb8959312125f8.png",
+      "page_number": 3,
+      "caption": "3. csma cd/ca diff 3. Module Users take turns to transmit data. Used in 2G GSM systems. 📌 Example: Students use a single computer turn by tu",
+      "context_text": "3. csma cd/ca diff 3. Module Users take turns to transmit data. \nUsed in 2G GSM systems. \n📌 Example: \nStudents use a single computer turn by turn → No clash. \n✔ Advantages: \nBetter bandwidth utilization than FDMA \nSupports digital data \n✖ Disadvantages: \nHigh synchronization required \nMore delay when many users increase \n \n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required",
+      "ocr_text": "3. csma cd/ca diff 3. Module Users take turns to transmit data. \nUsed in 2G GSM systems. \n📌 Example: \nStudents use a single computer turn by turn → No clash. \n✔ Advantages: \nBetter bandwidth utilization than FDMA \nSupports digital data \n✖ Disadvantages: \nHigh synchronization required \nMore delay when many users increase \n \n📌 3️⃣ CDMA (Code Division Multiple Access) \nAll users share the same frequency at the same time. \nEach user is assigned a unique code, so signals don’t mix. \nUsed in 2G/3G and later technologies. \n📌 Example: \nMany people talking together in different languages — you hear only the one speaking your language (your \ncode). \n✔ Advantages: \nHigh capacity (more users) \nBetter security, less interference \n✖ Disadvantages: \nVery complex design \nCode management required",
+      "diagram_type": "document_diagram",
+      "mermaid_code": "",
+      "explanation": ""
+    },
+    {
+      "id": "de328b725fb848eba5c714220c166517",
+      "type": "image",
+      "content": "",
+      "image_path": "static/diagrams/diagnostic_test_p5_1_f7e1eb5413704fa4a4558a3061bb590b.png",
+      "image_url": "/static/diagrams/diagnostic_test_p5_1_f7e1eb5413704fa4a4558a3061bb590b.png",
+      "page_number": 5,
+      "caption": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST Unicast: Unicast is a type of communication where data is sent from one sender to ",
+      "context_text": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication. Leaky Bucket Algorithm",
+      "ocr_text": "3.LEAKY BUCKET TOKEN BUCKET 3.UNICAST BROADCAST MULTICAST  \nUnicast: \nUnicast is a type of communication where data is sent from one sender to one specific receiver. \nIt is known as one-to-one communication. \nExample: Sending a message to a single person or browsing a website. \nUnicast is reliable and secure for individual communication. \nBut if the same data has to be sent to many users, the sender must send multiple copies which \nincreases bandwidth usage. \nBroadcast: \nBroadcast is a type of communication where data is sent from one sender to all devices in the \nnetwork. \nIt is known as one-to-all communication. \nExample: ARP request in a LAN reaches all devices. \nBroadcast makes it easy to send information to everyone at once. \nHowever, it increases network traffic and sends data even to devices that do not need it. \nMulticast: \nMulticast is a type of communication where data is sent from one sender to a specific group of \nreceivers. \nIt is known as one-to-many communication (only selected users). \nExample: Online live streaming where only subscribed users receive the content. \nMulticast saves bandwidth because the sender transmits only one copy for the group. \nIt is more complex because the network must manage which devices are in the multicast group. \nConclusion: \nUnicast is one-to-one communication. \nBroadcast is one-to-all communication. \nMulticast is one-to-many selected communication. Leaky Bucket Algorithm",
+      "diagram_type": "document_diagram",
+      "mermaid_code": "",
+      "explanation": ""
+    }
+  ],
+  "revision": {
+    "revision_priority_order": [
+      "Distance Vector vs Link State Routing",
+      "CSMA Variants and CDMA/TDMA/FDMA Comparison",
+      "TCP vs UDP Differences and Applications",
+      "Leaky Bucket vs Token Bucket Traffic Shaping",
+      "ARP, RARP, ICMP, and IP (IPv4 vs IPv6) Fundamentals",
+      "Unicast, Broadcast, Multicast Communication Modes"
+    ],
+    "strategy": "Use a 1-3-7 day cycle. First revise concept flow, then redraw diagrams, then answer scenario and comparison questions.",
+    "daily_plan": [
+      "Revise Distance Vector vs Link State Routing: definition, workflow, example, mistake, and one question.",
+      "Revise CSMA Variants and CDMA/TDMA/FDMA Comparison: definition, workflow, example, mistake, and one question.",
+      "Revise TCP vs UDP Differences and Applications: definition, workflow, example, mistake, and one question.",
+      "Revise Leaky Bucket vs Token Bucket Traffic Shaping: definition, workflow, example, mistake, and one question.",
+      "Revise ARP, RARP, ICMP, and IP (IPv4 vs IPv6) Fundamentals: definition, workflow, example, mistake, and one question.",
+      "Revise Unicast, Broadcast, Multicast Communication Modes: definition, workflow, example, mistake, and one question."
+    ]
+  },
+  "questions": [
+    {
+      "id": "candidate-18",
+      "type": "workflow",
+      "question": "State the correct learning flow for explaining Transport Layer Protocols in one sentence.",
+      "options": [],
+      "correct_answer": "Begin with purpose, explain Layer, connect it to Reduce, then support it with a use case.",
+      "acceptable_answers": [
+        "purpose",
+        "Layer",
+        "Reduce",
+        "use case",
+        "Begin with purpose, explain Layer, connect it to Reduce, then support it with a use case."
+      ],
+      "explanation": "The expected flow is purpose, concept, relationship, and application.",
+      "difficulty": "medium",
+      "topic": "Transport Layer Protocols",
+      "expected_keywords": [
+        "purpose",
+        "Layer",
+        "Reduce"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-28",
+      "type": "workflow",
+      "question": "State the correct learning flow for explaining Traffic Shaping and Congestion Control in one sentence.",
+      "options": [],
+      "correct_answer": "Begin with purpose, explain Data, connect it to Bucket, then support it with a use case.",
+      "acceptable_answers": [
+        "purpose",
+        "Data",
+        "Bucket",
+        "use case",
+        "Begin with purpose, explain Data, connect it to Bucket, then support it with a use case."
+      ],
+      "explanation": "The expected flow is purpose, concept, relationship, and application.",
+      "difficulty": "medium",
+      "topic": "Traffic Shaping and Congestion Control",
+      "expected_keywords": [
+        "purpose",
+        "Data",
+        "Bucket"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-6",
+      "type": "mcq",
+      "question": "Which explanation best shows how Multiple functions inside Multiple Access Schemes?",
+      "options": [
+        "It connects the purpose of Multiple Access Schemes with Access and the working flow.",
+        "It is only a term to memorize without relationships.",
+        "It matters only when page numbers are asked.",
+        "It replaces the need to explain examples or workflow."
+      ],
+      "correct_answer": "It connects the purpose of Multiple Access Schemes with Access and the working flow.",
+      "acceptable_answers": [
+        "Multiple",
+        "Access",
+        "It connects the purpose of Multiple Access Schemes with Access and the working flow."
+      ],
+      "explanation": "A strong answer links Multiple, Access, and the actual working of Multiple Access Schemes.",
+      "difficulty": "easy",
+      "topic": "Multiple Access Schemes",
+      "expected_keywords": [
+        "Multiple",
+        "Access",
+        "workflow"
+      ],
+      "quality_score": 3.9
+    },
+    {
+      "id": "candidate-34",
+      "type": "compare",
+      "question": "Compare Protocol and Internet using purpose and role in Internet Protocol (IP).",
+      "options": [],
+      "correct_answer": "Protocol should be explained by its role, while Internet should be linked as the supporting or connected concept.",
+      "acceptable_answers": [
+        "Protocol",
+        "Internet",
+        "role",
+        "purpose",
+        "Protocol should be explained by its role, while Internet should be linked as the supporting or connected concept."
+      ],
+      "explanation": "Comparison questions test whether the learner can separate roles instead of listing terms.",
+      "difficulty": "medium",
+      "topic": "Internet Protocol (IP)",
+      "expected_keywords": [
+        "Protocol",
+        "Internet",
+        "role"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-19",
+      "type": "compare",
+      "question": "Compare Layer and Reduce using purpose and role in Transport Layer Protocols.",
+      "options": [],
+      "correct_answer": "Layer should be explained by its role, while Reduce should be linked as the supporting or connected concept.",
+      "acceptable_answers": [
+        "Layer",
+        "Reduce",
+        "role",
+        "purpose",
+        "Layer should be explained by its role, while Reduce should be linked as the supporting or connected concept."
+      ],
+      "explanation": "Comparison questions test whether the learner can separate roles instead of listing terms.",
+      "difficulty": "medium",
+      "topic": "Transport Layer Protocols",
+      "expected_keywords": [
+        "Layer",
+        "Reduce",
+        "role"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-1",
+      "type": "mcq",
+      "question": "Which explanation best shows how Control functions inside Medium Access Control Protocols and IP Characteristics?",
+      "options": [
+        "It connects the purpose of Medium Access Control Protocols and IP Characteristics with Access and the working flow.",
+        "It is only a term to memorize without relationships.",
+        "It matters only when page numbers are asked.",
+        "It replaces the need to explain examples or workflow."
+      ],
+      "correct_answer": "It connects the purpose of Medium Access Control Protocols and IP Characteristics with Access and the working flow.",
+      "acceptable_answers": [
+        "Control",
+        "Access",
+        "It connects the purpose of Medium Access Control Protocols and IP Characteristics with Access and the working flow."
+      ],
+      "explanation": "A strong answer links Control, Access, and the actual working of Medium Access Control Protocols and IP Characteristics.",
+      "difficulty": "easy",
+      "topic": "Medium Access Control Protocols and IP Characteristics",
+      "expected_keywords": [
+        "Control",
+        "Access",
+        "workflow"
+      ],
+      "quality_score": 3.9
+    },
+    {
+      "id": "candidate-39",
+      "type": "compare",
+      "question": "Compare Network and Rarp using purpose and role in Network Layer Utility Protocols.",
+      "options": [],
+      "correct_answer": "Network should be explained by its role, while Rarp should be linked as the supporting or connected concept.",
+      "acceptable_answers": [
+        "Network",
+        "Rarp",
+        "role",
+        "purpose",
+        "Network should be explained by its role, while Rarp should be linked as the supporting or connected concept."
+      ],
+      "explanation": "Comparison questions test whether the learner can separate roles instead of listing terms.",
+      "difficulty": "medium",
+      "topic": "Network Layer Utility Protocols",
+      "expected_keywords": [
+        "Network",
+        "Rarp",
+        "role"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-8",
+      "type": "workflow",
+      "question": "State the correct learning flow for explaining Multiple Access Schemes in one sentence.",
+      "options": [],
+      "correct_answer": "Begin with purpose, explain Multiple, connect it to Access, then support it with a use case.",
+      "acceptable_answers": [
+        "purpose",
+        "Multiple",
+        "Access",
+        "use case",
+        "Begin with purpose, explain Multiple, connect it to Access, then support it with a use case."
+      ],
+      "explanation": "The expected flow is purpose, concept, relationship, and application.",
+      "difficulty": "medium",
+      "topic": "Multiple Access Schemes",
+      "expected_keywords": [
+        "purpose",
+        "Multiple",
+        "Access"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-24",
+      "type": "compare",
+      "question": "Compare Communication and Unicast using purpose and role in Cast Communication Types.",
+      "options": [],
+      "correct_answer": "Communication should be explained by its role, while Unicast should be linked as the supporting or connected concept.",
+      "acceptable_answers": [
+        "Communication",
+        "Unicast",
+        "role",
+        "purpose",
+        "Communication should be explained by its role, while Unicast should be linked as the supporting or connected concept."
+      ],
+      "explanation": "Comparison questions test whether the learner can separate roles instead of listing terms.",
+      "difficulty": "medium",
+      "topic": "Cast Communication Types",
+      "expected_keywords": [
+        "Communication",
+        "Unicast",
+        "role"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-23",
+      "type": "workflow",
+      "question": "State the correct learning flow for explaining Cast Communication Types in one sentence.",
+      "options": [],
+      "correct_answer": "Begin with purpose, explain Communication, connect it to Unicast, then support it with a use case.",
+      "acceptable_answers": [
+        "purpose",
+        "Communication",
+        "Unicast",
+        "use case",
+        "Begin with purpose, explain Communication, connect it to Unicast, then support it with a use case."
+      ],
+      "explanation": "The expected flow is purpose, concept, relationship, and application.",
+      "difficulty": "medium",
+      "topic": "Cast Communication Types",
+      "expected_keywords": [
+        "purpose",
+        "Communication",
+        "Unicast"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-29",
+      "type": "compare",
+      "question": "Compare Data and Bucket using purpose and role in Traffic Shaping and Congestion Control.",
+      "options": [],
+      "correct_answer": "Data should be explained by its role, while Bucket should be linked as the supporting or connected concept.",
+      "acceptable_answers": [
+        "Data",
+        "Bucket",
+        "role",
+        "purpose",
+        "Data should be explained by its role, while Bucket should be linked as the supporting or connected concept."
+      ],
+      "explanation": "Comparison questions test whether the learner can separate roles instead of listing terms.",
+      "difficulty": "medium",
+      "topic": "Traffic Shaping and Congestion Control",
+      "expected_keywords": [
+        "Data",
+        "Bucket",
+        "role"
+      ],
+      "quality_score": 5.3
+    },
+    {
+      "id": "candidate-13",
+      "type": "workflow",
+      "question": "State the correct learning flow for explaining Routing Algorithms: Distance Vector vs. Link State in one sentence.",
+      "options": [],
+      "correct_answer": "Begin with purpose, explain Router, connect it to Count, then support it with a use case.",
+      "acceptable_answers": [
+        "purpose",
+        "Router",
+        "Count",
+        "use case",
+        "Begin with purpose, explain Router, connect it to Count, then support it with a use case."
+      ],
+      "explanation": "The expected flow is purpose, concept, relationship, and application.",
+      "difficulty": "medium",
+      "topic": "Routing Algorithms: Distance Vector vs. Link State",
+      "expected_keywords": [
+        "purpose",
+        "Router",
+        "Count"
+      ],
+      "quality_score": 5.3
+    }
+  ]
+}

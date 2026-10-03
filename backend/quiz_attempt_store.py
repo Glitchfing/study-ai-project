@@ -42,6 +42,7 @@ def save_quiz_attempt(payload: dict[str, Any]) -> dict[str, Any]:
         "responses": payload.get("responses") or [],
         "weak_topics": payload.get("weak_topics") or [],
         "question_types": payload.get("question_types") or {},
+        "performance": payload.get("performance") or {},
         "duration_seconds": int(payload.get("duration_seconds") or 0),
     }
     QUIZ_ATTEMPTS.append(attempt)

@@ -8,10 +8,17 @@ from typing import Any
 
 from note_generation import format_package_for_view
 from note_normalizer import normalize_generated_notes
+from services.note_quality_validator import validate_note_package
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 NOTES_DB_PATH = DATA_DIR / "generated_notes.json"
+
+
+# ============================================================
+# STATIC NOTES
+# ============================================================
 
 STATIC_NOTES: dict[str, dict[str, Any]] = {
     "nlp-derivatives": {
@@ -30,16 +37,22 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
                     "Difference between NER and POS tagging?",
                 ],
                 "notes": (
-                    "Tokenization splits raw text into tokens (words/sub-words/chars).\n\n"
-                    "BERT uses bidirectional transformer encoders with masked language modelling (MLM) "
-                    "and next sentence prediction (NSP).\n\n"
-                    "Named Entity Recognition (NER) identifies real-world entities; "
-                    "POS tagging labels grammatical roles.\n\n"
-                    "Word2Vec, GloVe produce static embeddings; BERT/GPT produce contextual embeddings."
+                    "Tokenization splits raw text into tokens "
+                    "(words/sub-words/chars).\n\n"
+                    "BERT uses bidirectional transformer encoders "
+                    "with masked language modelling (MLM) and next "
+                    "sentence prediction (NSP).\n\n"
+                    "Named Entity Recognition (NER) identifies "
+                    "real-world entities; POS tagging labels "
+                    "grammatical roles.\n\n"
+                    "Word2Vec, GloVe produce static embeddings; "
+                    "BERT/GPT produce contextual embeddings."
                 ),
                 "summary": (
-                    "NLP pipelines transform raw text -> tokens -> embeddings -> task-specific heads. "
-                    "Transformer-based models dominate benchmarks via self-attention mechanisms."
+                    "NLP pipelines transform raw text -> tokens -> "
+                    "embeddings -> task-specific heads. "
+                    "Transformer-based models dominate benchmarks "
+                    "via self-attention mechanisms."
                 ),
             },
             "outline": {
@@ -49,7 +62,8 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
                     {
                         "heading": "1. Tokenization",
                         "points": [
-                            "Word-level vs sub-word (BPE, WordPiece) vs character-level",
+                            "Word-level vs sub-word "
+                            "(BPE, WordPiece) vs character-level",
                             "Handles OOV words via sub-word splitting",
                             "Libraries: HuggingFace Tokenizers, NLTK, SpaCy",
                         ],
@@ -58,23 +72,29 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
                         "heading": "2. Embeddings",
                         "points": [
                             "Static: Word2Vec (skip-gram, CBOW), GloVe, FastText",
-                            "Contextual: ELMo (BiLSTM), BERT (Transformer encoder), GPT (decoder)",
+                            "Contextual: ELMo (BiLSTM), BERT "
+                            "(Transformer encoder), GPT (decoder)",
                             "Dimensionality: typically 128-1024 dims",
                         ],
                     },
                     {
                         "heading": "3. Key Architectures",
                         "points": [
-                            "Transformer: self-attention + feed-forward, positional encoding",
-                            "BERT: masked LM + NSP pre-training, fine-tune downstream",
-                            "GPT family: autoregressive decoder, in-context learning",
+                            "Transformer: self-attention + feed-forward, "
+                            "positional encoding",
+                            "BERT: masked LM + NSP pre-training, "
+                            "fine-tune downstream",
+                            "GPT family: autoregressive decoder, "
+                            "in-context learning",
                         ],
                     },
                     {
                         "heading": "4. Downstream Tasks",
                         "points": [
-                            "NER, POS, Relation Extraction (token classification)",
-                            "Sentiment, Classification (sequence classification)",
+                            "NER, POS, Relation Extraction "
+                            "(token classification)",
+                            "Sentiment, Classification "
+                            "(sequence classification)",
                             "QA, Summarisation, Translation (seq2seq)",
                         ],
                     },
@@ -105,19 +125,63 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
             "chart": {
                 "title": "NLP Core Concepts - Comparison Chart",
                 "format": "chart",
-                "columns": ["Model", "Type", "Context", "Year", "Key Feature"],
+                "columns": [
+                    "Model",
+                    "Type",
+                    "Context",
+                    "Year",
+                    "Key Feature",
+                ],
                 "rows": [
-                    ["Word2Vec", "Static", "None", "2013", "Efficient skip-gram"],
-                    ["GloVe", "Static", "None", "2014", "Global co-occurrence"],
-                    ["ELMo", "Contextual", "BiLSTM", "2018", "Character CNN + LSTM"],
-                    ["BERT", "Contextual", "Bidirectional", "2018", "Masked LM + NSP"],
-                    ["GPT-2", "Contextual", "Left-to-right", "2019", "Large-scale CLM"],
-                    ["RoBERTa", "Contextual", "Bidirectional", "2019", "Dynamic masking"],
+                    [
+                        "Word2Vec",
+                        "Static",
+                        "None",
+                        "2013",
+                        "Efficient skip-gram",
+                    ],
+                    [
+                        "GloVe",
+                        "Static",
+                        "None",
+                        "2014",
+                        "Global co-occurrence",
+                    ],
+                    [
+                        "ELMo",
+                        "Contextual",
+                        "BiLSTM",
+                        "2018",
+                        "Character CNN + LSTM",
+                    ],
+                    [
+                        "BERT",
+                        "Contextual",
+                        "Bidirectional",
+                        "2018",
+                        "Masked LM + NSP",
+                    ],
+                    [
+                        "GPT-2",
+                        "Contextual",
+                        "Left-to-right",
+                        "2019",
+                        "Large-scale CLM",
+                    ],
+                    [
+                        "RoBERTa",
+                        "Contextual",
+                        "Bidirectional",
+                        "2019",
+                        "Dynamic masking",
+                    ],
                 ],
             },
             "sentence": (
-                "NLP Core Concepts covers tokenization, embeddings, and transformer-based architectures, "
-                "with emphasis on how modern language models process context and support downstream tasks."
+                "NLP Core Concepts covers tokenization, embeddings, "
+                "and transformer-based architectures, with emphasis "
+                "on how modern language models process context and "
+                "support downstream tasks."
             ),
         },
         "package": {
@@ -127,9 +191,10 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
             "notes": {},
             "diagrams": [],
             "questions": [],
-            "global_summary": "NLP Core Concepts is a focused static study note.",
+            "global_summary": (
+                "NLP Core Concepts is a focused static study note."
+            ),
             "difficulty_level": "intermediate",
-            "recommended_revision_strategy": "Review the note format and use it as an example structure.",
         },
     },
     "ml-models": {
@@ -148,13 +213,16 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
                     "What is regularisation?",
                 ],
                 "notes": (
-                    "Decision Trees: recursive feature splits via Gini impurity / information gain. "
-                    "Prone to overfitting -> prune or ensemble.\n\n"
-                    "Random Forests: bagging + random feature subsets. Reduces variance. "
-                    "Good default for tabular data.\n\n"
-                    "Gradient Boosting (XGBoost, LightGBM): sequential trees, each corrects residuals. "
-                    "Better accuracy, slower training.\n\n"
-                    "SVMs: maximum-margin hyperplane, kernel trick for non-linearity."
+                    "Decision Trees: recursive feature splits via "
+                    "Gini impurity / information gain. Prone to "
+                    "overfitting -> prune or ensemble.\n\n"
+                    "Random Forests: bagging + random feature subsets. "
+                    "Reduces variance. Good default for tabular data.\n\n"
+                    "Gradient Boosting (XGBoost, LightGBM): sequential "
+                    "trees, each corrects residuals. Better accuracy, "
+                    "slower training.\n\n"
+                    "SVMs: maximum-margin hyperplane, kernel trick "
+                    "for non-linearity."
                 ),
                 "summary": (
                     "Ensemble methods dominate tabular benchmarks. "
@@ -171,7 +239,8 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
                         "points": [
                             "Decision Tree: Gini / entropy splits, depth pruning",
                             "Random Forest: bagging, OOB error estimate",
-                            "Gradient Boosting: learning rate, n_estimators, max_depth",
+                            "Gradient Boosting: learning rate, "
+                            "n_estimators, max_depth",
                         ],
                     },
                     {
@@ -199,25 +268,66 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
                 "branches": [
                     {
                         "name": "Tree-based Models",
-                        "sub_branches": [{"name": "Decision Tree"}, {"name": "Random Forest"}, {"name": "Boosting"}],
+                        "sub_branches": [
+                            {"name": "Decision Tree"},
+                            {"name": "Random Forest"},
+                            {"name": "Boosting"},
+                        ],
                     }
                 ],
             },
             "chart": {
                 "title": "ML Models - Comparison Chart",
                 "format": "chart",
-                "columns": ["Model", "Type", "Speed", "Interpretability", "Best For"],
+                "columns": [
+                    "Model",
+                    "Type",
+                    "Speed",
+                    "Interpretability",
+                    "Best For",
+                ],
                 "rows": [
-                    ["Decision Tree", "Tree", "Fast", "High", "Explainable baselines"],
-                    ["Random Forest", "Ensemble", "Medium", "Medium", "General tabular"],
-                    ["XGBoost", "Boosting", "Medium", "Low", "Competitions / kaggle"],
-                    ["SVM", "Margin", "Slow", "Low", "Small high-dim datasets"],
-                    ["Neural Network", "DL", "Slow", "None", "Unstructured data"],
+                    [
+                        "Decision Tree",
+                        "Tree",
+                        "Fast",
+                        "High",
+                        "Explainable baselines",
+                    ],
+                    [
+                        "Random Forest",
+                        "Ensemble",
+                        "Medium",
+                        "Medium",
+                        "General tabular",
+                    ],
+                    [
+                        "XGBoost",
+                        "Boosting",
+                        "Medium",
+                        "Low",
+                        "Competitions / kaggle",
+                    ],
+                    [
+                        "SVM",
+                        "Margin",
+                        "Slow",
+                        "Low",
+                        "Small high-dim datasets",
+                    ],
+                    [
+                        "Neural Network",
+                        "DL",
+                        "Slow",
+                        "None",
+                        "Unstructured data",
+                    ],
                 ],
             },
             "sentence": (
-                "ML Models Overview compares tree-based methods, SVMs, and neural networks, "
-                "highlighting trade-offs in accuracy, interpretability, and compute cost."
+                "ML Models Overview compares tree-based methods, "
+                "SVMs, and neural networks, highlighting trade-offs "
+                "in accuracy, interpretability, and compute cost."
             ),
         },
         "package": {
@@ -227,12 +337,18 @@ STATIC_NOTES: dict[str, dict[str, Any]] = {
             "notes": {},
             "diagrams": [],
             "questions": [],
-            "global_summary": "ML Models Overview is a focused static study note.",
+            "global_summary": (
+                "ML Models Overview is a focused static study note."
+            ),
             "difficulty_level": "intermediate",
-            "recommended_revision_strategy": "Review the note format and use it as an example structure.",
         },
     },
 }
+
+
+# ============================================================
+# GENERATED NOTES STORAGE
+# ============================================================
 
 GENERATED_NOTES: dict[str, dict[str, Any]] = {}
 
@@ -240,84 +356,460 @@ GENERATED_NOTES: dict[str, dict[str, Any]] = {}
 def _load_generated_notes() -> dict[str, dict[str, Any]]:
     if not NOTES_DB_PATH.exists():
         return {}
+
     try:
-        data = json.loads(NOTES_DB_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        data = json.loads(
+            NOTES_DB_PATH.read_text(
+                encoding="utf-8"
+            )
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ):
         return {}
-    return data if isinstance(data, dict) else {}
+
+    return (
+        data
+        if isinstance(data, dict)
+        else {}
+    )
 
 
 def _save_generated_notes() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    NOTES_DB_PATH.write_text(json.dumps(GENERATED_NOTES, indent=2), encoding="utf-8")
+    DATA_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    NOTES_DB_PATH.write_text(
+        json.dumps(
+            GENERATED_NOTES,
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
 
 
-def _normalize_record(note_id: str, record: dict[str, Any]) -> dict[str, Any]:
-    normalized_note = (record.get("normalized") or {}).get("note") or {}
+# ============================================================
+# NOTE LIST METADATA
+# ============================================================
+
+def _normalize_record(
+    note_id: str,
+    record: dict[str, Any],
+) -> dict[str, Any]:
+
+    normalized_note = (
+        record.get("normalized") or {}
+    ).get("note") or {}
+
+    quality_report = (
+        record.get("quality_report") or {}
+    )
+
     return {
         "id": note_id,
-        "title": record["title"],
-        "topic": record["topic"],
-        "updated": record["updated"],
-        "source": record.get("source", "generated"),
-        "total_sections": normalized_note.get("total_sections"),
-        "estimated_read_time": normalized_note.get("estimated_read_time"),
-        "progress": normalized_note.get("progress", 0),
-        "is_favorite": normalized_note.get("is_favorite", False),
-        "last_opened": normalized_note.get("last_opened"),
+        "title": record.get(
+            "title",
+            normalized_note.get(
+                "title",
+                "Untitled Note",
+            ),
+        ),
+        "topic": record.get(
+            "topic",
+            "UPLOAD",
+        ),
+        "updated": record.get(
+            "updated",
+            "",
+        ),
+        "source": record.get(
+            "source",
+            "generated",
+        ),
+        "total_sections": normalized_note.get(
+            "total_sections"
+        ),
+        "estimated_read_time": normalized_note.get(
+            "estimated_read_time"
+        ),
+        "progress": normalized_note.get(
+            "progress",
+            0,
+        ),
+        "is_favorite": normalized_note.get(
+            "is_favorite",
+            False,
+        ),
+        "last_opened": normalized_note.get(
+            "last_opened"
+        ),
+        "quality_score": quality_report.get(
+            "quality_score"
+        ),
+        "quality_rating": quality_report.get(
+            "rating"
+        ),
+        "quality_valid": quality_report.get(
+            "valid"
+        ),
     }
 
 
-def register_generated_note(package: dict[str, Any], topic: str | None = None) -> str:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    topic_label = (topic or "UPLOAD").upper()
-    normalized = normalize_generated_notes(package, topic_label)
-    note_id = normalized["note"]["id"]
+# ============================================================
+# REGISTER GENERATED NOTE
+# ============================================================
+
+def register_generated_note(
+    package: dict[str, Any],
+    topic: str | None = None,
+    session_id: str | None = None,
+) -> str:
+    """
+    Register a newly generated study note.
+
+    Pipeline:
+
+        raw generated package
+                ↓
+        normalization
+                ↓
+        quality validation
+                ↓
+        persistent storage
+
+    The original package is retained for compatibility with
+    existing format rendering.
+
+    The normalized package is retained separately for:
+        - retrieval
+        - chunking
+        - revision
+        - analytics
+        - quality inspection
+    """
+
+    if not isinstance(
+        package,
+        dict,
+    ):
+        raise ValueError(
+            "Generated note package must be a dictionary."
+        )
+
+    now = datetime.now().strftime(
+        "%Y-%m-%d %H:%M"
+    )
+
+    topic_label = (
+        topic or "UPLOAD"
+    ).upper()
+
+    # --------------------------------------------------------
+    # NORMALIZATION
+    # --------------------------------------------------------
+
+    normalized = normalize_generated_notes(
+        package,
+        topic_label,
+    )
+
+    note_id = normalized[
+        "note"
+    ][
+        "id"
+    ]
+
+    # --------------------------------------------------------
+    # QUALITY VALIDATION
+    # --------------------------------------------------------
+
+    expected_pages = (
+        package.get(
+            "source_page_count"
+        )
+        or package.get(
+            "total_source_pages"
+        )
+        or package.get(
+            "page_count"
+        )
+    )
+
+    try:
+        expected_pages = (
+            int(expected_pages)
+            if expected_pages is not None
+            else None
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        expected_pages = None
+
+    quality_report = validate_note_package(
+        normalized,
+        expected_source_pages=expected_pages,
+    )
+
+    # --------------------------------------------------------
+    # TITLE
+    # --------------------------------------------------------
+
+    document_title = (
+        package.get(
+            "document_title"
+        )
+        or normalized[
+            "note"
+        ].get(
+            "title"
+        )
+        or "Untitled Note"
+    )
+
+    # --------------------------------------------------------
+    # RECORD
+    # --------------------------------------------------------
+
     GENERATED_NOTES[note_id] = {
         "id": note_id,
-        "title": package["document_title"],
+        "title": document_title,
         "topic": topic_label,
         "updated": now,
         "source": "generated",
+        "session_id": (
+            session_id
+            or package.get(
+                "session_id"
+            )
+        ),
+
+        # Original generated package.
         "package": package,
+
+        # Clean normalized package.
         "normalized": normalized,
+
+        # Deterministic quality report.
+        "quality_report": quality_report,
     }
+
     _save_generated_notes()
+
     return note_id
 
 
+# ============================================================
+# SESSION ATTACHMENT
+# ============================================================
+
+def attach_session_to_note(
+    note_id: str,
+    session_id: str,
+) -> None:
+
+    if note_id not in GENERATED_NOTES:
+        return
+
+    GENERATED_NOTES[
+        note_id
+    ][
+        "session_id"
+    ] = session_id
+
+    GENERATED_NOTES[
+        note_id
+    ].setdefault(
+        "package",
+        {},
+    )[
+        "session_id"
+    ] = session_id
+
+    if GENERATED_NOTES[
+        note_id
+    ].get(
+        "normalized"
+    ):
+        GENERATED_NOTES[
+            note_id
+        ][
+            "normalized"
+        ][
+            "note"
+        ][
+            "session_id"
+        ] = session_id
+
+    _save_generated_notes()
+
+
+# ============================================================
+# LIST NOTES
+# ============================================================
+
 def list_notes() -> list[dict[str, Any]]:
+
     items = [
-        _normalize_record(note_id, record)
-        for note_id, record in STATIC_NOTES.items()
+        _normalize_record(
+            note_id,
+            record,
+        )
+        for note_id, record
+        in STATIC_NOTES.items()
     ]
+
     items.extend(
-        _normalize_record(note_id, record)
-        for note_id, record in GENERATED_NOTES.items()
+        _normalize_record(
+            note_id,
+            record,
+        )
+        for note_id, record
+        in GENERATED_NOTES.items()
     )
+
     return items
 
 
-def get_note_record(note_id: str) -> dict[str, Any] | None:
+# ============================================================
+# GET NOTE RECORD
+# ============================================================
+
+def get_note_record(
+    note_id: str,
+) -> dict[str, Any] | None:
+
     if note_id in GENERATED_NOTES:
-        return GENERATED_NOTES[note_id]
-    return STATIC_NOTES.get(note_id)
+        return GENERATED_NOTES[
+            note_id
+        ]
+
+    return STATIC_NOTES.get(
+        note_id
+    )
 
 
-def get_note_content(note_id: str, note_format: str) -> dict[str, Any]:
-    record = get_note_record(note_id)
+# ============================================================
+# GET NOTE CONTENT FOR FRONTEND
+# ============================================================
+
+def get_note_content(
+    note_id: str,
+    note_format: str,
+) -> dict[str, Any]:
+
+    record = get_note_record(
+        note_id
+    )
+
     if not record:
         return {}
-    if record.get("source") == "generated":
-        return format_package_for_view(record["package"], note_format)
-    return deepcopy(record["content"].get(note_format) or record["content"].get("cornell") or {})
+
+    # Keep the existing frontend format pipeline.
+    if record.get(
+        "source"
+    ) == "generated":
+
+        return format_package_for_view(
+            record.get(
+                "package",
+                {},
+            ),
+            note_format,
+        )
+
+    return deepcopy(
+        record.get(
+            "content",
+            {},
+        ).get(
+            note_format
+        )
+        or record.get(
+            "content",
+            {},
+        ).get(
+            "cornell",
+            {},
+        )
+    )
 
 
-def get_normalized_note(note_id: str) -> dict[str, Any]:
-    record = get_note_record(note_id)
+# ============================================================
+# GET NORMALIZED NOTE
+# ============================================================
+
+def get_normalized_note(
+    note_id: str,
+) -> dict[str, Any]:
+
+    record = get_note_record(
+        note_id
+    )
+
     if not record:
         return {}
-    return deepcopy(record.get("normalized") or {})
+
+    return deepcopy(
+        record.get(
+            "normalized"
+        )
+        or {}
+    )
 
 
-GENERATED_NOTES.update(_load_generated_notes())
+# ============================================================
+# GET QUALITY REPORT
+# ============================================================
+
+def get_note_quality(
+    note_id: str,
+) -> dict[str, Any]:
+
+    record = get_note_record(
+        note_id
+    )
+
+    if not record:
+        return {}
+
+    return deepcopy(
+        record.get(
+            "quality_report"
+        )
+        or {}
+    )
+
+
+# ============================================================
+# QUALITY STATUS
+# ============================================================
+
+def is_note_quality_valid(
+    note_id: str,
+) -> bool:
+
+    report = get_note_quality(
+        note_id
+    )
+
+    return bool(
+        report.get(
+            "valid",
+            False,
+        )
+    )
+
+
+# ============================================================
+# LOAD PERSISTED NOTES
+# ============================================================
+
+GENERATED_NOTES.update(
+    _load_generated_notes()
+)

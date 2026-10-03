@@ -21,6 +21,7 @@ from routes import (
     quiz,
     chat,
     planner,
+    targeted_study,
 )
 
 # =====================================================
@@ -125,6 +126,12 @@ app.include_router(
     planner.router,
     prefix="/planner",
     tags=["Planner"],
+)
+
+app.include_router(
+    targeted_study.router,
+    prefix="/study",
+    tags=["Targeted Study"],
 )
 
 # =====================================================

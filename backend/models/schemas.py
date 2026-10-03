@@ -46,6 +46,7 @@ class RecentQuiz(BaseModel):
     difficulty: str
     icon: str
     variant: str
+    feedback: Optional[str] = None
 
 
 class Tip(BaseModel):
@@ -73,6 +74,39 @@ class ActivityEntry(BaseModel):
     message: Optional[str] = None
     task_id: Optional[int] = None
     done: Optional[bool] = None
+    session_id: Optional[str] = None
+    file_count: Optional[int] = None
+    uploaded_files: Optional[List[str]] = None
+
+
+class WeakTopic(BaseModel):
+    topic: str
+    count: int
+
+
+class EmojiHistoryItem(BaseModel):
+    attempt_id: Optional[str] = None
+    created_at: Optional[str] = None
+    score: int
+    total: int
+    percentage: int
+    emoji: Optional[str] = None
+    feedback: Optional[str] = None
+
+
+class DashboardAnalytics(BaseModel):
+    total_sessions: int
+    uploaded_files_count: int
+    quizzes_attempted: int
+    highest_score: int
+    average_score: float
+    weak_topics: List[WeakTopic]
+    most_difficult_topics: List[WeakTopic] = []
+    diagrams_generated: int = 0
+    learning_progress: int
+    study_minutes: int
+    topics_mastered: int
+    emoji_performance_history: List[EmojiHistoryItem]
 
 
 class DashboardResponse(BaseModel):
@@ -86,3 +120,4 @@ class DashboardResponse(BaseModel):
     heatmap_weeks: int
     activity_heatmap: List[List[HeatmapCell]]
     recent_activity: List[ActivityEntry]
+    analytics: Optional[DashboardAnalytics] = None

@@ -8,6 +8,7 @@ const BASE_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:8000"
     : import.meta.env.VITE_API_URL;
+
 export const getAssetUrl = (path) => {
   if (!path) return "";
   if (path.startsWith("http")) return path;
@@ -44,6 +45,12 @@ export const uploadFile = (file) => {
   return request("POST", "/upload", fd, true);
 };
 
+export const uploadFiles = (files) => {
+  const fd = new FormData();
+  files.forEach((file) => fd.append("files", file));
+  return request("POST", "/upload", fd, true);
+};
+
 // ── Notes ────────────────────────────────────────────────────────────────────
 export const getNotesList = () => request("GET", "/notes");
 export const getNote = (id, format = "cornell") =>
@@ -73,5 +80,38 @@ export const toggleTask = (task_id, done) =>
   request("POST", "/planner/toggle", { task_id, done });
 export const autoSchedule = () => request("POST", "/planner/auto-schedule");
 
-// Activity
+// ── Activity ─────────────────────────────────────────────────────────────────
 export const logActivity = (event) => request("POST", "/activity", event);
+
+// ── Targeted Topic Study ─────────────────────────────────────────────────────
+export const uploadAndTargetStudy = (files, query, topK = 12, maxChunks = 18) => {
+  const fd = new FormData();
+  files.forEach((file) => fd.append("files", file));
+  fd.append("query", query);
+  fd.append("top_k", String(topK));
+  fd.append("max_chunks", String(maxChunks));
+  return request("POST", "/study/upload-and-target", fd, true);
+};
+
+export const generateTargetedStudy = (documentId, query, options = {}) => {
+  return request("POST", "/study/targeted", {
+    document_id: documentId,
+    query,
+    top_k: options.topK || 12,
+    max_chunks: options.maxChunks || 18,
+    note_depth: options.noteDepth || "deep",
+    include_examples: options.includeExamples !== false,
+    include_diagrams: options.includeDiagrams !== false,
+  });
+};
+
+export const retrieveTargetedChunks = (documentId, query, topK = 12, maxChunks = 18) => {
+  return request("POST", "/study/targeted-retrieval", {
+    document_id: documentId,
+    query,
+    top_k: topK,
+    max_chunks: maxChunks,
+  });
+};
+
+export const getIndexedDocuments = () => request("GET", "/study/documents");

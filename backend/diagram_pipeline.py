@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from uuid import uuid4
+
+from semantic_utils import top_keywords
 
 try:
     import fitz
@@ -13,7 +16,21 @@ except ImportError:
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DIAGRAM_DIR = STATIC_DIR / "diagrams"
-DIAGRAM_KEYWORDS = ("diagram", "architecture", "flow", "model", "lifecycle", "layer", "pipeline")
+DIAGRAM_KEYWORDS = (
+    "diagram",
+    "architecture",
+    "flow",
+    "model",
+    "lifecycle",
+    "layer",
+    "pipeline",
+    "process",
+    "framework",
+    "component",
+    "structure",
+    "classification",
+    "relationship",
+)
 
 
 def _nearby_text(page, image_rect) -> str:
@@ -96,6 +113,8 @@ def extract_diagrams_from_pdf(file_bytes: bytes, note_id: str) -> list[dict]:
 
 def _section_match_score(section: dict, diagram: dict) -> int:
     score = 0
+    if diagram.get("source_filename") and section.get("source_filename") == diagram.get("source_filename"):
+        score += 8
     section_pages = set(section.get("page_numbers") or [])
     if diagram.get("page_number") in section_pages:
         score += 5
@@ -110,17 +129,6 @@ def _section_match_score(section: dict, diagram: dict) -> int:
     return score
 
 
-def _default_mermaid(section_title: str, caption: str) -> str:
-    return "\n".join(
-        [
-            "flowchart TD",
-            f"  A[{section_title}] --> B[{caption}]",
-            "  B --> C[Structure or flow]",
-            "  C --> D[Exam explanation]",
-        ]
-    )
-
-
 def attach_diagrams_to_sections(package: dict, diagrams: list[dict]) -> dict:
     sections = package.get("sections") or []
     if not diagrams:
@@ -132,15 +140,22 @@ def attach_diagrams_to_sections(package: dict, diagrams: list[dict]) -> dict:
 
     for diagram in diagrams:
         best_section = max(sections, key=lambda section: _section_match_score(section, diagram))
+        existing_ids = {item.get("id") for item in best_section.get("diagrams", []) if item.get("id")}
+        if diagram.get("id") and diagram.get("id") in existing_ids:
+            continue
         best_section.setdefault("diagrams", []).append(diagram)
         diagram["section_id"] = best_section.get("section_id")
+        context_keywords = top_keywords(
+            f"{diagram.get('caption', '')} {diagram.get('context_text', '')} {best_section.get('explanation', '')}",
+            limit=5,
+        )
+        topics = (best_section.get("topics") or [])[:3] + [keyword.title() for keyword in context_keywords[:2]]
         if not diagram.get("explanation"):
             diagram["explanation"] = (
-                f"This diagram belongs with {best_section.get('title', 'the current section')}. "
-                "Use it to explain the structure, flow, or relationship shown in the uploaded material."
+                f"This diagram supports {best_section.get('title', 'the current section')} by visually connecting "
+                f"{', '.join(topics[:4]) or 'the main concepts'}. Use it to explain the structure, flow, or relationship "
+                "before writing the final exam answer."
             )
-        if not diagram.get("mermaid_code"):
-            diagram["mermaid_code"] = _default_mermaid(best_section.get("title", "Section"), diagram.get("caption", "Diagram"))
 
     package["sections"] = sections
     package["diagrams"] = diagrams

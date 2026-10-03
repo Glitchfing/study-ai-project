@@ -13,31 +13,24 @@ from fastapi import (
 
 from activity import record_activity
 from note_store import get_note_record
+from note_generation import generate_note_package
+from quiz_engine import evaluate_answer, generate_quiz_for_package, performance_feedback
 from quiz_attempt_store import (
     list_quiz_attempts,
     save_quiz_attempt,
 )
+from session_store import attach_quiz_attempt, find_session_by_note_id
 
-import os
 import json
 import uuid
 import random
 
 from pathlib import Path
 
-from groq import Groq
-from dotenv import load_dotenv
-
 from pypdf import PdfReader
 from docx import Document
 
-load_dotenv()
-
 router = APIRouter()
-
-client = Groq(
-    api_key=os.getenv("GROQ_API_KEY")
-)
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -77,15 +70,13 @@ def extract_text(file_path: str) -> str:
     if path.suffix == ".pdf":
         reader = PdfReader(file_path)
 
-        text = ""
-
-        for page in reader.pages:
+        pages = []
+        for index, page in enumerate(reader.pages, start=1):
             page_text = page.extract_text()
 
-            if page_text:
-                text += page_text + "\n"
+            pages.append(f"[[PAGE_{index}]]\n{page_text or ''}")
 
-        return text
+        return "\n\n".join(pages)
 
     if path.suffix == ".docx":
         doc = Document(file_path)
@@ -109,69 +100,18 @@ def extract_text(file_path: str) -> str:
 # GROQ AI GENERATION
 # =====================================================
 
-def generate_ai_content(document_text: str):
-
-    prompt = f"""
-You are an AI study assistant.
-
-Analyze the uploaded document and generate:
-
-1. Summary
-2. Important topics
-3. Notes sections
-4. MCQ quiz questions
-
-Return ONLY valid JSON.
-
-JSON Format:
-
-{{
-    "summary": "",
-    "topics": [],
-    "sections": [
-        {{
-            "title": "",
-            "topics": [],
-            "content": "",
-            "questions": [
-                {{
-                    "question": "",
-                    "options": [],
-                    "correct": 0,
-                    "explanation": "",
-                    "difficulty": "easy"
-                }}
-            ]
-        }}
-    ]
-}}
-
-Document:
-{document_text[:12000]}
-"""
-
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-        temperature=0.4,
+def generate_ai_content(document_text: str, filename: str):
+    return generate_note_package(
+        document_text,
+        filename,
+        preferences={
+            "note_depth": "deep",
+            "preferred_format": "cornell",
+            "exam_focus": True,
+            "include_examples": True,
+            "include_diagrams": True,
+        },
     )
-
-    content = response.choices[0].message.content
-
-    try:
-        return json.loads(content)
-
-    except Exception:
-        return {
-            "summary": "Failed to generate AI notes",
-            "topics": [],
-            "sections": [],
-        }
 
 
 # =====================================================
@@ -198,9 +138,7 @@ async def upload_document(
         str(file_path)
     )
 
-    ai_package = generate_ai_content(
-        extracted_text
-    )
+    ai_package = generate_ai_content(extracted_text, file.filename or "uploaded-document.txt")
 
     note_record = {
         "id": note_id,
@@ -223,8 +161,12 @@ async def upload_document(
     return {
         "message": "AI notes generated successfully",
         "note_id": note_id,
-        "summary": ai_package.get("summary"),
-        "topics": ai_package.get("topics"),
+        "summary": ai_package.get("global_summary"),
+        "topics": [
+            topic.get("title") if isinstance(topic, dict) else str(topic)
+            for topic in (ai_package.get("topic_map") or {}).get("major_topics", [])
+            if (topic.get("title") if isinstance(topic, dict) else str(topic))
+        ],
     }
 
 
@@ -345,44 +287,12 @@ def _generated_questions_for_note(
         or "Generated Note"
     )
 
-    questions = []
-
-    counter = 0
-
-    for section in package.get("sections") or []:
-
-        for question in (
-            section.get("questions") or []
-        ):
-
-            counter += 1
-
-            questions.append(
-                _normalize_question(
-                    question,
-                    index=counter,
-                    note_id=note_id,
-                    note_title=note_title,
-                    section=section,
-                )
-            )
-
-    if not questions:
-
-        for question in (
-            package.get("questions") or []
-        ):
-
-            counter += 1
-
-            questions.append(
-                _normalize_question(
-                    question,
-                    index=counter,
-                    note_id=note_id,
-                    note_title=note_title,
-                )
-            )
+    questions = generate_quiz_for_package(
+        package,
+        note_id=note_id,
+        note_title=note_title,
+        limit=limit,
+    )
 
     return {
         "topic": (
@@ -398,7 +308,7 @@ def _generated_questions_for_note(
 
         "total": len(questions),
 
-        "questions": questions[:limit],
+        "questions": questions,
     }
 
 
@@ -490,32 +400,27 @@ def create_quiz_attempt(
             detail="No quiz responses supplied.",
         )
 
-    total = int(
-        payload.get("total")
-        or len(responses)
-    )
+    evaluated_responses = []
+    for response in responses:
+        question_payload = response.get("question_data") or response
+        if response.get("question_data"):
+            evaluation = evaluate_answer(question_payload, response)
+            evaluated_responses.append({**response, **evaluation})
+        else:
+            evaluated_responses.append(response)
 
-    correct = int(
-        payload.get("correct")
-        or 0
-    )
+    responses = evaluated_responses
+    total = int(payload.get("total") or len(responses))
+    correct = sum(1 for response in responses if response.get("is_correct"))
+    score = int(round((correct / max(total, 1)) * 100))
+    performance = performance_feedback(correct, total)
 
-    score = int(
-        payload.get("score")
-        or round(
-            (correct / max(total, 1)) * 100
-        )
-    )
-
-    weak_topics = (
-        payload.get("weak_topics")
-        or [
-            response.get("topic")
-            for response in responses
-            if not response.get("is_correct")
-            and response.get("topic")
-        ]
-    )
+    weak_topics = [
+        response.get("topic")
+        for response in responses
+        if not response.get("is_correct")
+        and response.get("topic")
+    ]
 
     weak_topics = list(
         dict.fromkeys(weak_topics)
@@ -532,12 +437,14 @@ def create_quiz_attempt(
             "score": score,
             "total": total,
             "correct": correct,
+            "responses": responses,
             "weak_topics": weak_topics,
-            "question_types": dict(
-                question_types
-            ),
+            "question_types": dict(question_types),
+            "performance": performance,
         }
     )
+
+    attach_quiz_attempt(payload.get("note_id"), attempt, performance)
 
     record_activity(
         "quiz_completed",
@@ -563,9 +470,10 @@ def create_quiz_attempt(
         weak_topics=weak_topics,
 
         attempt_id=attempt["id"],
+        performance=performance,
     )
 
-    return attempt
+    return {**attempt, "performance": performance, "session": find_session_by_note_id(payload.get("note_id"))}
 
 
 # =====================================================

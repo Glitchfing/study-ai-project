@@ -151,6 +151,35 @@ export default function Dashboard({ data, loading, onNavigate, onRefresh, toast 
         ))}
       </div>
 
+      {data.analytics ? (
+        <div className="analytics-grid">
+          {[
+            { label: "Total Sessions", value: data.analytics.total_sessions },
+            { label: "Uploaded Files", value: data.analytics.uploaded_files_count },
+            { label: "Quizzes Attempted", value: data.analytics.quizzes_attempted },
+            { label: "Highest Score", value: `${data.analytics.highest_score}%` },
+            { label: "Average Score", value: `${data.analytics.average_score}%` },
+            { label: "Learning Progress", value: `${data.analytics.learning_progress}%` },
+            { label: "Diagrams Generated", value: data.analytics.diagrams_generated ?? 0 },
+          ].map((item) => (
+            <div className="analytics-pill" key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {data.analytics?.weak_topics?.length ? (
+        <div className="weak-topic-strip">
+          {data.analytics.weak_topics.map((item) => (
+            <span key={item.topic}>
+              {item.topic}: {item.count}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       <div className="section-label">Topic Mastery</div>
       <div className="orb-row">
         {data.topics.map((t) => (
@@ -246,6 +275,31 @@ export default function Dashboard({ data, loading, onNavigate, onRefresh, toast 
               ))
             ) : (
               <div style={{ color: "var(--muted)", fontSize: 12 }}>No quiz activity yet.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: "18px 20px" }}>
+          <div className="card-header">
+            <div className="card-title">Performance History</div>
+            <span className="card-action">Emoji</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.analytics?.emoji_performance_history?.length ? (
+              data.analytics.emoji_performance_history.slice().reverse().map((item) => (
+                <div className="tip-row" key={item.attempt_id || `${item.created_at}-${item.percentage}`}>
+                  <div className="tip-ico">{item.emoji}</div>
+                  <div className="tip-body">
+                    <strong>{item.feedback}</strong>
+                    <br />
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {item.score}/{item.total} · {item.percentage}% · {item.created_at}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ color: "var(--muted)", fontSize: 12 }}>Emoji feedback appears after quiz attempts.</div>
             )}
           </div>
         </div>

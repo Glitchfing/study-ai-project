@@ -1,5 +1,34 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getAssetUrl, getNotesList, getNote } from "../services/api";
+
+let mermaidModulePromise = null;
+
+function loadMermaid() {
+  if (!mermaidModulePromise) {
+    mermaidModulePromise = import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs")
+      .then((module) => {
+        const mermaid = module.default;
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: "dark",
+          mindmap: { padding: 16 },
+          flowchart: { htmlLabels: false, curve: "basis" },
+          themeVariables: {
+            background: "transparent",
+            primaryColor: "#13505b",
+            primaryTextColor: "#edf6f9",
+            primaryBorderColor: "#119da4",
+            lineColor: "#83c5be",
+            secondaryColor: "#0c7489",
+            tertiaryColor: "#040404",
+          },
+        });
+        return mermaid;
+      });
+  }
+  return mermaidModulePromise;
+}
 
 const FORMAT_LABELS = {
   full: "Reader",
@@ -9,30 +38,6 @@ const FORMAT_LABELS = {
   chart: "Chart",
   sentence: "Sentence",
 };
-
-function SectionList({ title, items }) {
-  if (!items?.length) return null;
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{
-        fontSize: 10,
-        letterSpacing: 1,
-        textTransform: "uppercase",
-        color: "var(--muted)",
-        marginBottom: 8,
-      }}>
-        {title}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {items.map((item, index) => (
-          <div key={index} style={{ color: "var(--text2)", fontSize: 12, lineHeight: 1.7 }}>
-            {index + 1}. {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function CornellView({ content }) {
   const cues = content.cue || content.cues || [];
@@ -57,16 +62,61 @@ function CornellView({ content }) {
 }
 
 function renderMindMapNode(node, depth = 0) {
+  const name = typeof node === "string" ? node : node?.name;
+  const children = typeof node === "string" ? [] : node?.sub_branches || [];
+  if (!name) return null;
   return (
-    <div key={`${node.name}-${depth}`} style={{ marginLeft: depth * 18, marginTop: 8 }}>
+    <div key={`${name}-${depth}`} style={{ marginLeft: depth * 18, marginTop: 8 }}>
       <div style={{
         fontFamily: "'Syne', sans-serif",
         fontWeight: 700,
         color: depth === 0 ? "var(--c-bright)" : "var(--text)",
       }}>
-        {depth === 0 ? "Root" : "Node"}: {node.name}
+        {depth === 0 ? name : `- ${name}`}
       </div>
-      {node.sub_branches?.map((child) => renderMindMapNode(child, depth + 1))}
+      {children.map((child) => renderMindMapNode(child, depth + 1))}
+    </div>
+  );
+}
+
+function MermaidDiagram({ code, title = "Rendered diagram" }) {
+  const [svg, setSvg] = useState("");
+  const [error, setError] = useState("");
+  const renderId = useRef(`mermaid-${Math.random().toString(36).slice(2)}`);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!code?.trim()) return;
+
+    setError("");
+    setSvg("");
+    loadMermaid()
+      .then((mermaid) => mermaid.render(renderId.current, code))
+      .then((result) => {
+        if (!cancelled) setSvg(result.svg);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err?.message || "Could not render this Mermaid diagram.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (!code?.trim()) return null;
+
+  return (
+    <div className="mermaid-card">
+      <div className="mermaid-title">{title}</div>
+      {svg && !error ? (
+        <div className="mermaid-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+      ) : (
+        <div className="mermaid-fallback">
+          {error ? <div className="mermaid-error">{error}</div> : <div className="mermaid-loading">Rendering diagram...</div>}
+          <pre>{code}</pre>
+        </div>
+      )}
     </div>
   );
 }
@@ -81,19 +131,7 @@ function MindMapView({ content }) {
         {content.branches?.map((branch) => renderMindMapNode(branch, 0))}
       </div>
       {content.mermaid ? (
-        <div style={{
-          border: "1px solid var(--border2)",
-          borderRadius: 12,
-          padding: 12,
-          background: "rgba(17,157,164,0.08)",
-        }}>
-          <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>
-            Mermaid Source
-          </div>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: "var(--text2)", fontSize: 11 }}>
-            {content.mermaid}
-          </pre>
-        </div>
+        <MermaidDiagram code={content.mermaid} title="Mind map" />
       ) : null}
     </div>
   );
@@ -136,21 +174,16 @@ function SentenceView({ content }) {
 function ChartView({ content }) {
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <table className="study-chart">
+        <colgroup>
+          <col style={{ width: "24%" }} />
+          <col style={{ width: "48%" }} />
+          <col style={{ width: "28%" }} />
+        </colgroup>
         <thead>
           <tr>
             {content.columns?.map((column, index) => (
-              <th
-                key={index}
-                style={{
-                  padding: "8px 12px",
-                  background: "rgba(17,157,164,0.15)",
-                  color: "var(--c-sky)",
-                  textAlign: "left",
-                  borderBottom: "1px solid var(--border2)",
-                  fontFamily: "'Syne', sans-serif",
-                }}
-              >
+              <th key={index}>
                 {column}
               </th>
             ))}
@@ -158,9 +191,9 @@ function ChartView({ content }) {
         </thead>
         <tbody>
           {content.rows?.map((row, rowIndex) => (
-            <tr key={rowIndex} style={{ borderBottom: "1px solid var(--border)" }}>
+            <tr key={rowIndex}>
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex} style={{ padding: "8px 12px", color: "var(--text2)" }}>
+                <td key={cellIndex}>
                   {cell}
                 </td>
               ))}
@@ -175,14 +208,14 @@ function ChartView({ content }) {
 function DiagramBlock({ diagram }) {
   return (
     <div style={{
-      marginTop: 14,
+      margin: "18px 0",
       padding: 14,
       border: "1px solid var(--border2)",
-      borderRadius: 12,
+      borderRadius: 8,
       background: "rgba(17,157,164,0.08)",
     }}>
       <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, marginBottom: 8 }}>
-        Inline Diagram {diagram.page_number ? `- Page ${diagram.page_number}` : ""}
+        {diagram.caption || (diagram.page_number ? `Diagram from page ${diagram.page_number}` : "Diagram")}
       </div>
       {diagram.image_url ? (
         <img
@@ -200,7 +233,7 @@ function DiagramBlock({ diagram }) {
       ) : null}
       {diagram.caption ? (
         <div style={{ color: "var(--muted)", fontSize: 11, marginTop: 8 }}>
-          {diagram.caption}
+          Page {diagram.page_number || "source"}
         </div>
       ) : null}
       {diagram.explanation ? (
@@ -208,69 +241,97 @@ function DiagramBlock({ diagram }) {
           {diagram.explanation}
         </div>
       ) : null}
-      {diagram.mermaid_code ? (
-        <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>
-            Mermaid Source
-          </div>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: "var(--text2)", fontSize: 11 }}>
-            {diagram.mermaid_code}
-          </pre>
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function QuestionGroup({ questions }) {
-  if (!questions?.length) return null;
+function NarrativeText({ text, diagrams = [] }) {
+  const paragraphs = String(text || "")
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 
-  const grouped = questions.reduce((acc, question) => {
-    const type = question.type || "general";
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(question);
-    return acc;
-  }, {});
+  if (!paragraphs.length) return null;
+
+  const firstDiagramIndex = Math.min(1, paragraphs.length);
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>
-        Exam Practice
-      </div>
-      {Object.entries(grouped).map(([type, items]) => (
-        <div key={type} style={{ marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, color: "var(--c-bright)", marginBottom: 6 }}>
-            {type}
-          </div>
-          {items.map((question, index) => (
-            <div key={index} style={{
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              padding: 10,
-              marginBottom: 8,
-              background: "rgba(255,255,255,0.02)",
-            }}>
-              <div style={{ color: "var(--text)", fontSize: 12, marginBottom: 6 }}>
-                {index + 1}. {question.question}
-              </div>
-              {question.options?.length ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
-                  {question.options.map((option, optionIndex) => (
-                    <div key={optionIndex} style={{ color: "var(--text2)", fontSize: 11 }}>
-                      {String.fromCharCode(65 + optionIndex)}. {option}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {question.answer_hint ? (
-                <div style={{ color: "var(--muted)", fontSize: 11 }}>
-                  Hint: {question.answer_hint}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
+    <div className="teaching-narrative">
+      {paragraphs.map((paragraph, index) => (
+        <React.Fragment key={index}>
+          <p>{paragraph}</p>
+          {index + 1 === firstDiagramIndex
+            ? diagrams.map((diagram, diagramIndex) => (
+                <DiagramBlock key={diagram.id || diagramIndex} diagram={diagram} />
+              ))
+            : null}
+        </React.Fragment>
       ))}
+      {firstDiagramIndex === 0
+        ? diagrams.map((diagram, diagramIndex) => (
+            <DiagramBlock key={diagram.id || diagramIndex} diagram={diagram} />
+          ))
+        : null}
+    </div>
+  );
+}
+
+function StudyAidList({ title, items = [] }) {
+  const cleanItems = items.filter(Boolean);
+  if (!cleanItems.length) return null;
+
+  return (
+    <div className="study-aid-block">
+      <div className="study-aid-title">{title}</div>
+      <ul>
+        {cleanItems.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SectionStudyAids({ section }) {
+  const examples = [
+    ...(section.examples || []),
+    ...(section.use_cases || []),
+  ];
+
+  const hasContent = [
+    section.why_this_matters,
+    ...(section.definitions || []),
+    ...(section.key_points || []),
+    ...examples,
+    ...(section.important_notes || []),
+    ...(section.common_mistakes || []),
+    ...(section.revision_notes || []),
+    ...(section.memory_tricks || []),
+    ...(section.concept_comparisons || []),
+    ...(section.test_yourself || []),
+  ].filter(Boolean).length;
+
+  if (!hasContent) return null;
+
+  return (
+    <div className="study-aids">
+      {section.why_this_matters ? (
+        <div className="why-card">
+          <div className="study-aid-title">Why This Matters</div>
+          <p>{section.why_this_matters}</p>
+        </div>
+      ) : null}
+      <div className="study-aid-grid">
+        <StudyAidList title="Definitions" items={section.definitions || []} />
+        <StudyAidList title="Exam Points" items={section.key_points || []} />
+        <StudyAidList title="Examples And Uses" items={examples} />
+        <StudyAidList title="Avoid These Mistakes" items={section.common_mistakes || []} />
+        <StudyAidList title="Revision Plan" items={section.revision_notes || []} />
+        <StudyAidList title="Test Yourself" items={section.test_yourself || []} />
+      </div>
+      <StudyAidList title="Memory Hooks" items={section.memory_tricks || []} />
+      <StudyAidList title="Concept Comparisons" items={section.concept_comparisons || []} />
+      <StudyAidList title="Important Notes" items={section.important_notes || []} />
     </div>
   );
 }
@@ -282,64 +343,23 @@ function FullNoteView({ content }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ color: "var(--text2)", lineHeight: 1.75 }}>
+      <div className="teaching-summary">
         {content.global_summary}
       </div>
-      {content.recommended_revision_strategy ? (
-        <div style={{
-          border: "1px solid var(--border2)",
-          borderRadius: 12,
-          padding: 14,
-          background: "rgba(244,140,108,0.08)",
-        }}>
-          <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>
-            Revision Strategy
-          </div>
-          <div style={{ color: "var(--text2)", fontSize: 12, lineHeight: 1.7 }}>
-            {content.recommended_revision_strategy}
-          </div>
-        </div>
-      ) : null}
 
       {content.sections.map((section, index) => (
-        <section key={section.section_id || index} style={{ borderTop: "1px solid var(--border)", paddingTop: 18 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, color: "var(--text)", marginBottom: 10 }}>
-            {index + 1}. {section.title}
-          </div>
+        <section key={section.section_id || index} className="teaching-section">
+          <h2>{section.title}</h2>
           {section.page_numbers?.length ? (
             <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 10 }}>
               Pages: {section.page_numbers.join(", ")}
             </div>
           ) : null}
-          <div style={{ color: "var(--text2)", lineHeight: 1.8 }}>
-            {section.explanation || section.notes?.cornell?.summary}
-          </div>
-
-          <SectionList title="Key Points" items={section.key_points} />
-          <SectionList title="Definitions" items={section.definitions} />
-          <SectionList title="Examples" items={section.examples} />
-          <SectionList title="Use Cases" items={section.use_cases} />
-
-          {section.why_this_matters ? (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>
-                Why This Matters
-              </div>
-              <div style={{ color: "var(--text2)", fontSize: 12, lineHeight: 1.7 }}>
-                {section.why_this_matters}
-              </div>
-            </div>
-          ) : null}
-
-          <SectionList title="Important Notes" items={section.important_notes} />
-          <SectionList title="Common Mistakes" items={section.common_mistakes} />
-          <SectionList title="Test Yourself" items={section.test_yourself} />
-
-          {section.diagrams?.map((diagram, diagramIndex) => (
-            <DiagramBlock key={diagram.id || diagramIndex} diagram={diagram} />
-          ))}
-
-          <QuestionGroup questions={section.questions} />
+          <NarrativeText
+            text={section.content || section.educational_explanation || section.explanation || section.notes?.cornell?.notes}
+            diagrams={section.diagrams || []}
+          />
+          <SectionStudyAids section={section} />
         </section>
       ))}
     </div>
@@ -446,8 +466,42 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
                 ) : null}
               </div>
               {content.generation_mode ? (
-                <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 16 }}>
-                  Generation mode: {content.generation_mode}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: "var(--r)",
+                  background: content.generation_mode === "targeted" ? "rgba(17,157,164,0.12)" : "rgba(255,255,255,0.03)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text2)",
+                  fontSize: 11,
+                  marginBottom: 16,
+                }}>
+                  <div>
+                    {content.generation_mode === "targeted" ? (
+                      <>
+                        <strong style={{ color: "var(--c-sky)" }}>⚡ Targeted Topic Study:</strong>{" "}
+                        <span>{content.requested_topic || activeNoteMeta?.topic}</span>
+                        {content.retrieval?.pages?.length ? (
+                          <span style={{ color: "var(--muted)", marginLeft: 6 }}>
+                            · Source Pages: {content.retrieval.pages.join(", ")}
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span>Generation mode: {content.generation_mode}</span>
+                    )}
+                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: 10, padding: "3px 8px" }}
+                    onClick={() => onNavigate("upload")}
+                  >
+                    + Study Another Topic
+                  </button>
                 </div>
               ) : null}
               {format === "full" && <FullNoteView content={content} />}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from activity import record_activity
 from note_store import get_normalized_note, get_note_content, get_note_record, list_notes
+from session_store import update_session_note_format
 
 router = APIRouter()
 
@@ -26,6 +27,7 @@ def get_note(note_id: str, format: str = Query("cornell")):
         format=format,
         title=note.get("title"),
     )
+    update_session_note_format(note_id, format)
 
     result = {
         "id": note["id"],

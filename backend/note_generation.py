@@ -1,260 +1,28 @@
 from __future__ import annotations
 
-import json
 import re
-from collections import Counter
 from datetime import datetime
-from difflib import SequenceMatcher
-from pathlib import Path
 from typing import Any
 
-from ai_generation import generate_structured_json, has_llm_support, image_bytes_to_data_url
+from services.llm_orchestrator import run_multi_pass_pipeline
 
-BASE_DIR = Path(__file__).resolve().parent
 
-STOPWORDS = {
-    "the",
-    "and",
-    "for",
-    "with",
-    "that",
-    "this",
-    "from",
-    "are",
-    "was",
-    "were",
-    "your",
-    "their",
-    "into",
-    "have",
-    "has",
-    "had",
-    "not",
-    "can",
-    "will",
-    "may",
-    "shall",
-    "should",
-    "would",
-    "could",
-    "there",
-    "here",
-    "about",
-    "been",
-    "each",
-    "when",
-    "what",
-    "which",
-    "where",
-    "how",
-    "why",
-    "through",
-    "using",
-    "use",
-    "used",
-    "our",
-    "its",
-    "it",
-    "a",
-    "an",
-    "of",
-    "to",
-    "in",
-    "on",
-    "at",
-    "by",
-    "is",
-    "as",
-    "or",
-}
-
-HEADING_PREFIXES = (
-    "chapter",
-    "unit",
-    "module",
-    "topic",
-    "lecture",
-    "lesson",
-    "section",
-    "part",
-)
-
-CONCEPT_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "title": {"type": "string"},
-        "topics": {"type": "array", "items": {"type": "string"}},
-        "definitions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "term": {"type": "string"},
-                    "meaning": {"type": "string"},
-                },
-                "required": ["term", "meaning"],
-            },
-        },
-        "relationships": {"type": "array", "items": {"type": "string"}},
-        "exam_focus": {"type": "array", "items": {"type": "string"}},
-        "diagram_insights": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["title", "topics", "definitions", "relationships", "exam_focus", "diagram_insights"],
-}
-
-SECTION_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "title": {"type": "string"},
-        "explanation": {"type": "string"},
-        "key_points": {"type": "array", "items": {"type": "string"}},
-        "definitions": {"type": "array", "items": {"type": "string"}},
-        "examples": {"type": "array", "items": {"type": "string"}},
-        "use_cases": {"type": "array", "items": {"type": "string"}},
-        "important_notes": {"type": "array", "items": {"type": "string"}},
-        "why_this_matters": {"type": "string"},
-        "common_mistakes": {"type": "array", "items": {"type": "string"}},
-        "test_yourself": {"type": "array", "items": {"type": "string"}},
-        "notes": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "cornell": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "cue": {"type": "array", "items": {"type": "string"}},
-                        "notes": {"type": "string"},
-                        "summary": {"type": "string"},
-                    },
-                    "required": ["cue", "notes", "summary"],
-                },
-                "outline": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "title": {"type": "string"},
-                        "sections": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "heading": {"type": "string"},
-                                    "points": {"type": "array", "items": {"type": "string"}},
-                                },
-                                "required": ["heading", "points"],
-                            },
-                        },
-                    },
-                    "required": ["title", "sections"],
-                },
-                "mindmap": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "root": {"type": "string"},
-                        "mermaid": {"type": "string"},
-                        "branches": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/$defs/mindmapNode"
-                            },
-                        },
-                    },
-                    "required": ["root", "mermaid", "branches"],
-                },
-                "chart": {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "minItems": 3,
-                        "maxItems": 3,
-                    },
-                },
-                "sentence": {"type": "string"},
-            },
-            "required": ["cornell", "outline", "mindmap", "chart", "sentence"],
-        },
-        "questions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "type": {"type": "string"},
-                    "difficulty": {"type": "string"},
-                    "question": {"type": "string"},
-                    "options": {"type": "array", "items": {"type": "string"}},
-                    "answer_index": {"type": "integer"},
-                    "answer_hint": {"type": "string"},
-                    "explanation": {"type": "string"},
-                },
-                "required": [
-                    "type",
-                    "difficulty",
-                    "question",
-                    "options",
-                    "answer_index",
-                    "answer_hint",
-                    "explanation",
-                ],
-            },
-        },
-    },
-    "required": [
-        "title",
-        "explanation",
-        "key_points",
-        "definitions",
-        "examples",
-        "use_cases",
-        "important_notes",
-        "why_this_matters",
-        "common_mistakes",
-        "test_yourself",
-        "notes",
-        "questions",
-    ],
-    "$defs": {
-        "mindmapNode": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "name": {"type": "string"},
-                "sub_branches": {
-                    "type": "array",
-                    "items": {"$ref": "#/$defs/mindmapNode"},
-                },
-            },
-            "required": ["name", "sub_branches"],
-        }
-    },
-}
+def _clean_text(text: str) -> str:
+    normalized = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    normalized = normalized.replace("â€¢", "-").replace("â—", "-").replace("â—¦", "-")
+    normalized = re.sub(r"[ \t]+", " ", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    return "\n".join(line.strip() for line in normalized.splitlines()).strip()
 
 
 def _title_from_filename(filename: str) -> str:
     return filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").title()
 
 
-def _clean_text(text: str) -> str:
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    normalized = normalized.replace("•", "").replace("●", "").replace("◦", "")
-    normalized = re.sub(r"[ \t]+", " ", normalized)
-    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
-    lines = [line.strip() for line in normalized.split("\n")]
-    return "\n".join(lines).strip()
-
-
 def _split_pages(text: str) -> list[dict[str, Any]]:
-    matches = list(re.finditer(r"\[\[PAGE_(\d+)\]\]", text))
+    matches = list(re.finditer(r"\[\[PAGE_(\d+)\]\]", text or ""))
     if not matches:
-        return [{"page_number": 1, "text": text}]
-
+        return [{"page_number": 1, "text": text or ""}]
     pages = []
     for index, match in enumerate(matches):
         start = match.end()
@@ -262,618 +30,333 @@ def _split_pages(text: str) -> list[dict[str, Any]]:
         page_text = text[start:end].strip()
         if page_text:
             pages.append({"page_number": int(match.group(1)), "text": page_text})
-    return pages or [{"page_number": 1, "text": text}]
-
-
-def _split_paragraphs(text: str) -> list[str]:
-    paragraphs = [part.strip() for part in re.split(r"\n\s*\n+", text) if part.strip()]
-    if paragraphs:
-        return paragraphs
-    return [line.strip() for line in text.split("\n") if line.strip()]
-
-
-def _sentences(text: str) -> list[str]:
-    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
-
-
-def _keywords(text: str, limit: int = 8) -> list[str]:
-    words = re.findall(r"[A-Za-z][A-Za-z0-9_\-]+", text.lower())
-    counts = Counter(word for word in words if len(word) > 2 and word not in STOPWORDS)
-    return [word.replace("_", " ") for word, _ in counts.most_common(limit)]
-
-
-def _looks_like_heading(paragraph: str) -> bool:
-    stripped = paragraph.strip(":").strip()
-    if not stripped or len(stripped) > 90:
-        return False
-    lowered = stripped.lower()
-    if lowered.startswith(HEADING_PREFIXES):
-        return True
-    if re.match(r"^\d+(\.\d+)*\s+[A-Za-z].+$", stripped):
-        return True
-    words = stripped.split()
-    title_case_words = sum(1 for word in words if word[:1].isupper())
-    return len(words) <= 9 and title_case_words >= max(1, len(words) - 2)
-
-
-def _normalize_heading(text: str, fallback: str) -> str:
-    cleaned = re.sub(r"^\d+(\.\d+)*\s*", "", text).strip(":- ").strip()
-    return cleaned or fallback
-
-
-def _chunk_pages(text: str, filename: str) -> list[dict[str, Any]]:
-    pages = _split_pages(text)
-    chunks: list[dict[str, Any]] = []
-    current_title = _title_from_filename(filename)
-    current_parts: list[str] = []
-    current_pages: list[int] = []
-
-    def flush_chunk() -> None:
-        nonlocal current_parts, current_pages, current_title
-        joined = "\n\n".join(part for part in current_parts if part.strip()).strip()
-        if not joined:
-            return
-        chunks.append(
-            {
-                "section_id": f"section-{len(chunks) + 1}",
-                "title": current_title or f"Section {len(chunks) + 1}",
-                "raw_text": joined,
-                "page_numbers": sorted(set(current_pages)) or [1],
-            }
-        )
-        current_parts = []
-        current_pages = []
-
-    for page in pages:
-        paragraphs = _split_paragraphs(page["text"])
-        for paragraph in paragraphs:
-            if _looks_like_heading(paragraph):
-                if current_parts:
-                    flush_chunk()
-                current_title = _normalize_heading(paragraph, current_title)
-                current_pages = [page["page_number"]]
-                continue
-            current_parts.append(paragraph)
-            current_pages.append(page["page_number"])
-            if len(" ".join(current_parts)) > 2200:
-                flush_chunk()
-        if len(" ".join(current_parts)) > 2400:
-            flush_chunk()
-
-    flush_chunk()
-
-    if not chunks:
-        cleaned = _clean_text(text)
-        chunks.append(
-            {
-                "section_id": "section-1",
-                "title": _title_from_filename(filename),
-                "raw_text": cleaned or "No extracted text found.",
-                "page_numbers": [1],
-            }
-        )
-
-    merged: list[dict[str, Any]] = []
-    for chunk in chunks:
-        if merged and len(chunk["raw_text"]) < 350:
-            merged[-1]["raw_text"] = f"{merged[-1]['raw_text']}\n\n{chunk['raw_text']}".strip()
-            merged[-1]["page_numbers"] = sorted(set(merged[-1]["page_numbers"] + chunk["page_numbers"]))
-            continue
-        merged.append(chunk)
-    return merged
+    return pages or [{"page_number": 1, "text": text or ""}]
 
 
 def _difficulty_from_text(text: str) -> str:
-    length = len(text)
-    if length < 1500:
+    words = len(re.findall(r"\w+", text or ""))
+    if words < 900:
         return "beginner"
-    if length < 6000:
+    if words < 4500:
         return "intermediate"
     return "advanced"
 
 
-def _revision_strategy(section_count: int, difficulty: str) -> str:
-    if section_count <= 1:
-        return "Review the note once on the same day, then answer the conceptual and theory questions aloud."
-    if difficulty == "advanced":
-        return "Use a 1-3-7 day revision cycle, redraw the diagrams, and practice long-form theory answers for each section."
-    if difficulty == "intermediate":
-        return "Use a 1-3-7 day revision cycle and alternate between explanation recall, diagram review, and exam-style questions."
-    return "Start with the section summaries, then test yourself with the cue questions and application prompts."
-
-
 def _target_note_pages(source_page_count: int) -> dict[str, int]:
-    if source_page_count <= 1:
-        return {"min": 1, "max": 2}
+    """
+    Adaptive output-size target.
+
+    Very short documents need enough space to remain useful, while large
+    documents should be compressed more strongly. This is document-agnostic
+    and based only on source size.
+    """
+    pages = max(1, int(source_page_count or 1))
+
+    if pages <= 5:
+        ratio_min, ratio_max = 0.65, 1.00
+    elif pages <= 20:
+        # Typical target: 20 source pages -> about 11-15 note pages
+        # depending on layout and diagram density.
+        ratio_min, ratio_max = 0.60, 0.75
+    elif pages <= 50:
+        ratio_min, ratio_max = 0.45, 0.65
+    else:
+        # Large documents need stronger compression to remain practical.
+        ratio_min, ratio_max = 0.38, 0.55
+
     return {
-        "min": max(1, round(source_page_count * 0.35)),
-        "max": max(2, round(source_page_count * 0.55)),
+        "min": max(1, round(pages * ratio_min)),
+        "max": max(2, round(pages * ratio_max)),
     }
 
 
-def _dedupe(items: list[str], limit: int | None = None) -> list[str]:
+def _dedupe(values: list[Any], limit: int | None = None) -> list[str]:
     seen = set()
     result = []
-    for item in items:
-        value = " ".join(str(item).split())
-        if not value:
-            continue
-        key = value.lower()
-        if key in seen:
+    for value in values or []:
+        item = " ".join(str(value or "").split())
+        key = item.lower()
+        if not item or key in seen:
             continue
         seen.add(key)
-        result.append(value)
+        result.append(item)
         if limit and len(result) >= limit:
             break
     return result
 
 
-def _extract_definitions(text: str, keywords: list[str]) -> list[str]:
-    definitions = []
-    for sentence in _sentences(text):
-        match = re.match(r"^([A-Za-z][A-Za-z0-9\s()/\-]{1,60})\s+(is|are|refers to|means)\s+(.+)", sentence, re.I)
-        if match:
-            term = match.group(1).strip()
-            meaning = match.group(3).strip().rstrip(".")
-            definitions.append(f"{term}: {meaning}.")
-    if definitions:
-        return _dedupe(definitions, limit=4)
-    return [f"{keyword.title()}: a core idea that should be defined in your own words during revision." for keyword in keywords[:3]]
+def _sentences(text: Any) -> list[str]:
+    cleaned = _clean_text(str(text or ""))
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return [item.strip(" -•●○\t") for item in re.split(r"(?<=[.!?])\s+", cleaned) if item.strip()]
 
 
-def _build_branch_tree(section_title: str, keywords: list[str]) -> list[dict[str, Any]]:
-    head = keywords[:6] or [section_title.lower()]
-    branches = []
-    group_size = 2
-    for index in range(0, len(head), group_size):
-        branch_name = head[index].title()
-        child_terms = head[index + 1:index + group_size + 1]
-        branches.append(
-            {
-                "name": branch_name,
-                "sub_branches": [{"name": term.title(), "sub_branches": []} for term in child_terms] or [],
-            }
-        )
-    return branches or [{"name": section_title, "sub_branches": []}]
-
-
-def _mindmap_mermaid(root: str, branches: list[dict[str, Any]]) -> str:
-    lines = ["mindmap", f"  root(({root}))"]
-
-    def add_branch(node: dict[str, Any], depth: int) -> None:
-        lines.append(f"{'  ' * depth}{node['name']}")
-        for child in node.get("sub_branches", []):
-            add_branch(child, depth + 1)
-
-    for branch in branches:
-        add_branch(branch, 2)
-    return "\n".join(lines)
-
-
-def _build_exam_questions(title: str, keywords: list[str], definitions: list[str]) -> list[dict[str, Any]]:
-    focus = (keywords[0] if keywords else title).title()
-    compare = (keywords[1] if len(keywords) > 1 else "related concepts").title()
-    definition_term = definitions[0].split(":", 1)[0] if definitions else focus
-    return [
-        {
-            "type": "mcq",
-            "difficulty": "medium",
-            "question": f"Which option best identifies the main focus of {title}?",
-            "options": [
-                f"Understanding {focus} and its role",
-                f"Only memorizing isolated syntax",
-                "Ignoring system interactions",
-                "Studying unrelated background trivia",
-            ],
-            "answer_index": 0,
-            "answer_hint": f"Look for the option that captures the core role of {focus}.",
-            "explanation": f"The section centers on {focus} as a core concept rather than isolated facts.",
-        },
-        {
-            "type": "conceptual",
-            "difficulty": "medium",
-            "question": f"Why is {focus} important when studying {title}?",
-            "options": [],
-            "answer_index": 0,
-            "answer_hint": f"Explain the role of {focus}, the problem it solves, and how it connects to {compare}.",
-            "explanation": f"Strong answers should connect {focus} to purpose, flow, and exam relevance.",
-        },
-        {
-            "type": "theory",
-            "difficulty": "hard",
-            "question": f"Explain {title} in an exam-style answer and include the role of {definition_term} and {compare}.",
-            "options": [],
-            "answer_index": 0,
-            "answer_hint": "Structure the answer with definition, working, significance, and one example or comparison.",
-            "explanation": "This question checks whether the learner can write a full descriptive answer, not just a definition.",
-        },
-        {
-            "type": "application",
-            "difficulty": "hard",
-            "question": f"How would you apply the ideas from {title} in a practical scenario or system design discussion?",
-            "options": [],
-            "answer_index": 0,
-            "answer_hint": f"Describe a use case where {focus} influences design decisions, implementation, or troubleshooting.",
-            "explanation": "Application questions measure whether the concept can be used beyond rote memorization.",
-        },
+def _shorten(text: Any, *, sentences: int = 2, chars: int = 320) -> str:
+    candidates = _sentences(text)
+    meaningful = [
+        item
+        for item in candidates
+        if len(re.findall(r"[A-Za-z][A-Za-z0-9+-]*", item)) >= 5
     ]
+    selected = (meaningful or candidates)[:sentences]
+    value = " ".join(selected) if selected else " ".join(str(text or "").split())
+    value = re.sub(r"\s+\d+\.$", ".", value).strip()
+    if len(value) <= chars:
+        return value
+    trimmed = value[:chars].rsplit(" ", 1)[0].strip()
+    return f"{trimmed}..." if trimmed else value[:chars]
 
 
-def _fallback_section(chunk: dict[str, Any], document_title: str) -> dict[str, Any]:
-    keywords = _keywords(chunk["raw_text"], limit=8)
-    section_title = chunk["title"]
-    definitions = _extract_definitions(chunk["raw_text"], keywords)
-    explanation = (
-        f"{section_title} in {document_title} concentrates on {', '.join(term.title() for term in keywords[:4]) or 'the central topic'}. "
-        f"This part should be studied as a connected idea rather than as isolated lines from the source material. "
-        f"For exam preparation, focus on what the concept does, how it fits into the larger system, and where it is typically applied."
-    )
-    key_points = _dedupe(
-        [
-            f"{section_title} should be understood by purpose, flow, and relationship to surrounding concepts.",
-            f"Important keywords in this section include {', '.join(term.title() for term in keywords[:4]) or section_title}.",
-            "Learners should be ready to define the concept, describe its working, and explain one practical use.",
-            "Revision should include comparison, application, and common exam phrasing.",
-        ],
-        limit=4,
-    )
-    examples = [
-        f"Explain {section_title} using a short real-world or software-oriented example.",
-        f"Relate {keywords[0].title() if keywords else section_title} to one implementation or workflow scenario.",
-    ]
-    use_cases = [
-        f"Use {section_title} while discussing architecture, workflow, or implementation decisions.",
-        "Use the concept to justify design choices or explain system behavior in a written answer.",
-    ]
-    important_notes = [
-        "Do not memorize the section line by line; focus on meaning and relationships.",
-        "In exams, strong answers usually include definition, working, use case, and one comparison.",
-    ]
-    common_mistakes = [
-        f"Confusing {keywords[0].title() if keywords else section_title} with nearby related terms.",
-        "Writing only a definition without explaining working or significance.",
-        "Skipping the practical implication or architecture link in long answers.",
-    ]
-    test_yourself = [
-        f"Can you explain {section_title} without looking at the source text?",
-        f"Can you compare {keywords[0].title() if keywords else section_title} with another related concept?",
-        "Can you draw or describe the process/architecture from memory if asked in an exam?",
-    ]
-    branches = _build_branch_tree(section_title, keywords)
-    chart_rows = [
-        [
-            section_title,
-            ", ".join(term.title() for term in keywords[:3]) or "Core ideas",
-            "Study the concept through definition, flow, and exam relevance rather than line-by-line copying.",
-        ]
-    ]
-    sentence_note = (
-        f"{section_title} is best revised as a connected study topic that combines definition, role, flow, examples, "
-        "and likely exam framing."
-    )
-    return {
-        "section_id": chunk["section_id"],
-        "title": section_title,
-        "page_numbers": chunk["page_numbers"],
-        "source_excerpt": chunk["raw_text"][:600],
-        "topics": [term.title() for term in keywords[:5]] or [section_title],
-        "explanation": explanation,
-        "key_points": key_points,
-        "definitions": definitions,
-        "examples": examples,
-        "use_cases": use_cases,
-        "important_notes": important_notes,
-        "why_this_matters": (
-            "This section matters because exams typically test whether the learner can explain the concept clearly, "
-            "connect it to architecture or workflow, and apply it in context."
-        ),
-        "common_mistakes": common_mistakes,
-        "test_yourself": test_yourself,
-        "notes": {
-            "cornell": {
-                "cue": [
-                    f"What problem does {section_title} solve?",
-                    f"How would you explain the flow or working of {section_title}?",
-                    f"Where can {section_title} appear in an exam answer or application scenario?",
-                ],
-                "notes": "\n".join(key_points + examples + use_cases[:1]),
-                "summary": f"{section_title} should be revised through concept, flow, and application.",
-            },
-            "outline": {
-                "title": section_title,
-                "sections": [
-                    {"heading": f"{section_title} - Core Idea", "points": key_points[:2]},
-                    {"heading": f"{section_title} - Definitions and Use", "points": definitions[:2] + use_cases[:1]},
-                    {"heading": f"{section_title} - Exam Notes", "points": important_notes[:2] + common_mistakes[:1]},
-                ],
-            },
-            "mindmap": {
-                "root": section_title,
-                "mermaid": _mindmap_mermaid(section_title, branches),
-                "branches": branches,
-            },
-            "chart": chart_rows,
-            "sentence": sentence_note,
-        },
-        "diagrams": [],
-        "questions": _build_exam_questions(section_title, keywords, definitions),
-    }
+def _topic_title(value: Any, fallback: str = "Topic") -> str:
+    text = " ".join(str(value or fallback).replace("\n", " ").split())
+    text = re.sub(r"^source file:\s*", "", text, flags=re.I)
+    text = re.sub(r"^\d+(\.\d+)*\s*", "", text).strip(" :-")
+    text = re.sub(r"\.(pdf|docx?|pptx?|txt)$", "", text, flags=re.I).strip()
+    return text or fallback
 
 
-def _too_similar(source_text: str, generated_text: str) -> bool:
-    if not source_text or not generated_text:
+def _cue_questions(title: str, content: Any) -> list[str]:
+    topic = _topic_title(title)
+    if not topic:
+        return []
+    questions = [f"What is {topic}?"]
+    lowered = str(content or "").lower()
+    if re.search(r"\b(step|cycle|process|flow|request|response|life)\b", lowered):
+        questions.append(f"How does {topic} work?")
+    elif re.search(r"\b(vs|versus|difference|compare|between)\b", lowered):
+        questions.append(f"How is {topic} different from related concepts?")
+    else:
+        questions.append(f"Why is {topic} important?")
+    return questions
+
+
+def _meaning_sentence(title: str, content: Any) -> str:
+    topic = _topic_title(title)
+    text = _shorten(content, sentences=1, chars=220)
+    if not text:
+        return f"{topic} is an important concept from the uploaded material."
+    if topic.lower() in text.lower():
+        return text
+    return f"{topic}: {text}"
+
+
+def _unique_topic_rows(sections: list[dict[str, Any]], limit: int = 16) -> list[list[str]]:
+    rows: list[list[str]] = []
+    seen: set[str] = set()
+    for section in sections:
+        topic = _topic_title(section.get("title"), "Topic")
+        key = topic.lower()
+        if not topic or key in seen:
+            continue
+        seen.add(key)
+        content = section.get("content") or section.get("educational_explanation") or section.get("explanation") or ""
+        keywords = _dedupe(section.get("concept_keywords") or section.get("topics") or [], 3)
+        definitions = _dedupe(section.get("definitions") or [], 2)
+        examples = _dedupe(section.get("examples") or section.get("use_cases") or [], 1)
+        mistakes = _dedupe(section.get("common_mistakes") or [], 1)
+        meaning = definitions[0] if definitions else _shorten(content, sentences=1, chars=180)
+        remember_parts = []
+        if keywords:
+            remember_parts.append(", ".join(keyword.title() for keyword in keywords))
+        if examples:
+            remember_parts.append(f"Example: {examples[0]}")
+        if mistakes:
+            remember_parts.append(f"Avoid: {mistakes[0]}")
+        remember = " | ".join(remember_parts) or _shorten(content, sentences=1, chars=120)
+        rows.append([topic, meaning, remember])
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _useful_mindmap_label(value: Any) -> bool:
+    label = _topic_title(value, "").lower()
+    if len(label) < 3:
         return False
-    source = re.sub(r"\s+", " ", source_text.lower())[:2500]
-    target = re.sub(r"\s+", " ", generated_text.lower())[:2500]
-    return SequenceMatcher(None, source, target).ratio() > 0.82
-
-
-def _concept_prompt(chunk: dict[str, Any], preferences: dict[str, Any]) -> tuple[str, str]:
-    system_prompt = (
-        "You are a concept extraction system for academic notes. "
-        "Extract the teaching structure from the chunk. "
-        "Do not summarize the whole document. "
-        "Do not copy long sentences from the source. "
-        "Return valid JSON only."
-    )
-    user_prompt = (
-        f"Document title: {preferences['document_title']}\n"
-        f"Difficulty target: {preferences['difficulty_level']}\n"
-        f"Source pages: {preferences['source_page_count']}\n"
-        f"Target note pages: {preferences['target_note_pages']['min']} to {preferences['target_note_pages']['max']}\n"
-        f"Exam focus: {preferences['exam_focus']}\n"
-        f"Section title hint: {chunk['title']}\n"
-        f"Page numbers: {chunk['page_numbers']}\n\n"
-        "Tasks:\n"
-        "1. Identify the true teaching title for this chunk.\n"
-        "2. Extract main topics and sub-concepts.\n"
-        "3. Extract useful definitions.\n"
-        "4. Extract important relationships between concepts.\n"
-        "5. Mention diagram-relevant ideas if the chunk seems architectural, layered, process-based, or flow-based.\n\n"
-        f"Chunk text:\n{chunk['raw_text']}"
-    )
-    return system_prompt, user_prompt
-
-
-def _section_prompt(
-    chunk: dict[str, Any],
-    concept_payload: dict[str, Any],
-    preferences: dict[str, Any],
-    diagram_hints: list[dict[str, Any]],
-) -> tuple[str, str]:
-    system_prompt = (
-        "You are an AI academic note writer in transformation mode.\n"
-        "CRITICAL INSTRUCTION:\n"
-        "You are NOT allowed to copy sentences from the source text.\n"
-        "You MUST rewrite in your own words, simplify where needed, expand where needed, and convert raw material into study notes.\n"
-        "If the output is close to the source wording, it is invalid.\n"
-        "You are not a summarizer; you are a teacher creating exam-ready study material.\n"
-        "Maintain proportional depth: long documents need long, detailed notes rather than one-page summaries.\n"
-        "Always produce structured, section-wise notes. Return JSON only."
-    )
-    diagram_text = json.dumps(diagram_hints, ensure_ascii=True)
-    user_prompt = (
-        f"Document title: {preferences['document_title']}\n"
-        f"Preferred depth: {preferences['note_depth']}\n"
-        f"Preferred format emphasis: {preferences['preferred_format']}\n"
-        f"Difficulty target: {preferences['difficulty_level']}\n"
-        f"Source pages: {preferences['source_page_count']}\n"
-        f"Target note pages: {preferences['target_note_pages']['min']} to {preferences['target_note_pages']['max']}\n"
-        f"Exam focus: {preferences['exam_focus']}\n"
-        f"Include examples: {preferences['include_examples']}\n"
-        f"Include diagrams: {preferences['include_diagrams']}\n"
-        f"Section pages: {chunk['page_numbers']}\n\n"
-        "Mind Map Rules:\n"
-        "- Must show hierarchy: root to branch to sub-branch.\n"
-        "- Must show relationships, not flat bullets.\n"
-        "- Must also provide Mermaid mindmap code.\n\n"
-        "Question Rules:\n"
-        "- Generate conceptual, theory, application, and MCQ items.\n"
-        "- Questions must be exam-oriented and non-generic.\n"
-        "- Avoid repetition.\n\n"
-        "Diagram Integration Rule:\n"
-        "- If diagram hints are present, explain the diagram step by step.\n"
-        "- Connect the diagram to the theory.\n"
-        "- Produce a simplified Mermaid representation when possible.\n"
-        "- If diagrams exist but are ignored, the output is invalid.\n\n"
-        f"Structured concept payload:\n{json.dumps(concept_payload, ensure_ascii=True)}\n\n"
-        f"Diagram hints:\n{diagram_text}\n\n"
-        f"Source chunk:\n{chunk['raw_text']}"
-    )
-    return system_prompt, user_prompt
-
-
-def _generate_section_with_llm(
-    chunk: dict[str, Any],
-    preferences: dict[str, Any],
-    diagram_hints: list[dict[str, Any]],
-) -> dict[str, Any]:
-    concept_system, concept_user = _concept_prompt(chunk, preferences)
-    concepts = generate_structured_json(
-        concept_system,
-        concept_user,
-        "section_concepts",
-        CONCEPT_SCHEMA,
-    )
-
-    section_system, section_user = _section_prompt(chunk, concepts, preferences, diagram_hints)
-    generated = generate_structured_json(
-        section_system,
-        section_user,
-        "section_notes",
-        SECTION_SCHEMA,
-        images=_diagram_images_for_llm(diagram_hints),
-    )
-
-    if _too_similar(chunk["raw_text"], generated.get("explanation", "")) or _too_similar(
-        chunk["raw_text"],
-        generated.get("notes", {}).get("cornell", {}).get("notes", ""),
-    ):
-        raise ValueError("Generated section stayed too close to source wording.")
-
-    return {
-        "section_id": chunk["section_id"],
-        "title": generated["title"] or chunk["title"],
-        "page_numbers": chunk["page_numbers"],
-        "source_excerpt": chunk["raw_text"][:600],
-        "topics": concepts.get("topics") or _keywords(chunk["raw_text"], limit=5),
-        "explanation": generated["explanation"],
-        "key_points": _dedupe(generated["key_points"], limit=6),
-        "definitions": _dedupe(generated["definitions"], limit=5),
-        "examples": _dedupe(generated["examples"], limit=4),
-        "use_cases": _dedupe(generated["use_cases"], limit=4),
-        "important_notes": _dedupe(generated["important_notes"], limit=5),
-        "why_this_matters": generated["why_this_matters"],
-        "common_mistakes": _dedupe(generated["common_mistakes"], limit=4),
-        "test_yourself": _dedupe(generated["test_yourself"], limit=4),
-        "notes": generated["notes"],
-        "diagrams": [],
-        "questions": generated["questions"],
+    generic = {
+        "object",
+        "instance",
+        "used",
+        "use",
+        "page",
+        "jsp",
+        "java",
+        "request",
+        "response",
+        "elements",
+        "method",
+        "methods",
+        "name",
+        "source",
+        "file",
     }
+    return label not in generic
+
+
+def _mindmap_label(value: Any, fallback: str = "Concept") -> str:
+    text = re.sub(r"[\[\]{}()<>|`\"']", " ", str(value or fallback))
+    text = re.sub(r"\s+", " ", text).strip()
+    return _topic_title((text or fallback)[:64], fallback)
 
 
 def _aggregate_cornell(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
-    cues = []
-    notes = []
-    summaries = []
+    cues, notes, summaries = [], [], []
     for section in sections:
-        cues.extend(section["notes"]["cornell"]["cue"])
-        notes.append(f"{section['title']}\n{section['notes']['cornell']['notes']}")
-        summaries.append(section["notes"]["cornell"]["summary"])
+        cornell = section.get("notes", {}).get("cornell", {})
+        section_title = _topic_title(section.get("title"), "Section")
+        section_text = section.get("content") or section.get("educational_explanation") or cornell.get("notes", "")
+        cues.extend(cornell.get("cue") or [])
+        cues.extend(_cue_questions(section_title, section_text))
+        cues.extend(section.get("test_yourself") or [])
+        section_lines = []
+        short_note = _meaning_sentence(section_title, section_text)
+        if short_note:
+            section_lines.append(f"- {short_note}")
+        for label, values in [
+            ("Definition", section.get("definitions") or []),
+            ("Key point", section.get("key_points") or []),
+            ("Example/use", (section.get("examples") or []) + (section.get("use_cases") or [])),
+            ("Avoid", section.get("common_mistakes") or []),
+            ("Revise", section.get("revision_notes") or []),
+        ]:
+            for value in _dedupe(values, 4 if label == "Key point" else 2):
+                section_lines.append(f"- {label}: {value}")
+        why = section.get("why_this_matters")
+        if why:
+            section_lines.append(f"- Why it matters: {_shorten(why, sentences=1, chars=220)}")
+        if section_lines:
+            notes.append(f"{section_title}\n" + "\n".join(section_lines))
+        if cornell.get("summary"):
+            summaries.append(_shorten(cornell["summary"], sentences=1, chars=180))
+        elif section_text:
+            summaries.append(_shorten(section_text, sentences=1, chars=180))
     return {
         "title": f"{title} - Cornell Notes",
         "format": "cornell",
-        "cue": _dedupe(cues, limit=15),
-        "notes": "\n\n".join(notes),
-        "summary": " ".join(summaries[:6]),
+        "cue": _dedupe(cues, 18),
+        "notes": "\n\n".join(_dedupe([item for item in notes if item], 16)),
+        "summary": _shorten(" ".join(summaries), sentences=3, chars=520),
     }
 
 
 def _aggregate_outline(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
-    return {
-        "title": f"{title} - Outline",
-        "format": "outline",
-        "sections": [item for section in sections for item in section["notes"]["outline"]["sections"]],
-    }
+    outline_sections = []
+    for section in sections:
+        points: list[str] = []
+        for label, values in [
+            ("Definition", section.get("definitions") or []),
+            ("Core point", section.get("key_points") or []),
+            ("Example/use", (section.get("examples") or []) + (section.get("use_cases") or [])),
+            ("Important", section.get("important_notes") or []),
+            ("Revision", section.get("revision_notes") or []),
+        ]:
+            for value in _dedupe(values, 5 if label == "Core point" else 2):
+                points.append(f"{label}: {value}")
+        if section.get("why_this_matters"):
+            points.append(f"Why this matters: {_shorten(section.get('why_this_matters'), sentences=1, chars=220)}")
+        if not points:
+            points = [section.get("content") or section.get("educational_explanation") or section.get("explanation", "")]
+        outline_sections.append(
+            {
+                "heading": section.get("title", "Section"),
+                "points": points[:12],
+            }
+        )
+    return {"title": f"{title} - Outline", "format": "outline", "sections": outline_sections}
 
 
 def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
     branches = []
+    lines = ["mindmap", f"  root(({_mindmap_label(title, 'Study Document')}))"]
+    seen = set()
     for section in sections:
-        branches.append(
-            {
-                "name": section["title"],
-                "sub_branches": section["notes"]["mindmap"]["branches"],
-            }
+        section_name = _mindmap_label(section.get("title"), "Section")
+        section_key = section_name.lower()
+        if section_key in seen:
+            continue
+        seen.add(section_key)
+        child_values = (
+            section.get("topics")
+            or section.get("concept_keywords")
+            or section.get("notes", {}).get("mindmap", {}).get("branches", [])
+            or []
         )
+        children = []
+        for child in child_values:
+            child_name = child.get("name") if isinstance(child, dict) else child
+            child_label = _mindmap_label(child_name, "")
+            if child_label and _useful_mindmap_label(child_label):
+                children.append({"name": child_label, "sub_branches": []})
+            if len(children) >= 3:
+                break
+        child_names = _dedupe([child["name"] for child in children], 3)
+        section_branch = {
+            "name": section_name,
+            "sub_branches": [{"name": child_name, "sub_branches": []} for child_name in child_names],
+        }
+        branches.append(section_branch)
+        lines.append(f"    {_mindmap_label(section_branch['name'])}")
+        for child in child_names:
+            lines.append(f"      {_mindmap_label(child)}")
+        if len(branches) >= 8:
+            break
     return {
         "title": f"{title} - Mind Map",
         "format": "mindmap",
         "root": title,
-        "mermaid": _mindmap_mermaid(title, branches),
+        "mermaid": "\n".join(lines),
         "branches": branches,
     }
 
 
 def _aggregate_chart(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
-    rows = []
-    for section in sections:
-        rows.extend(section["notes"]["chart"])
     return {
-        "title": f"{title} - Chart",
+        "title": f"{title} - Concept Chart",
         "format": "chart",
-        "columns": ["Topic", "Key Idea", "Explanation"],
-        "rows": rows,
+        "columns": ["Topic", "Simple Meaning", "Remember"],
+        "rows": _unique_topic_rows(sections),
     }
 
 
 def _aggregate_sentence(sections: list[dict[str, Any]], title: str, summary: str) -> str:
-    paragraphs = [summary]
-    paragraphs.extend(section["notes"]["sentence"] for section in sections)
-    return "\n\n".join(paragraphs) if sections else f"{title}: {summary}"
+    paragraphs = [_shorten(summary, sentences=2, chars=420)]
+    for section in sections:
+        content = section.get("content") or section.get("educational_explanation") or section.get("notes", {}).get("sentence", "")
+        sentence = _meaning_sentence(section.get("title"), content)
+        if sentence:
+            paragraphs.append(sentence)
+        if len(paragraphs) >= 12:
+            break
+    return "\n\n".join(_dedupe([item for item in paragraphs if item], 12))
 
 
-def _global_summary(sections: list[dict[str, Any]], title: str) -> str:
-    if not sections:
-        return f"{title} could not be transformed into study notes."
-    return " ".join(
-        f"{section['title']}: {section['notes']['cornell']['summary']}"
-        for section in sections[:4]
-    )
+def _attach_section_questions(sections: list[dict[str, Any]], questions: list[dict[str, Any]]) -> None:
+    by_topic: dict[str, list[dict[str, Any]]] = {}
+    for question in questions:
+        by_topic.setdefault(str(question.get("topic") or "").lower(), []).append(question)
+    for section in sections:
+        section["questions"] = by_topic.get(str(section.get("title") or "").lower(), [])[:6]
 
 
-def _collect_diagram_hints(diagrams: list[dict[str, Any]] | None, page_numbers: list[int]) -> list[dict[str, Any]]:
-    if not diagrams:
-        return []
-    hints = []
-    page_set = set(page_numbers)
-    for diagram in diagrams:
-        if diagram.get("page_number") in page_set:
-            hints.append(
-                {
-                    "page_number": diagram.get("page_number"),
-                    "caption": diagram.get("caption", ""),
-                    "context_text": diagram.get("context_text", ""),
-                    "diagram_type": diagram.get("diagram_type", ""),
-                    "image_path": diagram.get("image_path", ""),
-                }
-            )
-    return hints[:3]
-
-
-def _diagram_images_for_llm(diagram_hints: list[dict[str, Any]]) -> list[dict[str, str]]:
-    images = []
-    for hint in diagram_hints[:2]:
-        image_path = hint.get("image_path")
-        if not image_path:
-            continue
-        path = BASE_DIR / image_path
-        if not path.exists() or path.stat().st_size > 4_000_000:
-            continue
-        suffix = path.suffix.lower()
-        mime_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
-        images.append({"image_url": image_bytes_to_data_url(path.read_bytes(), mime_type)})
-    return images
-
-
-def _empty_diagram_mermaid(section_title: str, diagram: dict[str, Any]) -> str:
-    label = diagram.get("caption") or section_title
-    return "\n".join(
-        [
-            "flowchart TD",
-            f"  A[{section_title}] --> B[{label}]",
-            "  B --> C[Key structure or flow]",
-            "  C --> D[Exam explanation point]",
-        ]
-    )
-
-
-def _enrich_section_diagrams(section: dict[str, Any]) -> None:
-    for diagram in section.get("diagrams", []):
-        if not diagram.get("caption"):
-            diagram["caption"] = f"Relevant diagram for {section['title']}"
-        if not diagram.get("explanation"):
-            diagram["explanation"] = (
-                f"This diagram supports the section on {section['title']}. "
-                "Use it to explain the structure, flow, or relationship between the main concepts in your own words."
-            )
-        if not diagram.get("mermaid_code"):
-            diagram["mermaid_code"] = _empty_diagram_mermaid(section["title"], diagram)
-
-
-def generate_note_package(
+def _build_package(
     text: str,
     filename: str,
+    *,
     preferences: dict[str, Any] | None = None,
     extracted_diagrams: list[dict[str, Any]] | None = None,
+    title_override: str | None = None,
+    source_files: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     cleaned = _clean_text(text)
-    title = _title_from_filename(filename)
-    difficulty = _difficulty_from_text(cleaned)
+    title = title_override or _title_from_filename(filename)
     source_page_count = len(_split_pages(cleaned))
+    difficulty = _difficulty_from_text(cleaned)
     target_note_pages = _target_note_pages(source_page_count)
     pref = {
-        "note_depth": (preferences or {}).get("note_depth", "deep"),
+        "note_depth": (preferences or {}).get(
+            "note_depth",
+            "focused_deep",
+        ),
         "preferred_format": (preferences or {}).get("preferred_format", "cornell"),
         "exam_focus": bool((preferences or {}).get("exam_focus", True)),
         "include_examples": bool((preferences or {}).get("include_examples", True)),
@@ -882,28 +365,46 @@ def generate_note_package(
         "difficulty_level": difficulty,
         "source_page_count": source_page_count,
         "target_note_pages": target_note_pages,
+        "educational_depth_policy": (
+            "Use structural compression, not shallow summarization. "
+            "Preserve definitions, core reasoning, procedures, formulas, "
+            "examples, comparisons, important exceptions, diagrams, "
+            "and source-specific terminology. Remove repetition, filler, "
+            "generic introductions, and redundant explanations. "
+            "The goal is high learning value per word."
+        ),
+        "generation_policy": {
+            "batch_related_topics": True,
+            "preferred_topics_per_api_call": "5-7 when source size permits",
+            "avoid_one_call_per_topic": True,
+            "target_output_ratio": (
+                f"{target_note_pages['min']}-{target_note_pages['max']} "
+                "note pages relative to the source document"
+            ),
+        },
+        "structure_policy": (
+            "Discover topics and subtopics from the uploaded document. "
+            "Do not assume a fixed academic hierarchy and do not invent "
+            "subject-specific sections that are not supported by the source."
+        ),
     }
-    chunks = _chunk_pages(cleaned, filename)
-
-    sections = []
-    generation_mode = "llm" if has_llm_support() else "fallback"
-    for chunk in chunks:
-        diagram_hints = _collect_diagram_hints(extracted_diagrams, chunk["page_numbers"])
-        try:
-            if has_llm_support():
-                section = _generate_section_with_llm(chunk, pref, diagram_hints)
-            else:
-                raise RuntimeError("LLM support not configured.")
-        except Exception:
-            generation_mode = "fallback"
-            section = _fallback_section(chunk, title)
-        sections.append(section)
-
-    summary = _global_summary(sections, title)
-    revision = _revision_strategy(len(sections), difficulty)
+    pipeline = run_multi_pass_pipeline(
+        cleaned,
+        filename,
+        diagrams=extracted_diagrams or [],
+        preferences=pref,
+        quiz_limit=max(12, min(40, (source_page_count or 1) * 2)),
+    )
+    intelligence = pipeline.get("document_intelligence") or {}
+    sections = pipeline.get("sections") or []
+    questions = pipeline.get("questions") or []
+    _attach_section_questions(sections, questions)
+    summary = intelligence.get("document_summary") or f"{title} converted into teacher-style study notes."
     package = {
         "document_title": title,
         "source_filename": filename,
+        "source_files": source_files,
+        "total_uploaded_files": len(source_files or [filename]),
         "total_sections": len(sections),
         "sections": sections,
         "notes": {
@@ -914,32 +415,144 @@ def generate_note_package(
             "sentence": _aggregate_sentence(sections, title, summary),
         },
         "diagrams": [diagram for section in sections for diagram in section.get("diagrams", [])],
-        "questions": [question for section in sections for question in section.get("questions", [])],
+        "questions": questions,
         "global_summary": summary,
+        "document_intelligence": intelligence,
+        "topic_map": intelligence,
         "difficulty_level": difficulty,
-        "recommended_revision_strategy": revision,
         "note_volume_policy": {
             "source_pages": source_page_count,
             "target_note_pages": target_note_pages,
-            "rule": "Generated notes should preserve proportional depth instead of collapsing the document into a short summary.",
+            "rule": "Premium notes should preserve 50-70% educational depth instead of overcompressing the source.",
+        },
+        "pipeline_diagnostics": {
+            "pipeline": [
+                "extract_complete_text",
+                "full_document_understanding",
+                "document_intelligence_map",
+                "semantic_educational_structuring",
+                "human_like_note_generation",
+                "revision_optimization",
+                "advanced_quiz_generation",
+            ],
+            "chunking_position": "after_full_document_llm_understanding",
+            "chunking_strategy": "document-intelligence-topic-sections",
+            "structure_policy": "domain-agnostic; discover topics from source content",
+            "content_policy": "source-grounded; preserve educationally important detail",
+            "section_count": len(sections),
+            "source_quality": intelligence.get("source_quality", {}),
+            "analysis_mode": intelligence.get("analysis_mode", "fallback"),
         },
         "preferences": pref,
-        "generation_mode": generation_mode,
+        "generation_mode": "llm" if intelligence.get("analysis_mode") == "llm" else "fallback",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
-
-    for section in package["sections"]:
-        _enrich_section_diagrams(section)
-    package["diagrams"] = [diagram for section in package["sections"] for diagram in section.get("diagrams", [])]
-    package["questions"] = [question for section in package["sections"] for question in section.get("questions", [])]
     return package
+
+
+def generate_note_package(
+    text: str,
+    filename: str,
+    preferences: dict[str, Any] | None = None,
+    extracted_diagrams: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return _build_package(
+        text,
+        filename,
+        preferences=preferences,
+        extracted_diagrams=extracted_diagrams,
+    )
+
+
+def _session_title(documents: list[dict[str, Any]]) -> str:
+    titles = [_title_from_filename(str(doc.get("filename") or "Document")) for doc in documents]
+    titles = _dedupe(titles, 3)
+    if not titles:
+        return "Combined Study Session"
+    if len(titles) == 1:
+        return titles[0]
+    suffix = "" if len(documents) <= 3 else f" + {len(documents) - 3} more"
+    return f"Study Session: {', '.join(titles)}{suffix}"
+
+
+def generate_session_note_package(
+    documents: list[dict[str, Any]],
+    preferences: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    valid_documents = [
+        {
+            "filename": str(doc.get("filename") or f"document-{index + 1}.txt"),
+            "text": _clean_text(str(doc.get("text") or "")),
+            "size_kb": doc.get("size_kb", 0),
+            "diagrams": doc.get("diagrams") or [],
+        }
+        for index, doc in enumerate(documents)
+        if str(doc.get("text") or "").strip()
+    ]
+    if not valid_documents:
+        valid_documents = [{"filename": "Study Session", "text": "No extracted text found.", "size_kb": 0, "diagrams": []}]
+
+    title = _session_title(valid_documents)
+    combined_text_parts = []
+    diagrams = []
+    source_files = []
+    for index, doc in enumerate(valid_documents, start=1):
+        combined_text_parts.append(f"Source file: {doc['filename']}\n{doc['text']}")
+        source_files.append(
+            {
+                "filename": doc["filename"],
+                "size_kb": doc.get("size_kb", 0),
+                "page_count": len(_split_pages(doc["text"])),
+                "diagram_count": len(doc.get("diagrams") or []),
+            }
+        )
+        for diagram in doc.get("diagrams") or []:
+            diagrams.append({**diagram, "source_filename": doc["filename"], "source_index": index})
+    return _build_package(
+        "\n\n".join(combined_text_parts),
+        "multi-document-session",
+        preferences=preferences,
+        extracted_diagrams=diagrams,
+        title_override=title,
+        source_files=source_files,
+    )
 
 
 def format_package_for_view(package: dict[str, Any], note_format: str) -> dict[str, Any]:
     note_format = note_format.lower()
     notes = package.get("notes", {})
+    sections = package.get("sections") or []
+    title = package.get("document_title") or package.get("title") or "Study Document"
     if note_format == "full":
         return package
+    if sections:
+        if note_format == "cornell":
+            return _aggregate_cornell(sections, title)
+        if note_format == "outline":
+            return _aggregate_outline(sections, title)
+        if note_format == "mindmap":
+            return _aggregate_mindmap(sections, title)
+        if note_format == "chart":
+            return _aggregate_chart(sections, title)
+        if note_format == "sentence":
+            return _aggregate_sentence(sections, title, package.get("global_summary") or "")
     if note_format in notes:
         return notes[note_format]
     return notes.get("cornell", {})
+
+
+def generate_targeted_note_package(
+    context: str,
+    topic: str,
+    source_metadata: dict[str, Any],
+    preferences: dict[str, Any] | None = None,
+    extracted_diagrams: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    from services.targeted_note_generation import generate_targeted_note_package as _gen
+    return _gen(
+        context,
+        topic,
+        source_metadata,
+        preferences=preferences,
+        extracted_diagrams=extracted_diagrams,
+    )
