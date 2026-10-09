@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 from datetime import date, datetime, timedelta
+import re
 from typing import Any
 
+from learner_model import build_topic_mastery
+from recommendation_service import build_recommendations
 from quiz_attempt_store import list_quiz_attempts
 from session_store import list_sessions
 
@@ -88,59 +91,57 @@ def _streak_from_days(days: list[date]) -> int:
     return streak
 
 
-def _topic_summary() -> list[dict[str, Any]]:
-    counts = Counter()
-    quiz_scores: dict[str, list[int]] = {}
-    for entry in ACTIVITY_LOG:
-        topic = entry.get("topic")
-        if topic:
-            counts[topic] += 1
-        if entry["kind"] == "quiz_completed" and topic and isinstance(entry.get("score"), (int, float)):
-            quiz_scores.setdefault(topic, []).append(int(entry["score"]))
+def _normalize_topic_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
-    topics = []
-    known_topic_ids = {base["id"] for base in BASE_TOPICS}
+
+def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Render dashboard topics from persisted quiz mastery, never activity counters."""
+    aliases = {
+        "nlp": {"nlp", "nlp text", "natural language processing"},
+        "ml": {"ml", "ml models", "machine learning", "machine learning models"},
+        "ds": {"ds", "data structures", "data structure", "dsa"},
+    }
+    topics: list[dict[str, Any]] = []
+    used_topics: set[str] = set()
+
     for base in BASE_TOPICS:
-        topic_count = counts.get(base["id"], 0)
-        average_score = None
-        if quiz_scores.get(base["id"]):
-            average_score = sum(quiz_scores[base["id"]]) / len(quiz_scores[base["id"]])
-
-        pct = 0
-        if topic_count:
-            pct = min(99, topic_count * 12)
-        if average_score is not None:
-            pct = min(99, max(pct, int(round(average_score))))
-
-        if topic_count:
-            sub = f"{topic_count} recent actions"
+        base_aliases = aliases.get(base["id"], {_normalize_topic_name(base["name"])})
+        found_name = next((name for name in topic_mastery if _normalize_topic_name(name) in base_aliases), None)
+        stats = topic_mastery.get(found_name) if found_name else None
+        if found_name:
+            used_topics.add(found_name)
+        pct = int(round(stats["mastery_pct"])) if stats and stats.get("mastery_pct") is not None else 0
+        if not stats:
+            sub = "No quiz attempts yet"
         else:
-            sub = "Start studying to build this topic"
+            trend = stats.get("trend", 0)
+            trend_label = "improving" if trend > 0.03 else "declining" if trend < -0.03 else "stable"
+            sub = f"{stats.get('attempts', 0)} quiz attempt(s) · {trend_label}"
+        topics.append({**base, "pct": max(0, min(100, pct)), "sub": sub})
 
-        topics.append({**base, "pct": pct, "sub": sub})
-
-    for topic_id, topic_count in counts.most_common():
-        if topic_id in known_topic_ids or not topic_id:
-            continue
-        scores = quiz_scores.get(topic_id, [])
-        average_score = sum(scores) / len(scores) if scores else None
-        pct = min(99, topic_count * 10)
-        if average_score is not None:
-            pct = min(99, max(pct, int(round(average_score))))
-        label = "Generated Notes" if topic_id == "generated" else str(topic_id).replace("_", " ").title()
-        topics.append(
-            {
-                "id": topic_id,
-                "name": label,
-                "sub": f"{topic_count} recent actions",
-                "pct": pct,
-                "color": "teal" if len(topics) % 3 == 0 else "coral" if len(topics) % 3 == 1 else "aqua",
-                "orb_colors": [0x119DA4, 0x83C5BE],
-            }
-        )
+    candidates = sorted(
+        ((name, stats) for name, stats in topic_mastery.items() if name not in used_topics),
+        key=lambda item: (float(item[1].get("mastery_pct") or 0), item[0].lower()),
+    )
+    for topic_name, stats in candidates:
         if len(topics) >= 6:
             break
-
+        attempts_count = int(stats.get("attempts") or 0)
+        trend = stats.get("trend", 0)
+        trend_label = "improving" if trend > 0.03 else "declining" if trend < -0.03 else "stable"
+        color = ("teal", "coral", "aqua")[len(topics) % 3]
+        pct = int(round(stats.get("mastery_pct") or 0))
+        slug = re.sub(r"[^a-z0-9]+", "-", topic_name.lower()).strip("-") or f"topic-{len(topics)}"
+        orb_colors = [0x119DA4, 0x83C5BE] if color == "teal" else [0xE29578, 0xC1694F] if color == "coral" else [0x64B6AC, 0xC0FDFB]
+        topics.append({
+            "id": slug,
+            "name": topic_name,
+            "sub": f"{attempts_count} quiz attempt(s) · {trend_label}",
+            "pct": max(0, min(100, pct)),
+            "color": color,
+            "orb_colors": orb_colors,
+        })
     return topics
 
 
@@ -167,73 +168,80 @@ def _study_minutes_from_activity() -> int:
     return study_minutes
 
 
-def _recent_quizzes() -> list[dict[str, Any]]:
-    quiz_events = [entry for entry in ACTIVITY_LOG if entry["kind"] == "quiz_completed"]
-    if not quiz_events:
-        return []
-
+def _recent_quizzes(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Use persistent quiz attempts so recent quizzes survive backend restarts."""
     recent = []
-    for entry in reversed(quiz_events[-3:]):
-        score = int(entry.get("score", 0))
+    for attempt in attempts[:3]:  # list_quiz_attempts returns newest first
+        try:
+            score = int(attempt.get("score", 0))
+        except (TypeError, ValueError):
+            score = 0
         difficulty = "Easy" if score >= 85 else "Medium" if score >= 65 else "Hard"
         variant = "green" if score >= 85 else "teal" if score >= 65 else "coral"
-        performance = entry.get("performance") or {}
-        recent.append(
-            {
-                "title": entry.get("topic_label") or entry.get("topic", "Quiz").title(),
-                "score": score,
-                "difficulty": difficulty,
-                "icon": "✓" if score >= 60 else "~",
-                "variant": variant,
-                "feedback": performance.get("feedback"),
-            }
-        )
+        performance = attempt.get("performance") or {}
+        recent.append({
+            "title": attempt.get("topic_label") or attempt.get("note_title") or str(attempt.get("topic") or "Quiz").title(),
+            "score": max(0, min(100, score)),
+            "difficulty": difficulty,
+            "icon": "✓" if score >= 60 else "~",
+            "variant": variant,
+            "feedback": performance.get("feedback"),
+        })
     return recent
 
 
-def _tips_from_activity() -> list[dict[str, Any]]:
-    tips = []
+def _tips_from_activity(
+    attempts: list[dict[str, Any]],
+    recommendations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    tips: list[dict[str, Any]] = []
+    latest_upload = next(
+        (entry for entry in reversed(ACTIVITY_LOG) if entry["kind"] == "upload_processed"),
+        None,
+    )
+    completed_tasks = sum(
+        1 for entry in ACTIVITY_LOG
+        if entry["kind"] == "planner_task_done" and entry.get("done")
+    )
 
-    latest_upload = next((entry for entry in reversed(ACTIVITY_LOG) if entry["kind"] == "upload_processed"), None)
-    latest_quiz = next((entry for entry in reversed(ACTIVITY_LOG) if entry["kind"] == "quiz_completed"), None)
-    completed_tasks = sum(1 for entry in ACTIVITY_LOG if entry["kind"] == "planner_task_done" and entry.get("done"))
+    # Surface calculated recommendations in the existing dashboard AI Tips area.
+    for rec in recommendations[:2]:
+        tips.append({
+            "icon": "🎯",
+            "title": f"Recommended: {rec['action']}",
+            "body": rec["reason"] + f" Suggested review in {rec['next_review_days']} day(s).",
+        })
 
-    if latest_upload:
-        tips.append(
-            {
-                "icon": "📄",
-                "title": "New Upload Detected",
-                "body": f"{latest_upload.get('filename', 'Your file')} was processed. Turn it into notes and a quick quiz next.",
-            }
-        )
-
-    if latest_quiz:
-        score = int(latest_quiz.get("score", 0))
+    if attempts:
+        latest_quiz = attempts[0]
+        score = int(latest_quiz.get("score") or 0)
         weak_topics = latest_quiz.get("weak_topics") or []
-        tips.append(
-            {
-                "icon": "🎯",
-                "title": "Quiz Feedback",
-                "body": f"Your latest quiz score was {score}%. Review the missed concepts before the next session.",
-            }
-        )
-        if weak_topics:
-            tips.append(
-                {
-                    "icon": "!",
-                    "title": "Recommended Revision",
-                    "body": f"Focus next on {', '.join(weak_topics[:3])}. These came from your latest quiz responses.",
-                }
-            )
+        if len(tips) < 3:
+            tips.append({
+                "icon": "📝",
+                "title": "Latest Quiz Feedback",
+                "body": f"Your latest saved quiz score was {score}%. Review missed concepts before moving on.",
+            })
+        if weak_topics and len(tips) < 3:
+            tips.append({
+                "icon": "!",
+                "title": "Missed Concepts",
+                "body": f"Focus next on {', '.join(weak_topics[:3])}. These came from your latest quiz responses.",
+            })
 
-    if completed_tasks:
-        tips.append(
-            {
-                "icon": "✅",
-                "title": "Planner Momentum",
-                "body": f"You completed {completed_tasks} planner task(s). Keep the streak moving with a short review block.",
-            }
-        )
+    if latest_upload and len(tips) < 3:
+        tips.append({
+            "icon": "📄",
+            "title": "New Upload Detected",
+            "body": f"{latest_upload.get('filename', 'Your file')} was processed. Turn it into notes and a quick quiz next.",
+        })
+
+    if completed_tasks and len(tips) < 3:
+        tips.append({
+            "icon": "✅",
+            "title": "Planner Momentum",
+            "body": f"You completed {completed_tasks} planner task(s). Keep going with a short review block.",
+        })
 
     return tips[:3]
 
@@ -284,9 +292,9 @@ def build_dashboard_payload() -> dict[str, Any]:
     days = _unique_days()
     streak = _streak_from_days(days)
     study_minutes = _study_minutes_from_activity()
-    quiz_completed = sum(1 for entry in ACTIVITY_LOG if entry["kind"] == "quiz_completed")
     sessions = list_sessions()
     attempts = list_quiz_attempts(limit=1000)
+    quiz_completed = len(attempts)
     uploaded_files_count = sum(len(session.get("uploaded_files") or []) for session in sessions)
     diagrams_generated = sum(
         int(file_info.get("diagram_count") or 0)
@@ -313,9 +321,19 @@ def build_dashboard_payload() -> dict[str, Any]:
                     "feedback": performance.get("feedback"),
                 }
             )
-    topic_summary = _topic_summary()
-    mastered_topics = sum(1 for topic in topic_summary if topic["pct"] >= 80)
-    mastery = int(average_score) if scores else min(99, len(ACTIVITY_LOG) * 2 + mastered_topics * 3)
+    topic_mastery = build_topic_mastery(attempts)
+    recommendations = build_recommendations(topic_mastery)
+    topic_summary = _topic_summary(topic_mastery)
+    mastered_topics = sum(
+        1 for stats in topic_mastery.values()
+        if (stats.get("mastery_pct") or 0) >= 80
+    )
+    mastery_values = [
+        float(stats["mastery_pct"])
+        for stats in topic_mastery.values()
+        if stats.get("mastery_pct") is not None
+    ]
+    mastery = int(round(sum(mastery_values) / len(mastery_values))) if mastery_values else 0
 
     month_counts = Counter()
     for entry in ACTIVITY_LOG:
@@ -335,8 +353,8 @@ def build_dashboard_payload() -> dict[str, Any]:
         activity_boost = month_counts.get((month.year, month.month), 0) * 6
         bar_chart.append({"month": month.strftime("%b"), "value": min(100, activity_boost)})
 
-    recent_quizzes = _recent_quizzes()
-    tips = _tips_from_activity()
+    recent_quizzes = _recent_quizzes(attempts)
+    tips = _tips_from_activity(attempts, recommendations)
 
     return {
         "user": {**USER_PROFILE, "streak": streak},
@@ -347,7 +365,7 @@ def build_dashboard_payload() -> dict[str, Any]:
                 "label": "Average Mastery",
                 "value": str(mastery),
                 "suffix": "%",
-                "delta": "↑ improving from activity" if ACTIVITY_LOG else "No activity yet",
+                "delta": "Calculated from recency-weighted quiz history" if topic_mastery else "Complete a quiz to build mastery",
                 "positive": True,
                 "link": "quiz",
             },
@@ -356,8 +374,8 @@ def build_dashboard_payload() -> dict[str, Any]:
                 "icon": "📚",
                 "label": "Topics Mastered",
                 "value": str(mastered_topics),
-                "suffix": "/6",
-                "delta": f"{max(0, 6 - mastered_topics)} topics remaining" if ACTIVITY_LOG else "Start studying to unlock progress",
+                "suffix": f"/{len(topic_mastery)}" if topic_mastery else "/6",
+                "delta": f"{max(0, len(topic_mastery) - mastered_topics)} topics to strengthen" if topic_mastery else "Start studying to unlock progress",
                 "positive": True,
                 "link": "notes",
             },
@@ -376,7 +394,7 @@ def build_dashboard_payload() -> dict[str, Any]:
                 "label": "Quizzes Completed",
                 "value": str(quiz_completed),
                 "suffix": "",
-                "delta": f"+{quiz_completed} from sessions" if ACTIVITY_LOG else "No quizzes completed yet",
+                "delta": f"{quiz_completed} saved attempts" if quiz_completed else "No quizzes completed yet",
                 "positive": True,
                 "link": "quiz",
             },
@@ -405,6 +423,6 @@ def build_dashboard_payload() -> dict[str, Any]:
             "learning_progress": mastery,
             "study_minutes": study_minutes,
             "topics_mastered": mastered_topics,
-            "emoji_performance_history": emoji_history[-8:],
+            "emoji_performance_history": emoji_history[:8],
         },
     }
