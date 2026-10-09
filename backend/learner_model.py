@@ -30,17 +30,14 @@ def _parse_timestamp(value: Any) -> datetime:
 
 
 def _score_fraction(value: Any) -> float | None:
-    """Convert a percentage (0-100) or fraction (0-1) into [0, 1]."""
+    """Convert the repository's stored percentage score (0-100) into [0, 1]."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     score = float(value)
-    if score < 0:
+    if not 0 <= score <= 100:
         return None
-    if score > 1:
-        score /= 100.0
-    if score > 1:
-        return None
-    return score
+    # quiz_attempt_store persists percentage scores, including 1 meaning 1%.
+    return score / 100.0
 
 
 def calculate_mastery(scores: Iterable[float], decay: float = DEFAULT_DECAY) -> float | None:
