@@ -1,0 +1,23 @@
+name: Backend unit tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - "feature/**"
+
+jobs:
+  learner-model-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run learner model tests
+        working-directory: backend
+        run: python -m unittest discover -s tests -v
