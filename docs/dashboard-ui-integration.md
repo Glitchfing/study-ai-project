@@ -7,7 +7,7 @@ This branch brings the supplied dashboard composition into the existing StudyAI 
 - Reference layout: greeting with 3D learning core, four KPI cards, learning journey and revision plan, recent notes and activity heat map, topic mastery and recommendations, quiz performance and study focus.
 - Three.js / React Three Fiber visual elements in the existing teal, cyan, mint, and restrained peach palette.
 - Scoped stylesheet so existing app pages retain their styles.
-- Existing app shell hides its previous sidebar and topbar only on the dashboard view, avoiding duplicate navigation; other views keep their current shell.
+- One shared reference-style sidebar is mounted at the app level and remains consistent when navigating between Dashboard, Upload Content, My Notes, Quizzes, Learn & Ask, and Revision Planner. The existing pages and backend flows are retained.
 
 ## Live project connections
 
@@ -17,7 +17,7 @@ This branch brings the supplied dashboard composition into the existing StudyAI 
 - `/planner` supplies pending revision tasks; actions open the existing Revision Planner.
 - Existing `App.jsx` navigation and activity logging are retained. Upload, notes, quiz, Learn & Ask, and planner are still their existing separate views.
 
-The study-time figure is labeled as an estimate because the current backend derives minutes from activity events rather than recording an actual timer. Settings and Plus are placeholders because this version of the app has no corresponding pages/subscription flow.
+The study-time figure is labeled as an estimate because the current backend derives minutes from activity events rather than recording an actual timer. There is no paid Plus promotion in the sidebar.
 
 ## Install and verify
 
