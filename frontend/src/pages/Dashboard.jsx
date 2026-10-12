@@ -1,349 +1,86 @@
-import React from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Float, MeshDistortMaterial, Sparkles } from "@react-three/drei";
+import { getNotesList, getQuizAttempts, getPlanner } from "../services/api";
+import "../styles/dashboard-reference.css";
 
-function KpiCard({ kpi, onNavigate }) {
-  return (
-    <div
-      className="card kpi-card"
-      onClick={() => kpi.link && onNavigate(kpi.link)}
-      style={{ cursor: kpi.link ? "pointer" : "default" }}
-    >
-      <div className="kpi-icon">{kpi.icon}</div>
-      <div className="kpi-label">{kpi.label}</div>
-      <div className="kpi-value">
-        {kpi.value}
-        {kpi.suffix && <sup>{kpi.suffix}</sup>}
-      </div>
-      <div className={`kpi-delta${kpi.positive ? "" : " neg"}`}>{kpi.delta}</div>
-    </div>
-  );
+const paths = {
+  home: <><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></>,
+  upload: <><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></>,
+  notes: <><path d="M6 3h9l4 4v14H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM14 3v5h5M8 12h8M8 16h6"/></>,
+  quiz: <><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 9h.01M12 9h.01M16 9h.01M8 14l2 2 5-5"/></>,
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6"/></>,
+  chart: <path d="M4 20V12h4v8M10 20V5h4v15M16 20V9h4v11"/>,
+  target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 12 21 3M16 3h5v5"/></>,
+  clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></>,
+  bulb: <path d="M9 18h6M10 22h4M8 14a7 7 0 1 1 8 0c-1 .7-1 2-1 2H9s0-1.3-1-2z"/>,
+  pie: <path d="M12 3v9h9A9 9 0 1 1 12 3z"/>,
+  arrow: <path d="M5 12h14M13 6l6 6-6 6"/>,
+  spark: <path d="m12 3 2.3 5.2L20 10l-5.7 1.8L12 17l-2.3-5.2L4 10l5.7-1.8z"/>
+};
+function Icon({ name = "spark", size = 18 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.spark}</svg>; }
+
+function Core() {
+  const orb = useRef(null), ring = useRef(null);
+  useFrame(({ pointer, clock }) => {
+    if (!orb.current || !ring.current) return;
+    orb.current.rotation.x += (pointer.y * .2 - orb.current.rotation.x) * .04;
+    orb.current.rotation.y += (pointer.x * .3 + clock.elapsedTime * .07 - orb.current.rotation.y) * .04;
+    ring.current.rotation.y += .003;
+    ring.current.rotation.x = .9 + pointer.y * .15;
+  });
+  return <group><Float speed={1.2} rotationIntensity={.25} floatIntensity={.45}><mesh ref={orb}><icosahedronGeometry args={[.9, 5]}/><MeshDistortMaterial color="#64b6ac" roughness={.2} metalness={.35} distort={.22} speed={1.5}/></mesh></Float><mesh ref={ring} rotation={[.9,.3,-.45]}><torusGeometry args={[1.22,.025,12,100]}/><meshStandardMaterial color="#c0fdfb" metalness={.75} emissive="#119da4" emissiveIntensity={.65}/></mesh><mesh rotation={[1.5,.2,.4]}><torusGeometry args={[1.42,.012,8,100]}/><meshStandardMaterial color="#e29578" metalness={.6} emissive="#e29578" emissiveIntensity={.35}/></mesh><Sparkles count={38} scale={3.8} size={2} speed={.28} color="#c0fdfb"/></group>;
 }
-
-function TopicCard({ topic, onNavigate }) {
-  const colorMap = {
-    teal: "var(--c-bright)",
-    coral: "var(--c-coral)",
-    aqua: "var(--c-aqua)",
-  };
-  const color = colorMap[topic.color] || "var(--c-bright)";
-  const gradMap = {
-    teal: "linear-gradient(90deg,var(--c-bright),var(--c-mint))",
-    coral: "linear-gradient(90deg,var(--c-coral),#c1694f)",
-    aqua: "linear-gradient(90deg,var(--c-aqua),var(--c-sky))",
-  };
-
-  return (
-    <div className="card orb-card" onClick={() => onNavigate("notes")} style={{ cursor: "pointer" }}>
-      <div className="orb-canvas-wrap">
-        <div
-          style={{
-            width: 50,
-            height: 50,
-            borderRadius: 12,
-            background: `radial-gradient(circle at 35% 35%, ${color}33, ${color}11)`,
-            border: `1px solid ${color}44`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 18,
-          }}
-        >
-          {topic.color === "teal" ? "🔤" : topic.color === "coral" ? "🤖" : "🌳"}
-        </div>
-      </div>
-      <div className="orb-meta">
-        <div className="orb-name">{topic.name}</div>
-        <div className="orb-sub">{topic.sub}</div>
-        <div className="progress-bar">
-          <div
-            className="progress-fill"
-            style={{ width: `${topic.pct}%`, background: gradMap[topic.color] }}
-          />
-        </div>
-      </div>
-      <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 17, color }}>
-        {topic.pct}%
-      </span>
-    </div>
-  );
+function Hero() { return <div className="rf-hero-3d"><Canvas camera={{position:[0,0,4.1],fov:42}} dpr={[1,1.5]} gl={{alpha:true,antialias:true}}><ambientLight intensity={1.3}/><directionalLight position={[3,4,4]} intensity={2} color="#c0fdfb"/><pointLight position={[-3,-1,2]} intensity={18} color="#119da4"/><pointLight position={[2,-2,-2]} intensity={10} color="#e29578"/><Suspense fallback={null}><Core/></Suspense></Canvas><div className="rf-orb-caption"><i/> YOUR LEARNING CORE</div></div>; }
+function ThreeIcon({kind="spark",size=32}) {
+  let mesh;
+  if(kind==="target") mesh=<><mesh><torusGeometry args={[.23,.018,8,32]}/><meshStandardMaterial color="#e29578"/></mesh><mesh><torusGeometry args={[.14,.014,8,32]}/><meshStandardMaterial color="#c0fdfb"/></mesh><mesh><sphereGeometry args={[.05,16,16]}/><meshPhysicalMaterial color="#fad4c0" metalness={.2} transmission={.2}/></mesh></>;
+  else if(kind==="clock") mesh=<><mesh><cylinderGeometry args={[.25,.25,.07,32]}/><meshPhysicalMaterial color="#64b6ac" metalness={.25} transmission={.2}/></mesh><mesh position={[0,0,.05]}><boxGeometry args={[.025,.14,.025]}/><meshStandardMaterial color="#fee9e1"/></mesh><mesh position={[.06,-.04,.06]} rotation={[0,0,.8]}><boxGeometry args={[.025,.11,.02]}/><meshStandardMaterial color="#e29578"/></mesh></>;
+  else if(kind==="notes"||kind==="calendar") mesh=<><mesh><boxGeometry args={kind==="calendar"?[.36,.32,.06]:[.32,.4,.07]}/><meshPhysicalMaterial color="#c0fdfb" roughness={.16} metalness={.18} transmission={.2}/></mesh><mesh position={[0,.1,.05]}><boxGeometry args={[.34,.05,.02]}/><meshStandardMaterial color="#e29578"/></mesh>{[-.04,-.12].map(y=><mesh key={y} position={[0,y,.05]}><boxGeometry args={[.21,.014,.01]}/><meshStandardMaterial color="#119da4"/></mesh>)}</>;
+  else if(kind==="chart"||kind==="pie") mesh=<>{[.15,.23,.32].map((h,i)=><mesh key={i} position={[-.18+i*.17,-.09+h/2,0]}><boxGeometry args={[.09,h,.09]}/><meshPhysicalMaterial color={i===1?"#fad4c0":"#119da4"} metalness={.2} transmission={.2}/></mesh>)}</>;
+  else mesh=<><mesh><icosahedronGeometry args={[.22,1]}/><meshPhysicalMaterial color="#64b6ac" roughness={.16} metalness={.18} transmission={.2}/></mesh><mesh rotation={[.7,.3,.4]}><torusGeometry args={[.31,.012,8,48]}/><meshStandardMaterial color="#e29578" metalness={.5}/></mesh></>;
+  return <span className="rf-glass-icon" style={{width:size,height:size}} aria-hidden="true"><Canvas camera={{position:[0,0,1.65],fov:48}} dpr={[1,1.5]} gl={{alpha:true,antialias:true}}><ambientLight intensity={1.5}/><directionalLight position={[2,3,4]} intensity={2} color="#fee9e1"/><pointLight position={[-2,-1,2]} intensity={5} color="#119da4"/><group>{mesh}</group></Canvas></span>;
 }
+function Panel({icon,title,subtitle,action,onAction,children,cls=""}) { return <section className={"rf-panel "+cls}><header className="rf-panel-title"><div className="rf-title-left"><span className="rf-small-icon"><Icon name={icon}/></span><span><b>{title}</b><small>{subtitle}</small></span></div>{action&&<button className="rf-link-button" onClick={onAction}>{action} <Icon name="arrow" size={13}/></button>}</header>{children}</section>; }
+const noteTitle=(n)=>n.title||n.filename||n.original_filename||n.name||"Untitled study note";
+const noteId=(n)=>n.id??n.note_id??n.document_id;
+const recent=(v)=>{if(!v)return "Recently";const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);const days=Math.max(0,Math.floor((Date.now()-d.getTime())/86400000));return days===0?"Today":days===1?"Yesterday":days<7?days+" days ago":d.toLocaleDateString(undefined,{day:"numeric",month:"short"});};
+const prettyMinutes=(n)=>{n=Number(n)||0;return n>=60?Math.floor(n/60)+"h "+(n%60)+"m":n+"m";};
 
-function BarChart({ data }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  return (
-    <div className="bar-chart-wrap">
-      {data.map((d) => (
-        <div className="bc-col" key={d.month}>
-          <div
-            className="bc-bar"
-            style={{
-              height: `${(d.value / max) * 80}px`,
-              background: "linear-gradient(180deg, var(--c-bright), var(--c-ocean))",
-            }}
-            title={`${d.month}: ${d.value}`}
-          />
-          <div className="bc-lbl">{d.month.slice(0, 3)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Heatmap({ cells = [] }) {
-  if (!cells.length) {
-    return <div style={{ color: "var(--muted)", fontSize: 12 }}>No activity yet.</div>;
-  }
-
-  return (
-    <div className="heatmap-wrap">
-      {cells.map((col, w) => (
-        <div className="hm-col" key={w}>
-          {col.map((cell, d) => (
-            <div key={d} className={`hm-cell ${cell.lvl}`} title={cell.tip} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function activityLabel(entry) {
-  switch (entry.kind) {
-    case "upload_processed":
-      return `Uploaded ${entry.filename || "a file"}`;
-    case "quiz_completed":
-      return `Finished quiz with ${entry.score ?? 0}%`;
-    case "note_view":
-      return `Opened ${entry.title || "a note"} (${entry.format || "cornell"})`;
-    case "planner_task_done":
-      return `${entry.done ? "Completed" : "Reopened"} task ${entry.task_id}`;
-    case "chat_message":
-      return "Asked the assistant a question";
-    case "view_opened":
-      return `Opened ${entry.view}`;
-    default:
-      return entry.kind.replaceAll("_", " ");
-  }
-}
-
-export default function Dashboard({ data, loading, onNavigate, onRefresh, toast }) {
-  if (loading) {
-    return (
-      <div style={{ padding: 40, color: "var(--muted)", textAlign: "center" }}>
-        Loading dashboard...
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div style={{ padding: 40, color: "var(--muted)", textAlign: "center" }}>
-        Dashboard data is unavailable.
-      </div>
-    );
-  }
-
-  return (
-    <div className="view active" id="view-dashboard">
-      <div className="section-label">Performance Overview</div>
-      <div className="kpi-grid">
-        {data.kpis.map((k) => (
-          <KpiCard key={k.id} kpi={k} onNavigate={onNavigate} />
-        ))}
-      </div>
-
-      {data.analytics ? (
-        <div className="analytics-grid">
-          {[
-            { label: "Total Sessions", value: data.analytics.total_sessions },
-            { label: "Uploaded Files", value: data.analytics.uploaded_files_count },
-            { label: "Quizzes Attempted", value: data.analytics.quizzes_attempted },
-            { label: "Highest Score", value: `${data.analytics.highest_score}%` },
-            { label: "Average Score", value: `${data.analytics.average_score}%` },
-            { label: "Learning Progress", value: `${data.analytics.learning_progress}%` },
-            { label: "Diagrams Generated", value: data.analytics.diagrams_generated ?? 0 },
-          ].map((item) => (
-            <div className="analytics-pill" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {data.analytics?.weak_topics?.length ? (
-        <div className="weak-topic-strip">
-          {data.analytics.weak_topics.map((item) => (
-            <span key={item.topic}>
-              {item.topic}: {item.count}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="section-label">Topic Mastery</div>
-      <div className="orb-row">
-        {data.topics.map((t) => (
-          <TopicCard key={t.id} topic={t} onNavigate={onNavigate} />
-        ))}
-      </div>
-
-      <div className="dash-grid">
-        <div className="card" style={{ padding: "18px 20px" }}>
-          <div className="card-header">
-            <div className="card-title">📅 Activity Heatmap</div>
-            <span
-              className="card-action"
-              onClick={() => toast("📅 Heatmap now reflects your real sessions", "teal")}
-            >
-              {data.heatmap_weeks} weeks
-            </span>
-          </div>
-          <Heatmap cells={data.activity_heatmap} />
-          <div className="hm-legend">
-            <span>Less</span>
-            <div style={{ display: "flex", gap: 3 }}>
-              {["", "l1", "l2", "l3", "l4"].map((c, i) => (
-                <div key={i} className={`hm-cell ${c}`} style={{ cursor: "default" }} />
-              ))}
-            </div>
-            <span>More</span>
-          </div>
-        </div>
-
-        <div className="card stats-stack">
-          <div className="card-title" style={{ marginBottom: 2 }}>
-            📊 Long-term Stats
-          </div>
-          {[
-            { label: "⚡ Total Activities", val: data.long_term_stats.total_activities, cls: "accent" },
-            { label: "🔥 Longest Streak", val: data.long_term_stats.longest_streak, cls: "" },
-            { label: "📅 Active Days", val: data.long_term_stats.active_days, cls: "warm" },
-          ].map(({ label, val, cls }) => (
-            <div className="stat-pill" key={label}>
-              <div className="stat-pill-label">{label}</div>
-              <div className={`stat-pill-val ${cls}`}>{val}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="section-label">Analytics & Insights</div>
-      <div className="bottom-grid">
-        <div className="card" style={{ padding: "18px 20px" }}>
-          <div className="card-header">
-            <div className="card-title">📈 Learning Progress</div>
-            <span className="card-action">12 months</span>
-          </div>
-          <BarChart data={data.bar_chart} />
-        </div>
-
-        <div className="card" style={{ padding: "18px 20px" }}>
-          <div className="card-header">
-            <div className="card-title">📝 Recent Quizzes</div>
-            <span className="card-action" onClick={() => onNavigate("quiz")}>
-              All Quizzes →
-            </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-            {data.recent_quizzes.length ? (
-              data.recent_quizzes.map((q) => (
-                <div
-                  key={`${q.title}-${q.score}`}
-                  className="tip-row"
-                  onClick={() => onNavigate("quiz")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div
-                    className="tip-ico"
-                    style={{
-                      background: `rgba(${
-                        q.variant === "green" ? "100,182,172" : q.variant === "coral" ? "226,149,120" : "17,157,164"
-                      },0.15)`,
-                    }}
-                  >
-                    {q.icon}
-                  </div>
-                  <div className="tip-body">
-                    <strong>{q.title}</strong>
-                    <br />
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                      {q.score}% · {q.difficulty}
-                    </span>
-                  </div>
-                  <span className={`tag tag-${q.variant}`}>{q.score}%</span>
-                </div>
-              ))
-            ) : (
-              <div style={{ color: "var(--muted)", fontSize: 12 }}>No quiz activity yet.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: "18px 20px" }}>
-          <div className="card-header">
-            <div className="card-title">Performance History</div>
-            <span className="card-action">Emoji</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {data.analytics?.emoji_performance_history?.length ? (
-              data.analytics.emoji_performance_history.slice().reverse().map((item) => (
-                <div className="tip-row" key={item.attempt_id || `${item.created_at}-${item.percentage}`}>
-                  <div className="tip-ico">{item.emoji}</div>
-                  <div className="tip-body">
-                    <strong>{item.feedback}</strong>
-                    <br />
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                      {item.score}/{item.total} · {item.percentage}% · {item.created_at}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div style={{ color: "var(--muted)", fontSize: 12 }}>Emoji feedback appears after quiz attempts.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: "18px 20px" }}>
-          <div className="card-header">
-            <div className="card-title">💡 Live Activity</div>
-            <span className="card-action" onClick={onRefresh}>
-              Refresh ↻
-            </span>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-            {(data.recent_activity || []).slice(0, 4).map((entry) => (
-              <div key={`${entry.timestamp}-${entry.kind}`} className="tip-row">
-                <div className="tip-ico">•</div>
-                <div className="tip-body">
-                  <strong>{activityLabel(entry)}</strong>
-                  <br />
-                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{entry.timestamp}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="card-title" style={{ marginBottom: 8 }}>
-            💡 AI Tips
-          </div>
-          <div className="tips-list">
-            {data.tips.length ? (
-              data.tips.map((tip) => (
-                <div className="tip-row" key={tip.title}>
-                  <div className="tip-ico">{tip.icon}</div>
-                  <div className="tip-body">
-                    <strong>{tip.title}:</strong> {tip.body}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div style={{ color: "var(--muted)", fontSize: 12 }}>Tips will appear after you start learning.</div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+export default function Dashboard({data,loading,onNavigate,onRefresh,toast}) {
+  const [query,setQuery]=useState(""),[notes,setNotes]=useState([]),[attempts,setAttempts]=useState([]),[tasks,setTasks]=useState([]),[menuOpen,setMenuOpen]=useState(false),[loadingExtras,setLoadingExtras]=useState(false);
+  useEffect(()=>{let live=true;setLoadingExtras(true);Promise.allSettled([getNotesList(),getQuizAttempts(null,20),getPlanner()]).then(([n,q,p])=>{if(!live)return;if(n.status==="fulfilled"){const v=n.value;setNotes((Array.isArray(v)?v:v?.notes||v?.items||v?.documents||[]).map(x=>({...x,_title:noteTitle(x),_id:noteId(x)})));}if(q.status==="fulfilled"){const v=q.value;setAttempts(Array.isArray(v)?v:v?.attempts||v?.items||[]);}if(p.status==="fulfilled"){const v=p.value;setTasks(Array.isArray(v)?v:v?.tasks||[]);}setLoadingExtras(false);});return()=>{live=false;};},[data?.analytics?.quizzes_attempted,data?.analytics?.uploaded_files_count]);
+  const a=data?.analytics||{},topics=data?.topics||[],kpi=(id)=>(data?.kpis||[]).find(x=>x.id===id);
+  const shownNotes=useMemo(()=>notes.filter(n=>!query||n._title.toLowerCase().includes(query.trim().toLowerCase())).slice(0,3),[notes,query]);
+  const scores=useMemo(()=>{const rows=attempts.length?attempts.slice(0,8).reverse():(a.emoji_performance_history||[]).slice(0,8).reverse();return rows.map((q,i)=>({x:rows.length===1?330:i/(rows.length-1)*660,y:8+(100-Math.max(0,Math.min(100,Number(q.score??q.percentage??0))))*1.4,score:Number(q.score??q.percentage??0),title:q.topic_label||q.note_title||q.topic||q.feedback||"Quiz "+(i+1)}));},[attempts,a.emoji_performance_history]);
+  const line=scores.map((p,i)=>(i?"L":"M")+p.x+" "+p.y).join(" "),area=scores.length?line+" L "+scores[scores.length-1].x+" 148 L "+scores[0].x+" 148 Z":"";
+  const activity=(data?.activity_heatmap||[]).slice(-12).flatMap(c=>c).map(c=>({level:({"":0,l1:1,l2:2,l3:3,l4:4})[c.lvl]??0,label:(c.date||"")+" · "+(c.tip||"No activity")}));
+  const activities=Number(String(data?.long_term_stats?.total_activities??0).replace(/,/g,""))||0,studyMins=Number(a.study_minutes)||0,mastered=Number(a.topics_mastered)||0,topicCount=Math.max(topics.length,mastered);
+  const recommendations=(data?.tips||[]).slice(0,3);
+  const donut=(()=>{const x=Number(a.quizzes_attempted)||0,y=Number(a.uploaded_files_count)||0,z=Math.max(0,activities-x),sum=x+y+z;const p=sum?x/sum*100:0,q=sum?(x+y)/sum*100:66;return "conic-gradient(var(--rf-teal) 0 "+p+"%,var(--rf-mint) "+p+"% "+q+"%,var(--rf-coral) "+q+"% 100%)";})();
+  if(loading)return <div className="rf-dashboard-loading">Loading your learning dashboard…</div>;
+  if(!data)return <div className="rf-dashboard-loading">Dashboard data unavailable. <button onClick={onRefresh}>Try again</button></div>;
+  const nav=[["dashboard","home","Dashboard"],["upload","upload","Upload content"],["notes","notes","Your notes"],["quiz","quiz","Practice quiz"],["chat","spark","Learn & Ask"],["planner","calendar","Revision planner"]];
+  const stats=[
+    {title:"Average mastery",value:(a.learning_progress??kpi("mastery")?.value??0)+"%",pct:Number(a.learning_progress??kpi("mastery")?.value??0),note:a.quizzes_attempted? a.quizzes_attempted+" saved quiz attempts":"Complete a quiz to build mastery",icon:"target",tone:"peach",view:"quiz"},
+    {title:"Study time",value:prettyMinutes(studyMins),pct:studyMins?Math.min(100,studyMins/12):0,note:(a.total_sessions||0)+" learning sessions · estimated",icon:"clock",tone:"mint"},
+    {title:"Quizzes completed",value:String(a.quizzes_attempted??kpi("quizzes")?.value??0),pct:Math.min(100,Number(a.quizzes_attempted||0)*5),note:a.average_score?a.average_score+"% average score":"Saved attempts appear here",icon:"notes",tone:"ice",view:"quiz"},
+    {title:"Topics mastered",value:mastered+" / "+topicCount,pct:topicCount?mastered/topicCount*100:0,note:topics.length+" tracked learning topics",icon:"chart",tone:"coral",view:"notes"}
+  ];
+  return <div className="rf-dashboard">
+    <aside className={"rf-sidebar "+(menuOpen?"rf-sidebar-open":"")}><div className="rf-brand"><span className="rf-logo">SA</span><span><b>StudyAI</b><small>AI-powered learning</small></span></div><nav className="rf-nav">{nav.map(([view,icon,label])=><button key={view} className={"rf-nav-item "+(view==="dashboard"?"active":"")} onClick={()=>{setMenuOpen(false);if(view==="dashboard")onRefresh();else onNavigate(view);}}><Icon name={icon}/>{label}</button>)}<div className="rf-nav-rule"/><button className="rf-nav-item" onClick={()=>toast("Settings page is planned for a later release.","teal")}><Icon name="calendar"/>Settings</button></nav><div className="rf-plus-card"><span className="rf-plus-icon"><Icon name="spark"/></span><b>StudyAI Plus</b><p>More insights. More room to grow.</p><button onClick={()=>toast("StudyAI Plus will be available in a later release.","teal")}>Explore Plus <Icon name="arrow" size={13}/></button></div><div className="rf-sidebar-foot">LEARN · PRACTICE · GROW</div></aside>
+    <main className="rf-main"><header className="rf-topbar"><button className="rf-menu-button" aria-label="Toggle navigation" onClick={()=>setMenuOpen(!menuOpen)}>☰</button><label className="rf-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search your notes and topics…"/><kbd>Ctrl K</kbd></label><span className="rf-top-spacer"/><span className="rf-streak-pill">✦ {data.user?.streak??0} day streak</span><button className="rf-notification" aria-label="Notifications" onClick={()=>toast((data.recent_activity||[]).length+" recent learning activities.","teal")}>♧<i/></button><span className="rf-profile-dot">{data.user?.initials||"SA"}</span><span className="rf-profile-name">Welcome back,<b>{data.user?.name||"LEARNER"}</b></span></header>
+      <section className="rf-welcome"><div><div className="rf-overline">YOUR PERSONAL LEARNING SPACE</div><h1>Your learning, <em>in motion.</em></h1><p>Small steps today. Stronger understanding tomorrow.</p><span className="rf-welcome-chip"><i/>Consistency is your superpower</span></div><Hero/></section>
+      <div className="rf-metric-grid">{stats.map(s=><article key={s.title} className={"rf-metric-card tone-"+s.tone} role={s.view?"button":undefined} tabIndex={s.view?0:undefined} onClick={()=>s.view&&onNavigate(s.view)}><div className="rf-metric-card-top"><ThreeIcon kind={s.icon} size={36}/><span>↗</span></div><label>{s.title}</label><strong>{s.value}</strong><div className="rf-mini-track"><span style={{width:Math.max(0,Math.min(100,s.pct))+"%"}}/></div><small><Icon name="arrow" size={12}/>{s.note}</small></article>)}</div>
+      <div className="rf-main-grid"><Panel cls="rf-journey-panel" icon="spark" title="Your learning journey" subtitle="One clear next step at a time." action="Full journey" onAction={()=>onNavigate("planner")}><div className="rf-journey-steps">{[["01","Review notes","Reconnect with recent study material.",notes.length?"Ready":"Start here","notes"],["02","Practice quiz","Check what really stuck.",a.quizzes_attempted?"In progress":"Up next","quiz"],["03","Revise weak topics","Turn gaps into strengths.",(a.weak_topics||[]).length?"Recommended":"Up next","quiz"],["04","Next session","Keep your momentum moving.",tasks.some(t=>!t.done)?"Queued":"Plan session","planner"]].map(([num,title,desc,status,view])=><div key={num} className={"rf-journey-step rf-step-"+num}><span className="rf-step-node">{num==="01"&&notes.length?"✓":num}</span><b>{title}</b><p>{desc}</p><button className="rf-step-status" onClick={()=>onNavigate(view)}>{status}</button></div>)}</div><footer className="rf-journey-bottom"><span/>YOUR PATH IS TAKING SHAPE<span/></footer></Panel>
+        <Panel cls="rf-revision-panel" icon="calendar" title="Revision plan" subtitle="Your next focused sessions." action="View plan" onAction={()=>onNavigate("planner")}><div className="rf-revision-list">{tasks.filter(t=>!t.done).slice(0,4).map((t,i)=><button className="rf-revision-item" key={t.id??t.title} onClick={()=>onNavigate("planner")}><span className="rf-revision-node">{String(i+1).padStart(2,"0")}</span><span className="rf-revision-copy"><small>{t.date||(t.day==="today"?"Today":"Upcoming")}</small><b>{t.title}</b></span><span className="rf-upcoming">Planned</span></button>)}{!tasks.some(t=>!t.done)&&<p className="rf-empty">{loadingExtras?"Loading your plan…":"No pending sessions. Open the planner to plan your next session."}</p>}</div></Panel></div>
+      <div className="rf-secondary-grid"><Panel cls="rf-notes-panel" icon="notes" title="Recent notes" subtitle="Pick up where you left off." action="All notes" onAction={()=>onNavigate("notes")}><div className="rf-recent-notes">{shownNotes.map((n,i)=><button key={n._id??n._title} className="rf-recent-note" onClick={()=>n._id?onNavigate("notes",{noteId:n._id}):onNavigate("notes")}><ThreeIcon kind={i===0?"notes":i===1?"chart":"calendar"} size={32}/><span><b>{n._title}</b><small>{n.page_count?n.page_count+" pages · ":""}{recent(n.updated_at||n.created_at||n.timestamp)}</small></span><i>›</i></button>)}{!shownNotes.length&&<p className="rf-empty">{loadingExtras?"Loading your notes…":notes.length?"No notes match your search.":"Your processed notes will appear here."}</p>}</div></Panel>
+        <Panel cls="rf-heat-panel" icon="calendar" title="Study heat map" subtitle="Your activity across the last 12 weeks."><div className="rf-heatmap-wrap"><div className="rf-heat-days">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=><span key={d}>{d}</span>)}</div><div className="rf-heat-grid">{(activity.length?activity:Array.from({length:84},()=>({level:0,label:"No activity recorded"}))).map((c,i)=><i key={i} className={"rf-heat-cell rf-heat-"+c.level} title={c.label}/>)}</div></div><div className="rf-heat-legend">LESS {[0,1,2,3,4].map(i=><i key={i} className={"rf-heat-cell rf-heat-"+i}/>)} MORE</div></Panel></div>
+      <div className="rf-main-grid rf-lower-grid"><Panel cls="rf-subjects-panel" icon="chart" title="Your subjects" subtitle="Progress across your learning map." action="All subjects" onAction={()=>onNavigate("notes")}><div className="rf-subject-grid">{topics.slice(0,4).map(t=><button key={t.id} className="rf-subject-card" onClick={()=>onNavigate("notes")}><span className="rf-subject-heading"><ThreeIcon kind={t.id==="ds"?"target":"chart"} size={30}/><b>{t.name}</b></span><span className="rf-subject-track"><i className={t.color} style={{width:Math.max(0,Math.min(100,t.pct))+"%"}}/></span><small>{t.pct}% mastered</small></button>)}{!topics.length&&<p className="rf-empty">Topic mastery appears after your first quiz.</p>}</div></Panel>
+        <Panel cls="rf-recommendations-panel" icon="bulb" title="AI recommendations" subtitle="A little direction for your next session." action="Explore" onAction={()=>onNavigate("chat")}><div className="rf-recommendation-list">{recommendations.map((r,i)=><button key={r.title} className="rf-recommendation" onClick={()=>onNavigate(i===1?"notes":"quiz")}><ThreeIcon kind={i===0?"target":i===1?"notes":"bulb"} size={30}/><span><b>{r.title}</b><small>{r.body}</small></span><i>›</i></button>)}{!recommendations.length&&<p className="rf-empty">Personalized tips appear as you complete activities.</p>}</div></Panel></div>
+      <div className="rf-main-grid rf-analytics-grid"><Panel cls="rf-performance-panel" icon="chart" title="Quiz performance" subtitle={scores.length?"Saved quiz scores across your recent attempts.":"Your saved quiz scores will appear here."}><div className="rf-score-chart"><div className="rf-y-labels"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div><svg viewBox="0 0 660 155" preserveAspectRatio="none" aria-label="Saved quiz scores"><defs><linearGradient id="rfFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#64b6ac" stopOpacity=".38"/><stop offset="100%" stopColor="#119da4" stopOpacity="0"/></linearGradient></defs>{[8,43,78,113,148].map(y=><line key={y} x1="0" x2="660" y1={y} y2={y} className="rf-chart-gridline"/>)}{[0,94,188,282,376,470,564,659].map(x=><line key={x} x1={x} x2={x} y1="8" y2="148" className="rf-chart-gridline rf-vertical"/>)}{scores.length>1&&<><path d={area} fill="url(#rfFill)"/><path d={line} className="rf-score-line"/></>}{scores.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="4" className="rf-score-dot"><title>{p.title+": "+p.score+"%"}</title></circle>)}</svg></div><div className="rf-x-labels">{scores.map((s,i)=><span key={i} title={s.title}>Quiz {i+1}</span>)}</div></Panel>
+        <Panel cls="rf-focus-panel" icon="pie" title="Study focus" subtitle="Where your learning activity is going."><div className="rf-focus-content"><div className="rf-focus-donut" style={{background:donut}}><div><b>{prettyMinutes(studyMins)}</b><small>study estimate</small></div></div><div className="rf-focus-legend">{[["Quiz practice",Number(a.quizzes_attempted)||0,"teal"],["Notes & uploads",Number(a.uploaded_files_count)||0,"mint"],["Other activity",Math.max(0,activities-(Number(a.quizzes_attempted)||0)),"peach"]].map(([label,val,tone],i,arr)=>{const total=arr.reduce((s,x)=>s+x[1],0);return <div className="rf-focus-row" key={label}><i className={tone}/><span>{label}</span><b>{total?Math.round(val/total*100):0}%</b></div>;})}</div></div><footer className="rf-focus-foot"><Icon name="spark" size={14}/>Statistics update as you study and complete quizzes.</footer></Panel></div>
+      <footer className="rf-footer">STUDYAI <span>·</span> Keep showing up. Your progress is adding up.</footer>
+    </main>
+  </div>;
 }

@@ -11,12 +11,7 @@ import RevisionPlanner from "./pages/RevisionPlanner";
 import { useToast } from "./hooks/useToast";
 import { getDashboard, logActivity } from "./services/api";
 
-const FALLBACK_USER = {
-  name: "RUTU",
-  initials: "RU",
-  role: "Individual Learning",
-  streak: 0,
-};
+const FALLBACK_USER = { name: "RUTU", initials: "RU", role: "Individual Learning", streak: 0 };
 
 export default function App() {
   const [currentView, setCurrentView] = useState("dashboard");
@@ -28,44 +23,23 @@ export default function App() {
 
   const refreshDashboard = useCallback(async () => {
     setLoadingDashboard(true);
-    try {
-      const data = await getDashboard();
-      setDashboardData(data);
-    } catch {
-      setDashboardData(null);
-    } finally {
-      setLoadingDashboard(false);
-    }
+    try { setDashboardData(await getDashboard()); }
+    catch { setDashboardData(null); }
+    finally { setLoadingDashboard(false); }
   }, []);
 
-  useEffect(() => {
-    refreshDashboard();
+  useEffect(() => { refreshDashboard(); }, [refreshDashboard]);
+
+  const trackActivity = useCallback(async (event, shouldRefresh = true) => {
+    try { await logActivity(event); }
+    catch { /* Keep the UI responsive if activity telemetry is unavailable. */ }
+    finally { if (shouldRefresh) refreshDashboard(); }
   }, [refreshDashboard]);
 
-  const trackActivity = useCallback(
-    async (event, shouldRefresh = true) => {
-      try {
-        await logActivity(event);
-      } catch {
-        // Keep the UI moving even if telemetry fails.
-      } finally {
-        if (shouldRefresh) {
-          refreshDashboard();
-        }
-      }
-    },
-    [refreshDashboard]
-  );
-
   function navigate(view, options = {}) {
-    if (options.noteId) {
-      setSelectedNoteId(options.noteId);
-    }
-    if (Object.prototype.hasOwnProperty.call(options, "quizNoteId")) {
-      setSelectedQuizNoteId(options.quizNoteId);
-    } else if (view === "quiz" && !options.noteId) {
-      setSelectedQuizNoteId(null);
-    }
+    if (options.noteId) setSelectedNoteId(options.noteId);
+    if (Object.prototype.hasOwnProperty.call(options, "quizNoteId")) setSelectedQuizNoteId(options.quizNoteId);
+    else if (view === "quiz" && !options.noteId) setSelectedQuizNoteId(null);
     setCurrentView(view);
     window.scrollTo(0, 0);
     trackActivity({ kind: "view_opened", view });
@@ -74,29 +48,19 @@ export default function App() {
   const user = dashboardData?.user || FALLBACK_USER;
   const sharedProps = { onNavigate: navigate, toast, refreshDashboard, trackActivity };
 
-  return (
-    <>
-      <ToastContainer toasts={toasts} />
-      <Sidebar currentView={currentView} onNavigate={navigate} user={user} />
-      <div id="main">
-        <Topbar user={user} onToast={toast} />
-        <div id="view-container">
-          {currentView === "dashboard" && (
-            <Dashboard
-              data={dashboardData}
-              loading={loadingDashboard}
-              onNavigate={navigate}
-              onRefresh={refreshDashboard}
-              toast={toast}
-            />
-          )}
-          {currentView === "upload" && <UploadPage {...sharedProps} />}
-          {currentView === "notes" && <NotesView {...sharedProps} selectedNoteId={selectedNoteId} />}
-          {currentView === "quiz" && <QuizModule {...sharedProps} selectedNoteId={selectedQuizNoteId} />}
-          {currentView === "chat" && <ChatInterface {...sharedProps} />}
-          {currentView === "planner" && <RevisionPlanner {...sharedProps} />}
-        </div>
+  return <>
+    <ToastContainer toasts={toasts} />
+    {currentView !== "dashboard" && <Sidebar currentView={currentView} onNavigate={navigate} user={user} />}
+    <div id="main">
+      {currentView !== "dashboard" && <Topbar user={user} onToast={toast} />}
+      <div id="view-container" className={currentView === "dashboard" ? "dashboard-host" : ""}>
+        {currentView === "dashboard" && <Dashboard data={dashboardData} loading={loadingDashboard} onNavigate={navigate} onRefresh={refreshDashboard} toast={toast} />}
+        {currentView === "upload" && <UploadPage {...sharedProps} />}
+        {currentView === "notes" && <NotesView {...sharedProps} selectedNoteId={selectedNoteId} />}
+        {currentView === "quiz" && <QuizModule {...sharedProps} selectedNoteId={selectedQuizNoteId} />}
+        {currentView === "chat" && <ChatInterface {...sharedProps} />}
+        {currentView === "planner" && <RevisionPlanner {...sharedProps} />}
       </div>
-    </>
-  );
+    </div>
+  </>;
 }
