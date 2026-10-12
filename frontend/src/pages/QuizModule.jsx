@@ -58,10 +58,12 @@ function sortNotesForQuiz(list, selectedNoteId) {
    const selectedA = selectedNoteId != null && a.id === String(selectedNoteId);
    const selectedB = selectedNoteId != null && b.id === String(selectedNoteId);
    if (selectedA !== selectedB) return selectedA ? -1 : 1;
+   if (a.time != null && b.time != null && a.time !== b.time) return b.time - a.time;
+   if (a.time != null && b.time == null) return -1;
+   if (a.time == null && b.time != null) return 1;
    const generatedA = a.note?.source === "generated";
    const generatedB = b.note?.source === "generated";
    if (generatedA !== generatedB) return generatedA ? -1 : 1;
-   if (a.time != null && b.time != null && a.time !== b.time) return b.time - a.time;
    if (a.time != null && b.time == null) return -1;
    if (a.time == null && b.time != null) return 1;
    return b.index - a.index;
