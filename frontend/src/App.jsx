@@ -53,7 +53,7 @@ export default function App() {
     {currentView !== "dashboard" && <Sidebar currentView={currentView} onNavigate={navigate} user={user} />}
     <div id="main">
       {currentView !== "dashboard" && <Topbar user={user} onToast={toast} />}
-      <div id="view-container">
+      <div id="view-container" className={currentView === "dashboard" ? "dashboard-host" : ""}>
         {currentView === "dashboard" && <Dashboard data={dashboardData} loading={loadingDashboard} onNavigate={navigate} onRefresh={refreshDashboard} toast={toast} />}
         {currentView === "upload" && <UploadPage {...sharedProps} />}
         {currentView === "notes" && <NotesView {...sharedProps} selectedNoteId={selectedNoteId} />}
