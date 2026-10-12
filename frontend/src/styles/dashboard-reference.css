@@ -31,7 +31,7 @@
 .rf-app-sidebar .rf-brand{flex-shrink:0}
 .rf-app-sidebar .rf-nav{flex-shrink:0}
 .rf-app-sidebar .rf-nav-item{font-family:"DM Sans",sans-serif}
-.rf-app-sidebar .rf-sidebar-foot{margin-top:auto;padding-top:20px}
+.rf-app-sidebar-foot{margin-top:auto;padding-top:20px;text-align:center;font-size:8px;letter-spacing:1.8px;color:#517f7e}
 .rf-app-sidebar .rf-nav-item.active{font-weight:600}
 .rf-sidebar-scrim{display:none}
 .rf-shared-menu-toggle{display:none}
