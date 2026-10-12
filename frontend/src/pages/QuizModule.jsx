@@ -43,7 +43,7 @@ function noteTimestamp(note) {
  if (Number.isFinite(parsed)) return parsed;
  const value = String(raw).toLowerCase().trim();
  if (value === "yesterday") return Date.now() - 86400000;
- const relative = value.match(/(\\d+)\\s*(minutes?|mins?|hours?|days?|weeks?)\\s*ago/);
+ const relative = value.match(/(\d+)\s*(minutes?|mins?|hours?|days?|weeks?)\s*ago/);
  if (relative) {
   const units = relative[2];
   const factor = units.startsWith("min") ? 60000 : units.startsWith("hour") ? 3600000 : units.startsWith("day") ? 86400000 : units.startsWith("week") ? 604800000 : 60000;
