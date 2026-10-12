@@ -1,428 +1,69 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getQuiz, saveQuizAttempt } from "../services/api";
+import { getQuiz, getQuizAttempts, getNotesList, saveQuizAttempt } from "../services/api";
+import "../styles/quiz-reference.css";
 
-const TOPICS = ["all", "nlp", "ml", "ds"];
-
-function isChoiceQuestion(question) {
-  return (question?.options || []).length > 0;
+const SUBJECTS = [{value:"all",label:"All subjects"},{value:"ml",label:"Machine Learning"},{value:"nlp",label:"NLP"},{value:"ds",label:"Data Science"}];
+const DIFFICULTIES = [{value:"easy",label:"Easy",color:"easy"},{value:"medium",label:"Medium",color:""},{value:"hard",label:"Hard",color:"hard"},{value:"mixed",label:"Mixed",color:"mixed"}];
+const COUNTS = [5,10,15];
+const arr = (v) => Array.isArray(v) ? v : Array.isArray(v?.notes) ? v.notes : Array.isArray(v?.items) ? v.items : Array.isArray(v?.sessions) ? v.sessions : Array.isArray(v?.attempts) ? v.attempts : [];
+const idOf = (n) => String(n?.id ?? n?.note_id ?? n?.session_id ?? n?.document_id ?? "");
+const titleOf = (n) => n?.title || n?.note_title || n?.filename || n?.name || "Untitled note";
+const dateOf = (v) => { if (!v) return "Date unavailable"; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); };
+const scoreOf = (a) => Number.isFinite(Number(a?.score)) ? Number(a.score) : Number(a?.total) ? Math.round(Number(a?.correct || 0) / Number(a.total) * 100) : 0;
+const nameOf = (a) => a?.topic_label || a?.note_title || a?.title || a?.topic || "Practice quiz";
+const norm = (s) => String(s || "").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+function similarity(a,b) { const x=norm(a), y=norm(b); if(!x||!y)return 0; const d=Array.from({length:x.length+1},(_,i)=>[i]); for(let j=1;j<=y.length;j++)d[0][j]=j; for(let i=1;i<=x.length;i++)for(let j=1;j<=y.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(x[i-1]===y[j-1]?0:1)); return 1-d[x.length][y.length]/Math.max(x.length,y.length,1); }
+function checkText(q,a) { const given=norm(a); if(!given)return false; const expected=[q?.correct_answer,q?.answer_hint,...(q?.acceptable_answers||[])].filter(Boolean); if(expected.some(v=>given===norm(v)||similarity(given,v)>=.86))return true; const keys=(q?.expected_keywords||[]).map(norm).filter(Boolean); return keys.length>0&&keys.filter(k=>given.includes(k)).length/keys.length>=.5; }
+function Icon({name}) {
+ const paths={document:<><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,target:<><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></>,trophy:<><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4"/></>,bars:<><path d="M4 20V10M10 20V4M16 20v-7M22 20V7"/></>,play:<path d="m8 5 11 7-11 7z"/>,clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,chart:<><path d="M4 20V12M10 20V4M16 20v-8M22 20V8"/></>,sparkle:<><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></>,arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,close:<><path d="m6 6 12 12M18 6 6 18"/></>,file:<><path d="M6 3h8l4 4v14H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM14 3v5h5"/></>};
+ return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]||paths.sparkle}</svg>;
 }
+function statusOf(a) { const s=scoreOf(a); return s>=75?{label:"Strong",cls:"good"}:s>=50?{label:"Steady",cls:"mid"}:{label:"Revise",cls:"bad"}; }
 
-function normalizeAnswer(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId}) {
+ const [subject,setSubject]=useState("ml"),[difficulty,setDifficulty]=useState("medium"),[count,setCount]=useState(10);
+ const [notes,setNotes]=useState([]),[selectedNotes,setSelectedNotes]=useState([]),[search,setSearch]=useState(""),[showAll,setShowAll]=useState(false);
+ const [attempts,setAttempts]=useState([]),[range,setRange]=useState(10),[loading,setLoading]=useState(true),[generating,setGenerating]=useState(false),[error,setError]=useState("");
+ const [quiz,setQuiz]=useState(null),[questions,setQuestions]=useState([]),[current,setCurrent]=useState(0),[answers,setAnswers]=useState({}),[revealed,setRevealed]=useState(false),[result,setResult]=useState(null),[saving,setSaving]=useState(false),[review,setReview]=useState(null);
 
-function initialism(value) {
-  const words = normalizeAnswer(value).split(" ").filter(Boolean);
-  return words.length > 1 ? words.map((word) => word[0]).join("") : "";
-}
+ const reloadData=useCallback(async()=>{setLoading(true);const out=await Promise.allSettled([getNotesList(),getQuizAttempts(null,100)]);if(out[0].status==="fulfilled"){const list=arr(out[0].value);setNotes(list);if(selectedNoteId)setSelectedNotes([String(selectedNoteId)]);else setSelectedNotes(old=>old.filter(id=>list.some(n=>idOf(n)===id)));}else setNotes([]);if(out[1].status==="fulfilled")setAttempts(arr(out[1].value).sort((a,b)=>new Date(b.created_at||b.completed_at||b.date||0)-new Date(a.created_at||a.completed_at||a.date||0)));else setAttempts([]);setLoading(false);},[selectedNoteId]);
+ useEffect(()=>{reloadData();},[reloadData]);
+ const filtered=useMemo(()=>{const q=norm(search);const list=notes.filter(n=>!q||norm(titleOf(n)).includes(q)||norm(n?.topic).includes(q));return showAll?list:list.slice(0,5);},[notes,search,showAll]);
+ const average=attempts.length?Math.round(attempts.reduce((s,a)=>s+scoreOf(a),0)/attempts.length):0;
+ const best=attempts.length?Math.max(...attempts.map(scoreOf)):0;
+ const weak=useMemo(()=>{const m=new Map();attempts.forEach(a=>{(a.responses||[]).filter(r=>!r.is_correct).forEach(r=>{const label=r.topic||r.section_title||nameOf(a);const v=m.get(label)||{label,misses:0};v.misses++;m.set(label,v);});(a.weak_topics||[]).forEach(label=>{const v=m.get(label)||{label,misses:0};v.misses++;m.set(label,v);});});return [...m.values()].sort((a,b)=>b.misses-a.misses).slice(0,3);},[attempts]);
+ const chart=useMemo(()=>[...attempts].reverse().slice(-range),[attempts,range]);
+ const q=questions[current], choice=(q?.options||[]).length>0, answer=q?answers[q.id]:undefined, hasAnswer=answer!==undefined&&answer!==null&&String(answer).trim()!=="";
+ const correct=q?(choice?Number(answer)===Number(q.correct??q.answer_index??0):checkText(q,answer)):false;
+ const pct=questions.length?Math.round(((current+(revealed?1:0))/questions.length)*100):0;
+ const stats=[{icon:"document",label:"Quizzes attempted",value:attempts.length,note:"Across all subjects",fill:Math.min(attempts.length*5,100)},{icon:"target",label:"Average score",value:average+"%",note:attempts.length?"From saved attempts":"Complete a quiz to build your average",fill:average,warm:true},{icon:"trophy",label:"Best score",value:best+"%",note:attempts.length?nameOf(attempts.reduce((a,b)=>scoreOf(a)>scoreOf(b)?a:b,attempts[0])):"Your best result will appear here",fill:best},{icon:"bars",label:"Topics to revise",value:weak.length,note:weak.length?"Based on missed questions":"Based on recent attempts",fill:weak.length*33}];
 
-function similarity(a, b) {
-  const left = normalizeAnswer(a);
-  const right = normalizeAnswer(b);
-  if (!left || !right) return 0;
-  const rows = Array.from({ length: left.length + 1 }, (_, index) => [index]);
-  for (let j = 1; j <= right.length; j++) rows[0][j] = j;
-  for (let i = 1; i <= left.length; i++) {
-    for (let j = 1; j <= right.length; j++) {
-      rows[i][j] = Math.min(
-        rows[i - 1][j] + 1,
-        rows[i][j - 1] + 1,
-        rows[i - 1][j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
-      );
-    }
-  }
-  const distance = rows[left.length][right.length];
-  return 1 - distance / Math.max(left.length, right.length, 1);
-}
+ function toggleNote(id){setSelectedNotes(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);}
+ async function generateQuiz(){setError("");setResult(null);setGenerating(true);try{const note=selectedNotes.length?notes.find(n=>idOf(n)===selectedNotes[0]):null;const data=await getQuiz(note?"all":subject,count,note?idOf(note):null);let list=Array.isArray(data?.questions)?data.questions:[];if(difficulty!=="mixed")list=list.filter(item=>!item.difficulty||String(item.difficulty).toLowerCase()===difficulty);list=list.slice(0,count);if(!list.length){setQuiz(data);setQuestions([]);setError(note?"No questions match this note and difficulty. Try Mixed or select another saved note.":"The backend returned no questions for this subject yet. Try a saved note or another subject.");return;}setQuiz({...data,topic:data.topic||subject,topic_label:note?titleOf(note):(SUBJECTS.find(s=>s.value===subject)?.label||data.topic_label),note_id:note?idOf(note):data.note_id,note_title:note?titleOf(note):data.note_title,difficulty});setQuestions(list);setCurrent(0);setAnswers({});setRevealed(false);toast("Quiz generated from your selected source.","teal");}catch(e){setError(e?.message||"Could not generate quiz. Check that the backend is running.");toast("Could not generate quiz","coral");}finally{setGenerating(false);}}
+ function showAnswer(){if(q&&hasAnswer)setRevealed(true);}
+ async function finish(){const responses=questions.map(question=>{const val=answers[question.id],isChoice=(question.options||[]).length>0,ok=isChoice?Number(val)===Number(question.correct??question.answer_index??0):checkText(question,val);return{question_id:question.id,question:question.question,type:question.type||(isChoice?"mcq":"short_answer"),topic:question.section_title||question.topic||quiz?.topic_label||"General",selected_index:isChoice?(val===undefined?null:Number(val)):null,selected_answer:isChoice?(question.options?.[Number(val)]||""):String(val||""),correct_index:question.correct??question.answer_index??null,expected_answer:question.correct_answer||question.options?.[question.correct??question.answer_index??0]||question.answer_hint||"",is_correct:ok,difficulty:question.difficulty||difficulty,question_data:question};});const correctCount=responses.filter(r=>r.is_correct).length;const data={responses,correct:correctCount,total:questions.length,score:Math.round(correctCount/Math.max(questions.length,1)*100),saved:false};setResult(data);setSaving(true);try{const saved=await saveQuizAttempt({note_id:quiz?.note_id||null,note_title:quiz?.note_title||null,topic:quiz?.topic||subject,topic_label:quiz?.topic_label||"Practice Quiz",total:questions.length,correct:correctCount,score:data.score,responses,weak_topics:[...new Set(responses.filter(r=>!r.is_correct).map(r=>r.topic))]});data.saved=true;data.savedAttempt=saved;setResult({...data});await reloadData();if(refreshDashboard)refreshDashboard();toast("Quiz result saved to your learning history.","teal");}catch(e){data.saveError=e?.message||"Could not save attempt.";setResult({...data});toast("Quiz finished, but saving failed.","coral");}finally{setSaving(false);}}
+ function reset(){setQuestions([]);setQuiz(null);setResult(null);setAnswers({});setCurrent(0);setRevealed(false);setError("");}
 
-function evaluateTextAnswer(question, answer) {
-  const expected = [
-    question.correct_answer,
-    question.answer_hint,
-    ...(question.acceptable_answers || []),
-  ].filter(Boolean);
-  const normalized = normalizeAnswer(answer);
-  const accepted = expected.flatMap((item) => {
-    const init = initialism(item);
-    return init ? [normalizeAnswer(item), init] : [normalizeAnswer(item)];
-  });
-  if (accepted.some((item) => normalized === item || similarity(normalized, item) >= 0.86)) {
-    return true;
-  }
+ return <div className="view active q-view" id="view-quiz">
+  <section className="q-hero"><div className="q-hero-copy"><div className="q-eyebrow">Your practice space</div><h1>Your practice, <em>in focus.</em></h1><p>Test what you know. Fix what you don't. Improve with every attempt.</p><span className="q-chip"><i/>Every quiz makes the next one easier</span></div><div className="q-orb-wrap" aria-label="Your learning core"><div className="q-orb"/><small><i/> YOUR LEARNING CORE</small></div></section>
+  <section className="q-stats" aria-label="Quiz statistics">{stats.map(s=><article className="q-stat" key={s.label}><div className="q-stat-top"><Icon name={s.icon}/><span>↗</span></div><label>{s.label}</label><strong>{s.value}</strong><div className={"q-stat-bar"+(s.warm?" warm":"")}><i style={{width:Math.max(0,Math.min(s.fill,100))+"%"}}/></div><small className={s.warm&&average?"coral":""}>{s.note}</small></article>)}</section>
 
-  const keywords = (question.expected_keywords || []).map(normalizeAnswer).filter(Boolean);
-  if (!keywords.length) return false;
-  const hits = keywords.filter((keyword) => normalized.includes(keyword) || normalized.split(" ").includes(keyword)).length;
-  const keywordScore = hits / Math.max(keywords.length, 1);
-  const semanticScore = Math.max(0, ...accepted.map((item) => similarity(normalized, item)));
-  return keywordScore >= 0.5 || (keywordScore >= 0.34 && semanticScore >= 0.62);
-}
+  {!result&&!questions.length&&<section className="q-card q-builder"><div className="q-panel-head"><span className="q-head-icon"><Icon name="play"/></span><div className="q-panel-heading"><b>Start a new quiz</b><small>Choose your subject, notes and preferences to generate a personalised quiz.</small></div></div>
+   <div className="q-builder-grid"><div><div className="q-field"><label htmlFor="q-subject">Subject</label><select id="q-subject" value={subject} onChange={e=>setSubject(e.target.value)} disabled={generating}>{SUBJECTS.map(s=><option value={s.value} key={s.value}>{s.label}</option>)}</select></div>
+    <div className="q-field"><div className="q-source-head"><label>Choose notes</label><span className="q-selected-count">{selectedNotes.length} selected</span></div><p className="q-source-help">Choose saved study sessions to generate questions from.</p><input className="q-note-search" aria-label="Search saved notes" placeholder="Search your saved notes…" value={search} onChange={e=>setSearch(e.target.value)}/><div className="q-note-picker">{loading?<div className="q-empty">Loading your saved notes…</div>:filtered.length?filtered.map(n=>{const id=idOf(n);if(!id)return null;const chosen=selectedNotes.includes(id);return <button type="button" className={"q-note-choice"+(chosen?" selected":"")} key={id} onClick={()=>toggleNote(id)} aria-pressed={chosen}><span className="q-note-file"><Icon name="file"/></span><span className="q-note-copy"><b>{titleOf(n)}</b><small>{n.section_count??n.sections?.length??n.topic??"Saved study notes"}{n.updated_at||n.created_at?" · "+dateOf(n.updated_at||n.created_at):""}</small></span><span className="q-check">✓</span></button>;}):<div className="q-empty">No saved notes match. Upload or generate notes first, or continue with a subject quiz.</div>}</div>{notes.length>5&&<button className="q-link-btn" type="button" onClick={()=>setShowAll(v=>!v)}>{showAll?"Show fewer notes ↑":"View all saved notes ↓"}</button>}{selectedNotes.length>1&&<p className="q-small-note">The current backend accepts one note at a time; the first selected note will be used.</p>}</div></div>
+    <div><div className="q-field"><label>Difficulty level</label><div className="q-options">{DIFFICULTIES.map(d=><button type="button" key={d.value} className={"q-option"+(difficulty===d.value?" selected":"")} onClick={()=>setDifficulty(d.value)} aria-pressed={difficulty===d.value}><span className={"q-dot "+d.color}/>{d.label}</button>)}</div></div><div className="q-field"><label>Number of questions</label><div className="q-count-options">{COUNTS.map(n=><button type="button" key={n} className={"q-count-option"+(count===n?" selected":"")} onClick={()=>setCount(n)} aria-pressed={count===n}>{n}</button>)}</div></div><button className="q-generate" type="button" onClick={generateQuiz} disabled={generating||loading}><Icon name="sparkle"/>{generating?"Generating quiz…":"Generate quiz"}</button><p className="q-small-note">Questions come from your selected note or subject. Results are saved to your learning history.</p>{error&&<div className="q-error" role="alert">{error}</div>}</div>
+   </div></section>}
 
-function getPerformance(correct, total) {
-  const score20 = Math.round((correct / Math.max(total, 1)) * 20);
-  const percentage = Math.round((correct / Math.max(total, 1)) * 100);
-  if (score20 >= 18) return { score20, percentage, emoji: "🥳", feedback: "Very Good", motivational_text: "Excellent work. Keep revising with mixed questions to stay sharp." };
-  if (score20 >= 15) return { score20, percentage, emoji: "😄", feedback: "Good", motivational_text: "Nice progress. Review the missed points once and try a shuffled quiz." };
-  if (score20 >= 10) return { score20, percentage, emoji: "🥺", feedback: "Better Next Time", motivational_text: "You are close. Re-read weak topics and answer them in your own words." };
-  if (score20 >= 5) return { score20, percentage, emoji: "😦", feedback: "You Can Do Much Better", motivational_text: "Slow down, revise the basics, and retry with short answers first." };
-  return { score20, percentage, emoji: "😞", feedback: "Do Hard Work", motivational_text: "Start again from the summary notes, then practice the easiest questions." };
-}
+  {!!questions.length&&!result&&<section className="q-card q-active-quiz"><div className="q-active-head"><div className="q-panel-head"><span className="q-head-icon"><Icon name="play"/></span><div className="q-panel-heading"><b>{quiz?.topic_label||"Practice quiz"}</b><small>Choose your answer and review the explanation.</small></div></div><span className="q-pill">{current+1} / {questions.length}</span></div><div className="q-progress"><i style={{width:pct+"%"}}/></div><div className="q-question-meta"><span>{String(q?.difficulty||difficulty).toUpperCase()}</span><span>{String(q?.type||(choice?"MCQ":"SHORT ANSWER")).replace("_"," ").toUpperCase()}</span></div><h2 className="q-question-text">{q?.question}</h2>
+   {choice?<div className="q-answer-options">{q.options.map((option,i)=>{const chosen=Number(answer)===i,idx=Number(q.correct??q.answer_index??0);let cls="q-answer-option"+(chosen?" selected":"");if(revealed&&i===idx)cls+=" correct";else if(revealed&&chosen)cls+=" incorrect";return <button type="button" key={q.id+"-"+i} className={cls} disabled={revealed} onClick={()=>setAnswers(old=>({...old,[q.id]:i}))}><span>{String.fromCharCode(65+i)}</span>{option}</button>;})}</div>:<textarea className="q-note-search" style={{minHeight:100,resize:"vertical"}} value={answer??""} onChange={e=>!revealed&&setAnswers(old=>({...old,[q.id]:e.target.value}))} disabled={revealed} placeholder="Write a concise answer…"/>}
+   {revealed&&<div className={"q-answer-review"+(correct?"":" bad")}><b>{correct?"Correct answer":"Review this answer"}</b><p>{q?.correct_answer||q?.options?.[q?.correct??q?.answer_index??0]||q?.answer_hint||"Review the related note section."}</p><small>{q?.explanation||q?.answer_hint||"Compare your answer with the related notes."}</small></div>}<div className="q-question-actions">{!revealed?<button className="q-generate q-action-primary" type="button" disabled={!hasAnswer} onClick={showAnswer}>Check answer <Icon name="arrow"/></button>:<button className="q-generate q-action-primary" type="button" disabled={saving} onClick={()=>current>=questions.length-1?finish():(setCurrent(v=>v+1),setRevealed(false))}>{saving?"Saving…":current>=questions.length-1?"Finish and save":"Next question"} <Icon name="arrow"/></button>}</div></section>}
 
-export default function QuizModule({ toast, refreshDashboard, selectedNoteId }) {
-  const [topic, setTopic] = useState("all");
-  const [quizMeta, setQuizMeta] = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [current, setCurrent] = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [answerText, setAnswerText] = useState("");
-  const [revealed, setRevealed] = useState(false);
-  const [currentCorrect, setCurrentCorrect] = useState(null);
-  const [score, setScore] = useState(0);
-  const [responses, setResponses] = useState([]);
-  const [finished, setFinished] = useState(false);
-  const [savedPerformance, setSavedPerformance] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  {result&&<section className="q-card q-result-card"><div className="q-result-orb">{result.score}%</div><div className="q-eyebrow">Quiz complete</div><h2>{result.score>=80?"Excellent progress.":result.score>=50?"Good effort. Keep building.":"A useful place to start."}</h2><p>{result.correct} correct out of {result.total}. Review missed questions below, then try another quiz to strengthen retention.</p><div className="q-result-summary"><span>Score<b>{result.score}%</b></span><span>Correct<b>{result.correct}/{result.total}</b></span><span>Result status<b>{saving?"Saving…":result.saved?"Saved":"Not saved"}</b></span></div>{result.saveError&&<div className="q-error">{result.saveError}</div>}<div className="q-review-list" style={{textAlign:"left",margin:"16px 0"}}>{result.responses.map((r,i)=><article className={"q-review-answer"+(r.is_correct?" ok":" bad")} key={r.question_id+"-"+i}><b>{i+1}. {r.question}</b><span>Your answer: {r.selected_answer||"No answer"}</span><span>Expected: {r.expected_answer||"See notes"}</span></article>)}</div><div className="q-result-actions"><button type="button" className="q-pill-btn" onClick={reset}>Back to quiz setup</button><button type="button" className="q-generate" onClick={reset}>Generate another <Icon name="arrow"/></button></div></section>}
 
-  const loadQuiz = useCallback((nextTopic = topic, noteId = selectedNoteId) => {
-    setLoading(true);
-    getQuiz(nextTopic, noteId ? 20 : 10, noteId)
-      .then((data) => {
-        setQuizMeta(data);
-        setQuestions(data.questions || []);
-        setCurrent(0);
-        setSelected(null);
-        setAnswerText("");
-        setRevealed(false);
-        setCurrentCorrect(null);
-        setScore(0);
-        setResponses([]);
-        setFinished(false);
-        setSavedPerformance(null);
-        setTimeLeft(noteId ? 90 : 60);
-      })
-      .catch(() => toast("Could not load quiz", "coral"))
-      .finally(() => setLoading(false));
-  }, [topic, selectedNoteId, toast]);
+  <section className="q-lower-grid"><article className="q-card q-history-card"><div className="q-panel-head"><span className="q-head-icon"><Icon name="clock"/></span><div className="q-panel-heading"><b>Recent quiz attempts</b><small>Your latest scores and results.</small></div><button type="button" className="q-pill-btn" onClick={()=>setReview({all:true})}>All attempts <Icon name="arrow"/></button></div>{loading?<div className="q-empty">Loading quiz history…</div>:attempts.length?<div className="q-recent-list">{attempts.slice(0,5).map((a,i)=>{const s=statusOf(a);return <button type="button" className="q-recent-item" key={a.id||nameOf(a)+i} onClick={()=>setReview(a)}><span className="q-rank">{String(i+1).padStart(2,"0")}</span><span className="q-recent-copy"><b>{nameOf(a)}</b><small>{a.topic_label||a.topic||"Practice"} · {a.total||a.responses?.length||0} questions</small><span><b>{scoreOf(a)}%</b> · {dateOf(a.created_at||a.completed_at||a.date)}</span></span><span className={"q-tag "+s.cls}>{s.label}</span></button>;})}</div>:<div className="q-empty">No saved quiz attempts yet. Complete your first quiz and your history will appear here.</div>}</article>
+   <article className="q-card q-performance-card"><div className="q-panel-head"><span className="q-head-icon"><Icon name="chart"/></span><div className="q-panel-heading"><b>Quiz performance</b><small>{attempts.length?"Your scores across recent attempts.":"Your scores will appear as you practice."}</small></div><select className="q-select-compact" aria-label="Chart attempt range" value={range} onChange={e=>setRange(Number(e.target.value))}><option value={5}>Last 5 attempts</option><option value={10}>Last 10 attempts</option><option value={20}>Last 20 attempts</option></select></div>{chart.length?<div className="q-chart-wrap"><svg className="q-chart" viewBox="0 0 540 190" role="img" aria-label="Quiz scores over recent attempts">{[0,25,50,75,100].map(v=><g key={v}><line className="q-chart-grid" x1="38" x2="526" y1={155-v*1.25} y2={155-v*1.25}/><text className="q-chart-label" x="28" y={159-v*1.25} textAnchor="end">{v}</text></g>)}<polyline className="q-chart-line" points={chart.map((a,i)=>(42+i*474/Math.max(chart.length-1,1))+","+(155-scoreOf(a)*1.25)).join(" ")}/>{chart.map((a,i)=><circle className="q-chart-point" key={a.id||i} cx={42+i*474/Math.max(chart.length-1,1)} cy={155-scoreOf(a)*1.25} r="4"><title>{nameOf(a)+": "+scoreOf(a)+"%"}</title></circle>)}</svg></div>:<div className="q-chart-empty q-empty">Complete a quiz to start your performance graph.</div>}
+    <div className="q-weak-header"><div className="q-panel-head"><span className="q-head-icon"><Icon name="target"/></span><div className="q-panel-heading"><b>Weak topics</b><small>Topics where you can improve.</small></div></div><button type="button" className="q-outline-btn" onClick={()=>setReview({weak:true})}>View all <Icon name="arrow"/></button></div>{weak.length?<div className="q-weak-grid">{weak.map(t=><div className="q-weak-card" key={t.label}><b title={t.label}>{t.label}</b><small>Missed in {t.misses} response{t.misses===1?"":"s"}</small><div className="q-weak-bar"><i className={t.misses>=3?"coral":""} style={{width:Math.min(100,25+t.misses*18)+"%"}}/></div></div>)}</div>:<div className="q-empty">Weak topics will be identified from incorrect answers in saved attempts.</div>}</article></section>
 
-  useEffect(() => {
-    loadQuiz(topic, selectedNoteId);
-  }, [selectedNoteId]);
-
-  useEffect(() => {
-    if (finished || revealed || questions.length === 0) return;
-    if (timeLeft <= 0) {
-      handleReveal();
-      return;
-    }
-    const timer = setTimeout(() => setTimeLeft((value) => value - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [timeLeft, finished, revealed, questions.length]);
-
-  const q = questions[current];
-  const currentIsChoice = isChoiceQuestion(q);
-  const completedPct = questions.length ? Math.round((current / questions.length) * 100) : 0;
-  const localPerformance = getPerformance(score, questions.length);
-  const performance = savedPerformance || localPerformance;
-  const missedTopics = Array.from(new Set(responses.filter((item) => !item.is_correct).map((item) => item.topic).filter(Boolean))).slice(0, 3);
-  const title = selectedNoteId ? quizMeta?.note_title || "Generated Note Quiz" : quizMeta?.topic_label || "Practice Quiz";
-
-  const canSubmit = useMemo(() => {
-    if (!q) return false;
-    if (currentIsChoice) return selected !== null || timeLeft <= 0;
-    return answerText.trim().length > 0 || timeLeft <= 0;
-  }, [q, currentIsChoice, selected, answerText, timeLeft]);
-
-  function handleSelect(index) {
-    if (revealed) return;
-    setSelected(index);
-  }
-
-  function judgeCurrentQuestion() {
-    if (!q) return false;
-    if (currentIsChoice) return selected === q.correct;
-    return evaluateTextAnswer(q, answerText);
-  }
-
-  function handleReveal() {
-    if (!canSubmit && timeLeft > 0) return;
-    const isCorrect = judgeCurrentQuestion();
-    setCurrentCorrect(isCorrect);
-    setRevealed(true);
-    toast(isCorrect ? "✅ Correct answer" : "💡 Review this one", isCorrect ? "teal" : "coral");
-  }
-
-  function buildResponse(isCorrect) {
-    return {
-      question_id: q.id,
-      question: q.question,
-      type: q.type || "mcq",
-      topic: q.section_title || q.topic || title,
-      selected_index: currentIsChoice ? selected : null,
-      selected_answer: currentIsChoice ? q.options?.[selected] || "" : answerText.trim(),
-      correct_index: q.correct,
-      expected_answer: q.correct_answer || q.options?.[q.correct] || q.answer_hint || "",
-      is_correct: isCorrect,
-      difficulty: q.difficulty || "medium",
-      question_data: q,
-    };
-  }
-
-  async function finishAttempt(nextResponses, nextScore) {
-    setSaving(true);
-    const total = questions.length;
-    const weakTopics = nextResponses
-      .filter((response) => !response.is_correct)
-      .map((response) => response.topic)
-      .filter(Boolean);
-
-    try {
-      const saved = await saveQuizAttempt({
-        note_id: quizMeta?.note_id || null,
-        note_title: quizMeta?.note_title || null,
-        topic: quizMeta?.topic || topic,
-        topic_label: title,
-        total,
-        correct: nextScore,
-        score: Math.round((nextScore / Math.max(total, 1)) * 100),
-        responses: nextResponses,
-        weak_topics: Array.from(new Set(weakTopics)),
-      });
-      if (saved.performance) setSavedPerformance(saved.performance);
-      if (typeof refreshDashboard === "function") refreshDashboard();
-    } catch {
-      toast("Could not save quiz attempt", "coral");
-    } finally {
-      setSaving(false);
-      setFinished(true);
-    }
-  }
-
-  function handleNext() {
-    const isCorrect = currentCorrect === true;
-    const nextResponses = [...responses, buildResponse(isCorrect)];
-    const nextScore = score + (isCorrect ? 1 : 0);
-    setResponses(nextResponses);
-    setScore(nextScore);
-
-    if (current + 1 >= questions.length) {
-      finishAttempt(nextResponses, nextScore);
-      return;
-    }
-
-    setCurrent((value) => value + 1);
-    setSelected(null);
-    setAnswerText("");
-    setRevealed(false);
-    setCurrentCorrect(null);
-    setTimeLeft(selectedNoteId ? 90 : 60);
-  }
-
-  function startTopicQuiz(nextTopic) {
-    setTopic(nextTopic);
-    loadQuiz(nextTopic, null);
-  }
-
-  return (
-    <div className="view active" id="view-quiz">
-      <div className="section-label">Practice Quiz</div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {selectedNoteId ? (
-          <button className="btn btn-sm btn-secondary" onClick={() => loadQuiz(topic, selectedNoteId)}>
-            Reload Generated Quiz
-          </button>
-        ) : (
-          TOPICS.map((item) => (
-            <button
-              key={item}
-              className={`btn btn-sm ${topic === item ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => startTopicQuiz(item)}
-            >
-              {item.toUpperCase()}
-            </button>
-          ))
-        )}
-        <button className="btn btn-sm btn-secondary" onClick={() => loadQuiz(topic, selectedNoteId || null)}>
-          Shuffle
-        </button>
-      </div>
-
-      {loading ? (
-        <div style={{ color: "var(--muted)", padding: 20 }}>Loading quiz...</div>
-      ) : finished ? (
-        <div className="result-card card">
-          <div className="result-emoji">{performance.emoji}</div>
-          <div className="result-score">{score} / {questions.length}</div>
-          <div className="result-percent">{performance.percentage}%</div>
-          <div className="progress-bar" style={{ width: "100%", maxWidth: 360, margin: "12px auto 0" }}>
-            <div
-              className="progress-fill"
-              style={{
-                width: `${performance.percentage}%`,
-                background: "linear-gradient(90deg,var(--c-coral),var(--c-bright),var(--c-aqua))",
-              }}
-            />
-          </div>
-          <div className="result-feedback">{performance.feedback}</div>
-          <p className="result-motivation">
-            {performance.motivational_text || "Review weak topics, retry with shuffled questions, and aim one level higher next time."}
-          </p>
-          {missedTopics.length ? (
-            <div className="result-suggestions">
-              <strong>Improve next:</strong> {missedTopics.join(", ")}
-            </div>
-          ) : null}
-          <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
-            {saving ? "Saving attempt..." : "Attempt saved. Dashboard analytics now include this result."}
-          </div>
-          <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => loadQuiz(topic, selectedNoteId)}>
-            Try Again
-          </button>
-        </div>
-      ) : q ? (
-        <div className="quiz-layout">
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, color: "var(--muted)" }}>
-            <span>{title}</span>
-            <span>Question {current + 1} / {questions.length}</span>
-          </div>
-          <div className="progress-bar" style={{ marginBottom: 16 }}>
-            <div className="progress-fill" style={{ width: `${completedPct}%`, background: "linear-gradient(90deg,var(--c-bright),var(--c-aqua))" }} />
-          </div>
-
-          <div className="card" style={{ padding: "22px 24px", marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14, alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span className={`tag tag-${q.difficulty === "easy" ? "green" : q.difficulty === "medium" ? "teal" : "coral"}`}>
-                  {(q.difficulty || "medium").toUpperCase()}
-                </span>
-                <span className="tag tag-teal">{(q.type || "mcq").replace("_", " ").toUpperCase()}</span>
-              </div>
-              <span style={{
-                fontFamily: "'Syne', sans-serif",
-                fontWeight: 800,
-                fontSize: 18,
-                color: timeLeft <= 10 ? "var(--c-coral)" : "var(--c-bright)",
-              }}>
-                {timeLeft}s
-              </span>
-            </div>
-
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 20, lineHeight: 1.5 }}>
-              {q.question}
-            </div>
-
-            {currentIsChoice ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {q.options.map((option, index) => {
-                  let bg = "var(--glass)";
-                  let border = "var(--border)";
-                  let color = "var(--text2)";
-                  if (revealed) {
-                    if (index === q.correct) {
-                      bg = "rgba(100,182,172,0.2)";
-                      border = "var(--c-aqua)";
-                      color = "#a0e9e0";
-                    } else if (index === selected) {
-                      bg = "rgba(226,149,120,0.15)";
-                      border = "var(--c-coral)";
-                      color = "var(--c-blush)";
-                    }
-                  } else if (selected === index) {
-                    bg = "rgba(17,157,164,0.15)";
-                    border = "var(--c-bright)";
-                    color = "var(--c-sky)";
-                  }
-                  return (
-                    <div
-                      key={index}
-                      onClick={() => handleSelect(index)}
-                      style={{
-                        padding: "11px 14px",
-                        borderRadius: 8,
-                        background: bg,
-                        border: `1px solid ${border}`,
-                        color,
-                        cursor: revealed ? "default" : "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <span style={{ fontWeight: 700, color: "var(--muted)", width: 20 }}>{String.fromCharCode(65 + index)}.</span>
-                      {option}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : q.type === "sentence" || q.type === "scenario" ? (
-              <textarea
-                value={answerText}
-                onChange={(event) => setAnswerText(event.target.value)}
-                disabled={revealed}
-                placeholder={q.type === "scenario" ? "Answer with a short phrase or one sentence..." : "Answer in one concise sentence..."}
-                style={{
-                  width: "100%",
-                  minHeight: 82,
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "rgba(255,255,255,0.04)",
-                  color: "var(--text)",
-                  padding: "12px 14px",
-                  lineHeight: 1.5,
-                  resize: "vertical",
-                }}
-              />
-            ) : (
-              <input
-                value={answerText}
-                onChange={(event) => setAnswerText(event.target.value)}
-                disabled={revealed}
-                placeholder={q.type === "one_word" ? "Type one word or abbreviation..." : "Type the missing term..."}
-                style={{
-                  width: "100%",
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "rgba(255,255,255,0.04)",
-                  color: "var(--text)",
-                  padding: "12px 14px",
-                  lineHeight: 1.4,
-                }}
-              />
-            )}
-
-            {revealed ? (
-              <div className={`answer-review ${currentCorrect ? "ok" : "bad"}`}>
-                <strong>{currentCorrect ? "✅ Correct:" : "💡 Expected:"}</strong>{" "}
-                {q.correct_answer || q.options?.[q.correct] || q.answer_hint}
-                <br />
-                <span>{q.explanation || "Compare this answer with the related note section."}</span>
-              </div>
-            ) : null}
-          </div>
-
-          <div style={{ display: "flex", gap: 10 }}>
-            {!revealed ? (
-              <button className="btn btn-primary" disabled={!canSubmit} onClick={handleReveal}>
-                Submit Answer
-              </button>
-            ) : (
-              <button className="btn btn-primary" onClick={handleNext}>
-                {current + 1 >= questions.length ? "Save Results" : "Next Question"}
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div style={{ color: "var(--muted)" }}>No questions available for this note yet.</div>
-      )}
-    </div>
-  );
+  {review&&<div className="q-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setReview(null);}}><section className="q-modal" role="dialog" aria-modal="true" aria-label="Quiz review"><div className="q-review-head"><div><div className="q-eyebrow">{review.all?"Learning history":review.weak?"Revision focus":"Attempt details"}</div><h2>{review.all?"All quiz attempts":review.weak?"Topics to revise":nameOf(review)}</h2></div><button type="button" className="q-close" aria-label="Close" onClick={()=>setReview(null)}><Icon name="close"/></button></div>{review.all?<div className="q-review-list">{attempts.length?attempts.map((a,i)=><article className="q-review-row" key={a.id||i}><b>{nameOf(a)} <span className="q-review-score">{scoreOf(a)}%</span></b><span>{a.total||a.responses?.length||0} questions · {dateOf(a.created_at||a.completed_at||a.date)}</span></article>):<p className="q-empty">No attempts have been saved yet.</p>}</div>:review.weak?<div className="q-review-list">{weak.length?weak.map(t=><article className="q-review-row" key={t.label}><b>{t.label}</b><span>Missed {t.misses} time(s). Revisit the related notes and try another quiz.</span></article>):<p className="q-empty">No weak topics recorded yet.</p>}</div>:<div className="q-review-list"><div className="q-review-row"><b>Score: {scoreOf(review)}%</b><span>{review.correct??"—"} correct out of {review.total??"—"} · {dateOf(review.created_at||review.completed_at||review.date)}</span></div>{(review.responses||[]).map((r,i)=><article className={"q-review-answer"+(r.is_correct?" ok":" bad")} key={(r.question_id||"q")+i}><b>{i+1}. {r.question||"Question"}</b><span>Your answer: {r.selected_answer||"No answer"}</span><span>Expected: {r.expected_answer||r.question_data?.answer_hint||"See related notes"}</span><small>{r.question_data?.explanation||r.explanation||""}</small></article>)}</div>}<div className="q-modal-actions"><button type="button" className="q-pill-btn" onClick={()=>setReview(null)}>Close</button></div></section></div>}
+ </div>;
 }
