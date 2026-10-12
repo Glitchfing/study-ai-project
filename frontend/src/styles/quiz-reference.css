@@ -9,3 +9,11 @@
 @media(max-width:1180px){.q-view{padding:20px 16px 24px!important}.q-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.q-builder-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.q-orb-wrap{width:140px}.q-lower-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.q-weak-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.q-view{padding:17px 12px 22px!important}.q-hero{min-height:0;margin-bottom:16px}.q-hero h1{font-size:28px}.q-hero p{font-size:12px}.q-orb-wrap{display:none}.q-stats{gap:9px}.q-stat{padding:13px;min-height:135px}.q-stat strong{font-size:25px}.q-stat-top{margin-bottom:11px}.q-card,.q-builder{padding:14px}.q-builder-grid,.q-lower-grid{grid-template-columns:1fr;gap:12px}.q-options{grid-template-columns:repeat(2,minmax(0,1fr))}.q-recent-item{gap:8px;padding:9px}.q-rank{width:28px;height:28px}.q-recent-copy>b,.q-recent-copy>span{font-size:11px}.q-tag{padding:3px 6px;font-size:9px}.q-weak-grid{grid-template-columns:1fr}.q-weak-card small{min-height:0}.q-question-text{font-size:16px}.q-question-actions .q-generate{width:100%}.q-panel-heading b{font-size:14px}.q-panel-heading small{font-size:10px}.q-pill-btn{padding:7px 8px}.q-select-compact{min-width:0;max-width:100%}.q-result-card{padding:19px 13px}}
 @media(prefers-reduced-motion:reduce){.q-view *{transition:none!important}}
+
+
+/* Emoji feedback: the same three outcomes are used in the result card and history. */
+.q-result-emoji{font-size:58px;line-height:1;display:grid;place-items:center;width:88px;height:78px;margin:0 auto 8px;filter:drop-shadow(0 5px 13px #2fc4c022);animation:q-emoji-enter .32s ease-out}
+.q-attempt-emoji{font-size:18px;line-height:1;display:inline-block;vertical-align:-2px;margin-right:7px}
+.q-recent-copy>b .q-attempt-emoji{font-weight:400}
+@keyframes q-emoji-enter{from{transform:scale(.75);opacity:.35}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.q-result-emoji{animation:none}}
