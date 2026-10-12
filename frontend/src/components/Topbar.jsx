@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 
-export default function Topbar({ user, onToast }) {
+export default function Topbar({ user, onToast, onToggleSidebar }) {
   const dateStr = useMemo(
     () =>
       new Date().toLocaleDateString("en-US", {
@@ -14,6 +14,7 @@ export default function Topbar({ user, onToast }) {
 
   return (
     <div id="topbar">
+      <button type="button" className="rf-menu-button rf-shared-menu-toggle" aria-label="Toggle navigation" onClick={onToggleSidebar}>☰</button>
       <div className="tb-greeting">
         <h2>Welcome back, {user?.name?.split(" ")[0] || "there"}! 👋</h2>
         <p>{dateStr}</p>

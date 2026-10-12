@@ -15,6 +15,7 @@ const FALLBACK_USER = { name: "RUTU", initials: "RU", role: "Individual Learning
 
 export default function App() {
   const [currentView, setCurrentView] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
   const [selectedQuizNoteId, setSelectedQuizNoteId] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
@@ -41,6 +42,7 @@ export default function App() {
     if (Object.prototype.hasOwnProperty.call(options, "quizNoteId")) setSelectedQuizNoteId(options.quizNoteId);
     else if (view === "quiz" && !options.noteId) setSelectedQuizNoteId(null);
     setCurrentView(view);
+    setSidebarOpen(false);
     window.scrollTo(0, 0);
     trackActivity({ kind: "view_opened", view });
   }
@@ -50,11 +52,11 @@ export default function App() {
 
   return <>
     <ToastContainer toasts={toasts} />
-    {currentView !== "dashboard" && <Sidebar currentView={currentView} onNavigate={navigate} user={user} />}
+    <Sidebar currentView={currentView} onNavigate={navigate} user={user} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} toast={toast} />
     <div id="main">
-      {currentView !== "dashboard" && <Topbar user={user} onToast={toast} />}
+      {currentView !== "dashboard" && <Topbar user={user} onToast={toast} onToggleSidebar={() => setSidebarOpen((open) => !open)} />}
       <div id="view-container" className={currentView === "dashboard" ? "dashboard-host" : ""}>
-        {currentView === "dashboard" && <Dashboard data={dashboardData} loading={loadingDashboard} onNavigate={navigate} onRefresh={refreshDashboard} toast={toast} />}
+        {currentView === "dashboard" && <Dashboard data={dashboardData} loading={loadingDashboard} onNavigate={navigate} onRefresh={refreshDashboard} toast={toast} onToggleSidebar={() => setSidebarOpen((open) => !open)} />}
         {currentView === "upload" && <UploadPage {...sharedProps} />}
         {currentView === "notes" && <NotesView {...sharedProps} selectedNoteId={selectedNoteId} />}
         {currentView === "quiz" && <QuizModule {...sharedProps} selectedNoteId={selectedQuizNoteId} />}
