@@ -213,6 +213,8 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
     )
     user_prompt = (
         f"Document title: {package.get('document_title')}\n"
+        f"Requested quiz topic: {package.get('quiz_topic') or 'entire note'}\n"
+        "When a topic is specified, every question must test that topic and be answerable from the retrieved source evidence.\n"
         f"Need {max(limit * 2, limit + 8)} candidate questions before filtering.\n"
         "Distribution target after filtering: 20% easy, 50% medium, 30% hard.\n"
         "Required type: mcq only. Every question must have exactly four non-empty options and exactly one correct option.\n"
@@ -258,21 +260,35 @@ def _normalize_question(question: dict[str, Any], index: int) -> dict[str, Any]:
     }
 
 
-def _valid_mcq(question: dict[str, Any]) -> bool:
+def _valid_mcq(question: dict[str, Any], source_text: str = "", requested_topic: str = "") -> bool:
     if str(question.get("type") or "").lower().replace("-", "_").replace(" ", "_") != "mcq":
         return False
     stem = _clean(question.get("question"))
-    options = [_clean(option) for option in question.get("options") or [] if _clean(option)]
-    options = list(dict.fromkeys(options))
+    options = list(dict.fromkeys(_clean(option) for option in question.get("options") or [] if _clean(option)))
     answer = _clean(question.get("correct_answer") or question.get("answer"))
-    return bool(
-        len(stem.split()) >= 6
-        and stem.endswith("?")
-        and len(options) == 4
-        and answer
-        and answer in options
-        and _clean(question.get("explanation"))
-    )
+    explanation = _clean(question.get("explanation"))
+    if not (len(stem.split()) >= 6 and stem.endswith("?") and len(options) == 4 and answer in options and explanation):
+        return False
+
+    # Ground the answer/explanation in the retrieved evidence, not just the prompt.
+    if source_text.strip():
+        source_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", source_text.lower()))
+        answer_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", answer.lower()))
+        explanation_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", explanation.lower()))
+        stop = {"the", "and", "for", "with", "that", "this", "from", "into", "which", "when", "where", "what", "how", "why", "are", "was", "were", "has", "have", "can", "will", "does", "using", "used"}
+        answer_terms -= stop
+        explanation_terms -= stop
+        if not answer_terms or len(answer_terms & source_terms) / len(answer_terms) < 0.35:
+            return False
+        if explanation_terms and len(explanation_terms & source_terms) / len(explanation_terms) < 0.2:
+            return False
+
+    if requested_topic:
+        topic_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", requested_topic.lower()))
+        stem_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", stem.lower()))
+        if topic_terms and not (topic_terms & stem_terms or topic_terms & set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", (answer + " " + explanation).lower()))):
+            return False
+    return True
 
 
 def _select_diverse(candidates: list[dict[str, Any]], limit: int, memory: list[str] | None = None) -> list[dict[str, Any]]:
@@ -334,7 +350,9 @@ def generate_exam_style_questions(
             candidates = _fallback_candidates(package, candidate_limit)
     else:
         candidates = _fallback_candidates(package, candidate_limit)
-    candidates = [question for question in candidates if isinstance(question, dict) and _valid_mcq(question)]
+    source_text = str(package.get("retrieved_source_text") or "")
+    requested_topic = str(package.get("quiz_topic") or "")
+    candidates = [question for question in candidates if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)]
     selected = _select_diverse(candidates, limit, memory=memory)
     random.shuffle(selected)
     return selected
