@@ -79,11 +79,7 @@ def _normalize_question(question: dict[str, Any], index: int, note_id: str | Non
         correct_answer = "True" if _normalize_answer(correct_answer) in {"true", "t", "yes", "1"} else "False"
 
     if q_type == "mcq":
-        if correct_answer and correct_answer not in options:
-            options = [correct_answer] + [option for option in options if option != correct_answer]
-        while len(options) < 4:
-            options.append(f"Conceptual distractor {len(options) + 1}")
-        options = options[:4]
+        # Never fabricate placeholder options. Invalid MCQs are rejected before normalization.
 
     acceptable = [_clean(item) for item in question.get("acceptable_answers") or [] if _clean(item)]
     if correct_answer:
@@ -155,18 +151,15 @@ def generate_quiz_for_package(
 ) -> list[dict[str, Any]]:
     requested_limit = max(1, limit)
     memory = _question_memory(note_id)
-    raw_questions = generate_exam_style_questions(package, limit=max(requested_limit * 2, requested_limit + 6), memory=memory)
+    raw_questions = generate_exam_style_questions(package, limit=max(requested_limit * 3, requested_limit + 10), memory=memory)
+    # Only admit real MCQs with four distinct options and a correct answer present in those options.
+    raw_questions = [question for question in raw_questions if isinstance(question, dict) and str(question.get("type") or "").lower() == "mcq" and len(list(dict.fromkeys(_clean(option) for option in question.get("options") or [] if _clean(option))) ) == 4 and _clean(question.get("correct_answer") or question.get("answer")) in [_clean(option) for option in question.get("options") or []] and len(_clean(question.get("question")).split()) >= 6 and _clean(question.get("question")).endswith("?") and _clean(question.get("explanation"))]
     normalized = [
         _normalize_question(question, index=index, note_id=note_id, note_title=note_title)
         for index, question in enumerate(raw_questions, start=1)
     ]
     filtered = _dedupe_after_normalization(normalized, requested_limit, memory)
-    if len(filtered) < requested_limit:
-        for question in normalized:
-            if len(filtered) >= requested_limit:
-                break
-            if not any(detect_duplicate_questions(question, old) for old in filtered):
-                filtered.append(question)
+    # Do not pad the quiz with invalid or duplicate questions if fewer valid MCQs exist.
     return [_shuffle_options(question) for question in filtered[:requested_limit]]
 
 
