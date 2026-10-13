@@ -15,6 +15,7 @@ from activity import record_activity
 from note_store import get_note_record
 from note_generation import generate_note_package
 from quiz_engine import evaluate_answer, generate_quiz_for_package, performance_feedback
+from services.targeted_retrieval_service import retrieve_targeted_chunks
 from quiz_attempt_store import (
     list_quiz_attempts,
     save_quiz_attempt,
@@ -266,9 +267,85 @@ def _normalize_question(
 # GENERATED QUESTIONS
 # =====================================================
 
+def _retrieve_quiz_evidence(record: dict[str, Any], topic: str | None = None) -> dict[str, Any]:
+    """Build quiz context from Qdrant chunks restricted to this note's source documents."""
+    package = dict(record.get("package") or {})
+    document_ids = package.get("source_document_ids") or record.get("source_document_ids") or []
+    document_ids = [str(value).strip() for value in document_ids if str(value).strip()]
+    if not document_ids:
+        return {"package": package, "retrieved_chunks": 0, "source_document_ids": []}
+
+    note_title = str(record.get("title") or package.get("document_title") or "Study note")
+    requested_topic = (topic or package.get("requested_quiz_topic") or "").strip()
+    existing_sections = package.get("sections") or []
+    queries = [requested_topic] if requested_topic else []
+    if not requested_topic:
+        for section in existing_sections:
+            title = str(section.get("title") or "").strip()
+            topics = section.get("topics") or []
+            for candidate in [title, *(topics if isinstance(topics, list) else [])]:
+                candidate = str(candidate).strip()
+                if candidate and candidate.lower() not in {q.lower() for q in queries}:
+                    queries.append(candidate)
+        if not queries:
+            queries = [note_title]
+
+    gathered: dict[str, dict[str, Any]] = {}
+    for document_id in document_ids:
+        for query in queries[:20]:
+            try:
+                result = retrieve_targeted_chunks(
+                    document_id=document_id,
+                    query=query,
+                    top_k=6 if requested_topic else 4,
+                    max_chunks=8 if requested_topic else 4,
+                )
+            except Exception:
+                continue
+            for match in result.get("matches") or []:
+                key = str(match.get("chunk_id") or (document_id, match.get("page"), match.get("text")))
+                previous = gathered.get(key)
+                if previous is None or float(match.get("score") or 0) > float(previous.get("score") or 0):
+                    gathered[key] = match
+
+    matches = sorted(
+        gathered.values(),
+        key=lambda item: (str(item.get("document_id") or ""), int(item.get("page") or 0), int(item.get("chunk_index") or 0)),
+    )
+    if not matches:
+        raise HTTPException(
+            status_code=404,
+            detail="No indexed source chunks were retrieved for this note/topic. Re-upload the source or verify Qdrant indexing; no unsupported quiz will be generated.",
+        )
+
+    grouped: dict[str, list[str]] = {}
+    for match in matches:
+        heading = str(match.get("heading") or f"Page {match.get('page') or '?'}").strip()
+        text = str(match.get("text") or "").strip()
+        if text:
+            grouped.setdefault(heading, []).append(text)
+    package["sections"] = [
+        {
+            "section_id": f"rag-{index}",
+            "title": heading,
+            "topics": [heading],
+            "content": "\n\n".join(dict.fromkeys(parts)),
+            "educational_explanation": "\n\n".join(dict.fromkeys(parts)),
+            "key_points": list(dict.fromkeys(parts)),
+        }
+        for index, (heading, parts) in enumerate(grouped.items(), start=1)
+    ]
+    package["document_title"] = note_title
+    package["quiz_source"] = "qdrant_rag"
+    package["quiz_topic"] = requested_topic or "entire note"
+    package["retrieved_source_text"] = "\n\n".join(str(match.get("text") or "") for match in matches)
+    return {"package": package, "retrieved_chunks": len(matches), "source_document_ids": document_ids}
+
+
 def _generated_questions_for_note(
     note_id: str,
     limit: int,
+    topic: str | None = None,
 ) -> dict[str, Any]:
 
     record = get_note_record(note_id)
@@ -312,6 +389,8 @@ def _generated_questions_for_note(
                 "key_points": [line.strip() for line in source_text.splitlines() if len(line.split()) >= 5],
             }]
 
+    rag = _retrieve_quiz_evidence(record, topic=topic)
+    package = rag["package"]
     questions = generate_quiz_for_package(
         package,
         note_id=note_id,
@@ -332,7 +411,7 @@ def _generated_questions_for_note(
         "note_title": note_title,
 
         "total": len(questions),
-
+        "retrieval": {"mode": "qdrant_rag" if rag["retrieved_chunks"] else "saved_note_fallback", "retrieved_chunks": rag["retrieved_chunks"], "source_document_ids": rag["source_document_ids"]},
         "questions": questions,
     }
 
@@ -346,6 +425,7 @@ def get_quiz(
     topic: str = Query("all"),
     limit: int = Query(5),
     note_id: str | None = Query(None),
+    quiz_topic: str | None = Query(None, description="Optional topic to retrieve from the selected note"),
 ):
 
     if note_id:
@@ -353,6 +433,7 @@ def get_quiz(
         payload = _generated_questions_for_note(
             note_id,
             limit,
+            topic=quiz_topic,
         )
 
         record_activity(
