@@ -190,9 +190,12 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
 def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]:
     system_prompt = (
         "You are a university exam setter. Generate ONLY four-option multiple-choice questions (MCQs) directly grounded in the supplied study notes. "
-        "Every question must test a specific fact, concept, relationship, or application supported by the notes. "
+        "Write a real exam-style MCQ quiz, not short-answer prompts and not one-sentence answer exercises. "
+        "Use a mix of conceptual understanding, application, scenario-based reasoning, and comparisons when supported by the notes. "
+        "Every question must test a specific fact, concept, relationship, or application supported by the source notes. "
         "Never ask generic study-skills questions, never use the document title as a substitute for subject content, and never invent unsupported facts. "
-        "Use three plausible but incorrect distractors derived from the notes. Return JSON only."
+        "Each question must have a meaningful question stem, exactly four distinct answer options, one unambiguous correct option, and a concise explanation. "
+        "Distractors must be plausible misconceptions related to the same subject, not placeholders or unrelated sentences. Return JSON only."
     )
     user_prompt = (
         f"Document title: {package.get('document_title')}\n"
@@ -223,30 +226,39 @@ def detect_concept_overlap(question: dict[str, Any], accepted: list[dict[str, An
 
 
 def _normalize_question(question: dict[str, Any], index: int) -> dict[str, Any]:
-    q_type = str(question.get("type") or "scenario").lower().replace("-", "_")
-    if q_type not in ALLOWED_TYPES:
-        q_type = "mcq" if question.get("options") else "scenario"
-    options = [_clean(option) for option in question.get("options") or [] if _clean(option)]
+    """Normalize a validated MCQ without inventing options or answers."""
+    options = list(dict.fromkeys(_clean(option) for option in question.get("options") or [] if _clean(option)))
     correct_answer = _clean(question.get("correct_answer") or question.get("answer") or "")
-    if q_type == "mcq":
-        if correct_answer and correct_answer not in options:
-            options = [correct_answer] + options
-        options = (options + ["A plausible misconception", "A partial explanation", "An unrelated detail"])[:4]
-    if q_type == "true_false":
-        options = ["True", "False"]
     return {
         "id": question.get("id") or f"candidate-{index}",
-        "type": q_type,
-        "question": _clean(question.get("question") or "Untitled question"),
+        "type": "mcq",
+        "question": _clean(question.get("question") or ""),
         "options": options,
-        "correct_answer": correct_answer or (options[0] if options else ""),
+        "correct_answer": correct_answer,
         "acceptable_answers": list(dict.fromkeys([_clean(item) for item in question.get("acceptable_answers") or [] if _clean(item)] + ([correct_answer] if correct_answer else []))),
-        "explanation": _clean(question.get("explanation") or "Review the related concept in the notes."),
+        "explanation": _clean(question.get("explanation") or ""),
         "difficulty": str(question.get("difficulty") or "medium").lower(),
         "topic": _clean(question.get("topic") or "Study Topic"),
         "expected_keywords": list(dict.fromkeys([_clean(item) for item in question.get("expected_keywords") or [] if _clean(item)]))[:6],
         "quality_score": rank_question_quality(question),
     }
+
+
+def _valid_mcq(question: dict[str, Any]) -> bool:
+    if str(question.get("type") or "").lower().replace("-", "_").replace(" ", "_") != "mcq":
+        return False
+    stem = _clean(question.get("question"))
+    options = [_clean(option) for option in question.get("options") or [] if _clean(option)]
+    options = list(dict.fromkeys(options))
+    answer = _clean(question.get("correct_answer") or question.get("answer"))
+    return bool(
+        len(stem.split()) >= 6
+        and stem.endswith("?")
+        and len(options) == 4
+        and answer
+        and answer in options
+        and _clean(question.get("explanation"))
+    )
 
 
 def _select_diverse(candidates: list[dict[str, Any]], limit: int, memory: list[str] | None = None) -> list[dict[str, Any]]:
@@ -308,6 +320,7 @@ def generate_exam_style_questions(
             candidates = _fallback_candidates(package, candidate_limit)
     else:
         candidates = _fallback_candidates(package, candidate_limit)
+    candidates = [question for question in candidates if isinstance(question, dict) and _valid_mcq(question)]
     selected = _select_diverse(candidates, limit, memory=memory)
     random.shuffle(selected)
     return selected
