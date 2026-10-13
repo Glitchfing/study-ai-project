@@ -177,7 +177,9 @@ def generate_targeted_study(req: TargetedStudyRequest):
     notes = attach_diagrams_to_sections(notes, relevant_diagrams)
     questions = notes.get("questions", [])
 
-    # 5. Store note & create session
+    # 5. Store the exact indexed source document ID with this targeted note.
+    notes["source_document_ids"] = [clean_doc_id]
+    notes["requested_quiz_topic"] = clean_query
     note_id = register_generated_note(notes, topic=clean_query)
 
     session = create_study_session(
