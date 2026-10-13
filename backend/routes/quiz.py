@@ -297,9 +297,9 @@ def _generated_questions_for_note(
         if not source_text:
             outline = content.get("outline") or {}
             outline_sections = outline.get("sections") or []
-            source_text = "\\n\\n".join(
-                str(section.get("heading") or "") + "\\n" +
-                "\\n".join(str(point) for point in (section.get("points") or []))
+            source_text = "\n\n".join(
+                str(section.get("heading") or "") + "\n" +
+                "\n".join(str(point) for point in (section.get("points") or []))
                 for section in outline_sections
             )
         if source_text.strip():
