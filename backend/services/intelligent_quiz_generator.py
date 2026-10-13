@@ -137,7 +137,11 @@ def _difficulty_targets(limit: int) -> list[str]:
 
 
 def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    """Build MCQs only from facts actually present in the saved note package."""
+    """
+    Conservative fallback: build a question only when the note provides a
+    specific concept and enough source-grounded distractors. Never manufacture
+    generic questions from the document title or pad missing options.
+    """
     sections = package.get("sections") or []
     facts: list[dict[str, str]] = []
     for section in sections:
@@ -151,35 +155,45 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
         for source in sources:
             if isinstance(source, dict):
                 fact = _clean(source.get("definition") or source.get("description") or source.get("point") or source.get("text") or source.get("explanation"))
-                concept = _clean(source.get("term") or source.get("concept") or source.get("title") or title)
+                concept = _clean(source.get("term") or source.get("concept") or source.get("title") or "")
             else:
-                fact, concept = _clean(source), title
-            if len(fact.split()) >= 5 and not any(item["fact"].lower() == fact.lower() for item in facts):
+                fact, concept = _clean(source), ""
+            if (
+                concept
+                and concept.lower() != title.lower()
+                and len(fact.split()) >= 5
+                and not any(item["fact"].lower() == fact.lower() for item in facts)
+            ):
                 facts.append({"topic": title, "concept": concept, "fact": fact})
-
-        if not any(item["topic"] == title for item in facts):
-            explanation = _clean(section.get("content") or section.get("educational_explanation") or section.get("explanation"))
-            sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", explanation) if len(part.split()) >= 7]
-            for sentence in sentences[:3]:
-                facts.append({"topic": title, "concept": title, "fact": sentence})
 
     candidates: list[dict[str, Any]] = []
     for index, item in enumerate(facts):
-        distractors = [other["fact"] for j, other in enumerate(facts) if j != index and other["fact"].lower() != item["fact"].lower()]
-        # Never pad an MCQ with made-up distractors.
+        distractors = [
+            other["fact"] for j, other in enumerate(facts)
+            if j != index and other["fact"].lower() != item["fact"].lower()
+        ]
         if len(distractors) < 3:
             continue
         options = [item["fact"], *random.sample(distractors, 3)]
+        options = list(dict.fromkeys(options))
+        if len(options) != 4:
+            continue
         random.shuffle(options)
+        stems = [
+            f"Which statement most accurately describes {item['concept']}?",
+            f"Which option correctly explains the role of {item['concept']}?",
+            f"When applying the concept of {item['concept']}, which statement is supported by the notes?",
+            f"Which statement distinguishes {item['concept']} from related concepts in the notes?",
+        ]
         candidates.append({
             "type": "mcq",
-            "question": f"According to the notes on {item['topic']}, which statement best describes {item['concept']}?",
+            "question": stems[index % len(stems)],
             "options": options,
             "correct_answer": item["fact"],
             "acceptable_answers": [item["fact"]],
-            "explanation": f"This statement is supported by the saved notes in the section '{item['topic']}'.",
+            "explanation": f"The selected statement matches the notes' description of {item['concept']} in '{item['topic']}'.",
             "difficulty": ["easy", "medium", "hard"][index % 3],
-            "topic": item["topic"],
+            "topic": item["concept"],
             "expected_keywords": top_keywords(item["fact"], limit=6),
         })
         if len(candidates) >= max(limit * 3, limit + 10):
