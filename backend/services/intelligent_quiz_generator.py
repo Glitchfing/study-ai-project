@@ -137,115 +137,72 @@ def _difficulty_targets(limit: int) -> list[str]:
 
 
 def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    candidates = []
+    """Build MCQs only from facts actually present in the saved note package."""
     sections = package.get("sections") or []
-    difficulties = _difficulty_targets(max(limit * 2, 8))
-    for index, section in enumerate(sections):
-        title = section.get("title") or "Study Topic"
-        keywords = top_keywords(
-            f"{title} {section.get('explanation', '')} {' '.join(section.get('key_points') or [])}",
-            limit=8,
-        )
-        focus = keywords[0].title() if keywords else title
-        relation = (keywords[1].title() if len(keywords) > 1 else title)
-        mistake = (section.get("common_mistakes") or [f"confusing {focus} with a related idea"])[0]
-        example = (section.get("examples") or [f"an applied situation involving {focus}"])[0]
-        difficulty = difficulties[index % len(difficulties)]
-        candidates.extend(
-            [
-                {
-                    "type": "mcq",
-                    "question": f"Which explanation best shows how {focus} functions inside {title}?",
-                    "options": [
-                        f"It connects the purpose of {title} with {relation} and the working flow.",
-                        f"It is only a term to memorize without relationships.",
-                        f"It matters only when page numbers are asked.",
-                        f"It replaces the need to explain examples or workflow.",
-                    ],
-                    "correct_answer": f"It connects the purpose of {title} with {relation} and the working flow.",
-                    "acceptable_answers": [focus, relation],
-                    "explanation": f"A strong answer links {focus}, {relation}, and the actual working of {title}.",
-                    "difficulty": difficulty,
-                    "topic": title,
-                    "expected_keywords": [focus, relation, "workflow"],
-                },
-                {
-                    "type": "scenario",
-                    "question": f"A learner can define {focus} but cannot solve an application question on {title}. What should they add to their answer?",
-                    "options": [],
-                    "correct_answer": f"They should add the working flow, relationship with {relation}, and a practical example.",
-                    "acceptable_answers": ["workflow", relation, "example", "application"],
-                    "explanation": "Application answers need concept use, not definition recall alone.",
-                    "difficulty": "hard",
-                    "topic": title,
-                    "expected_keywords": ["workflow", relation, "example"],
-                },
-                {
-                    "type": "workflow",
-                    "question": f"State the correct learning flow for explaining {title} in one sentence.",
-                    "options": [],
-                    "correct_answer": f"Begin with purpose, explain {focus}, connect it to {relation}, then support it with a use case.",
-                    "acceptable_answers": ["purpose", focus, relation, "use case"],
-                    "explanation": "The expected flow is purpose, concept, relationship, and application.",
-                    "difficulty": "medium",
-                    "topic": title,
-                    "expected_keywords": ["purpose", focus, relation],
-                },
-                {
-                    "type": "compare",
-                    "question": f"Compare {focus} and {relation} using purpose and role in {title}.",
-                    "options": [],
-                    "correct_answer": f"{focus} should be explained by its role, while {relation} should be linked as the supporting or connected concept.",
-                    "acceptable_answers": [focus, relation, "role", "purpose"],
-                    "explanation": "Comparison questions test whether the learner can separate roles instead of listing terms.",
-                    "difficulty": "medium",
-                    "topic": title,
-                    "expected_keywords": [focus, relation, "role"],
-                },
-                {
-                    "type": "sentence",
-                    "question": f"Rewrite this mistake as a correct exam point: {mistake}",
-                    "options": [],
-                    "correct_answer": f"A correct answer should explain {title} through concept, working, relationship, and example.",
-                    "acceptable_answers": [title, focus, "working", "example"],
-                    "explanation": f"The mistake is repaired by adding conceptual explanation and application: {example}",
-                    "difficulty": "hard",
-                    "topic": title,
-                    "expected_keywords": [focus, "working", "example"],
-                },
-            ]
-        )
-    if not candidates:
-        candidates.append(
-            {
-                "type": "scenario",
-                "question": "A student memorizes the document but cannot explain how ideas connect. What revision method fixes this?",
-                "options": [],
-                "correct_answer": "Build a concept flow with definitions, relationships, workflow, example, and self-test questions.",
-                "acceptable_answers": ["concept flow", "relationships", "workflow", "example"],
-                "explanation": "The platform prioritizes connected conceptual revision over memorized summaries.",
-                "difficulty": "medium",
-                "topic": package.get("document_title") or "Study Session",
-                "expected_keywords": ["relationships", "workflow", "example"],
-            }
-        )
+    facts: list[dict[str, str]] = []
+    for section in sections:
+        title = _clean(section.get("title") or package.get("document_title") or "Study topic")
+        sources = [
+            *(section.get("definitions") or []),
+            *(section.get("key_points") or []),
+            *(section.get("revision_notes") or []),
+            *(section.get("concept_comparisons") or []),
+        ]
+        for source in sources:
+            if isinstance(source, dict):
+                fact = _clean(source.get("definition") or source.get("description") or source.get("point") or source.get("text") or source.get("explanation"))
+                concept = _clean(source.get("term") or source.get("concept") or source.get("title") or title)
+            else:
+                fact, concept = _clean(source), title
+            if len(fact.split()) >= 5 and not any(item["fact"].lower() == fact.lower() for item in facts):
+                facts.append({"topic": title, "concept": concept, "fact": fact})
+
+        if not any(item["topic"] == title for item in facts):
+            explanation = _clean(section.get("content") or section.get("educational_explanation") or section.get("explanation"))
+            sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", explanation) if len(part.split()) >= 7]
+            for sentence in sentences[:3]:
+                facts.append({"topic": title, "concept": title, "fact": sentence})
+
+    candidates: list[dict[str, Any]] = []
+    for index, item in enumerate(facts):
+        distractors = [other["fact"] for j, other in enumerate(facts) if j != index and other["fact"].lower() != item["fact"].lower()]
+        # Never pad an MCQ with made-up distractors.
+        if len(distractors) < 3:
+            continue
+        options = [item["fact"], *random.sample(distractors, 3)]
+        random.shuffle(options)
+        candidates.append({
+            "type": "mcq",
+            "question": f"According to the notes on {item['topic']}, which statement best describes {item['concept']}?",
+            "options": options,
+            "correct_answer": item["fact"],
+            "acceptable_answers": [item["fact"]],
+            "explanation": f"This statement is supported by the saved notes in the section '{item['topic']}'.",
+            "difficulty": ["easy", "medium", "hard"][index % 3],
+            "topic": item["topic"],
+            "expected_keywords": top_keywords(item["fact"], limit=6),
+        })
+        if len(candidates) >= max(limit * 3, limit + 10):
+            break
     return candidates
 
 
 def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]:
     system_prompt = (
-        "You are a university exam setter. Generate varied, non-repetitive, application-focused questions from study notes. "
-        "Avoid shallow definition recall and avoid template phrasing. Use plausible distractors. Return JSON only."
+        "You are a university exam setter. Generate ONLY four-option multiple-choice questions (MCQs) directly grounded in the supplied study notes. "
+        "Every question must test a specific fact, concept, relationship, or application supported by the notes. "
+        "Never ask generic study-skills questions, never use the document title as a substitute for subject content, and never invent unsupported facts. "
+        "Use three plausible but incorrect distractors derived from the notes. Return JSON only."
     )
     user_prompt = (
         f"Document title: {package.get('document_title')}\n"
         f"Need {max(limit * 2, limit + 8)} candidate questions before filtering.\n"
         "Distribution target after filtering: 20% easy, 50% medium, 30% hard.\n"
-        "Required types: conceptual MCQ, scenario, workflow, architecture, case-study, fill_blank, match, one-sentence reasoning, compare-and-contrast, practical application.\n"
+        "Required type: mcq only. Every question must have exactly four non-empty options and exactly one correct option.\n"
         "Rules:\n"
-        "- Questions must test understanding, application, reasoning, relationships, workflows, or architecture.\n"
-        "- MCQs require exactly four options and realistic misconceptions.\n"
-        "- Keep sentence answers concise.\n"
+        "- Return MCQs only, each with exactly four distinct options and one correct answer.\n"
+        "- Use only information supported by the supplied notes; do not create generic questions.\n"
+        "- If the source lacks enough information, return fewer questions rather than guessing.\n"
         "- Include expected_keywords for semantic grading.\n"
         "- Do not use repeated stems or generic wording.\n\n"
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)}\n\n"
