@@ -57,9 +57,10 @@ export const getNote = (id, format = "cornell") =>
   request("GET", `/notes/${id}?format=${format}`);
 
 // ── Quiz ─────────────────────────────────────────────────────────────────────
-export const getQuiz = (topic = "all", limit = 5, noteId = null) => {
+export const getQuiz = (topic = "all", limit = 5, noteId = null, quizTopic = null) => {
   const params = new URLSearchParams({ topic, limit: String(limit) });
   if (noteId) params.set("note_id", noteId);
+  if (quizTopic) params.set("quiz_topic", quizTopic);
   return request("GET", `/quiz?${params.toString()}`);
 };
 export const saveQuizAttempt = (attempt) =>
