@@ -852,6 +852,12 @@ def upload_file(
     # STORE NOTE
     # ========================================================
 
+    # Link this generated note to the exact source document(s) indexed in Qdrant.
+    notes["source_document_ids"] = [
+        result["document_id"] for result in qdrant_results
+        if result.get("stored") and result.get("document_id")
+    ]
+
     note_id = register_generated_note(
         notes,
         topic,
