@@ -279,13 +279,38 @@ def _generated_questions_for_note(
             detail="Note not found",
         )
 
-    package = record.get("package") or {}
+    package = dict(record.get("package") or {})
 
     note_title = (
         record.get("title")
         or package.get("document_title")
         or "Generated Note"
     )
+
+    # Static notes may store their real learning content in the rendered formats
+    # rather than package.sections. Promote that source text into a section so the
+    # question generator never sees only a title and an empty package.
+    if not package.get("sections"):
+        content = record.get("content") or {}
+        cornell = content.get("cornell") or {}
+        source_text = cornell.get("notes") or cornell.get("summary") or ""
+        if not source_text:
+            outline = content.get("outline") or {}
+            outline_sections = outline.get("sections") or []
+            source_text = "\\n\\n".join(
+                str(section.get("heading") or "") + "\\n" +
+                "\\n".join(str(point) for point in (section.get("points") or []))
+                for section in outline_sections
+            )
+        if source_text.strip():
+            package["sections"] = [{
+                "section_id": f"{note_id}-source",
+                "title": note_title,
+                "topics": [note_title],
+                "content": source_text,
+                "educational_explanation": source_text,
+                "key_points": [line.strip() for line in source_text.splitlines() if len(line.split()) >= 5],
+            }]
 
     questions = generate_quiz_for_package(
         package,
