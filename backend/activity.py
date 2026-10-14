@@ -253,18 +253,33 @@ def _recent_quizzes(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return recent
 
 
+def _pending_revision_tasks() -> list[dict[str, Any]]:
+    """Return only saved, unfinished planner tasks; do not infer from templates."""
+    path = DATA_DIR / "revision_tasks.json"
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(saved, list):
+        return []
+    return [
+        task for task in saved
+        if isinstance(task, dict) and task.get("id") is not None and not task.get("done")
+    ]
+
+
 def _tips_from_activity(
     attempts: list[dict[str, Any]],
     recommendations: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     tips: list[dict[str, Any]] = []
     latest_upload = next(
-        (entry for entry in reversed(ACTIVITY_LOG) if entry["kind"] == "upload_processed"),
+        (entry for entry in reversed(ACTIVITY_LOG) if entry.get("kind") == "upload_processed"),
         None,
     )
     completed_tasks = sum(
         1 for entry in ACTIVITY_LOG
-        if entry["kind"] == "planner_task_done" and entry.get("done")
+        if entry.get("kind") == "planner_task_done" and entry.get("done")
     )
 
     # Surface calculated recommendations in the existing dashboard AI Tips area.
@@ -273,6 +288,15 @@ def _tips_from_activity(
             "icon": "🎯",
             "title": f"Recommended: {rec['action']}",
             "body": rec["reason"] + f" Suggested review in {rec['next_review_days']} day(s).",
+        })
+
+    pending_tasks = _pending_revision_tasks()
+    if pending_tasks and len(tips) < 3:
+        next_task = pending_tasks[0]
+        tips.append({
+            "icon": "📅",
+            "title": "Pending revision task",
+            "body": f"Continue with {next_task.get('title', 'your next revision task')} ({next_task.get('topic', 'General')}). It is still marked incomplete in your saved planner.",
         })
 
     if attempts:
