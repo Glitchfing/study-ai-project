@@ -105,6 +105,9 @@ class DashboardAnalytics(BaseModel):
     diagrams_generated: int = 0
     learning_progress: int
     study_minutes: int
+    study_minutes_today: int = 0
+    study_minutes_week: int = 0
+    notes_count: int = 0
     topics_mastered: int
     emoji_performance_history: List[EmojiHistoryItem]
 
