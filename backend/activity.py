@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+import json
+from pathlib import Path
 import re
 from typing import Any
 
@@ -52,28 +54,55 @@ BASE_TOPICS = [
     },
 ]
 
-ACTIVITY_LOG: list[dict[str, Any]] = []
+DATA_DIR = Path(__file__).resolve().parent / "data"
+ACTIVITY_PATH = DATA_DIR / "activity_events.json"
+
+def _load_activity() -> list[dict[str, Any]]:
+    try:
+        loaded = json.loads(ACTIVITY_PATH.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+def _save_activity() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temp = ACTIVITY_PATH.with_suffix(".tmp")
+    temp.write_text(json.dumps(ACTIVITY_LOG[-5000:], ensure_ascii=False, indent=2), encoding="utf-8")
+    temp.replace(ACTIVITY_PATH)
+
+STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "chat_message"}
+ACTIVITY_LOG: list[dict[str, Any]] = _load_activity()
 USER_PROFILE = deepcopy(BASE_USER)
 
 
 def record_activity(kind: str, **payload: Any) -> dict[str, Any]:
+    event_id = payload.get("event_id") or payload.get("attempt_id") or payload.get("session_id")
+    if event_id:
+        existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"), e.get("session_id"))), None)
+        if existing:
+            return existing
     entry = {
         "kind": kind,
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "event_id": event_id or f"{kind}:{datetime.now(timezone.utc).timestamp()}:{len(ACTIVITY_LOG)}",
         **payload,
     }
     ACTIVITY_LOG.append(entry)
-    if len(ACTIVITY_LOG) > 1000:
-        del ACTIVITY_LOG[: len(ACTIVITY_LOG) - 1000]
+    if len(ACTIVITY_LOG) > 5000:
+        del ACTIVITY_LOG[:-5000]
+    _save_activity()
     return entry
 
 
 def _unique_days() -> list[date]:
     days = set()
     for entry in ACTIVITY_LOG:
+        if entry.get("kind") not in STUDY_EVENT_KINDS:
+            continue
         try:
-            days.add(datetime.fromisoformat(entry["timestamp"]).date())
-        except Exception:
+            dt = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
+            days.add(dt.astimezone(timezone.utc).date() if dt.tzinfo else dt.date())
+        except (ValueError, TypeError, KeyError):
             continue
     return sorted(days)
 
@@ -151,21 +180,39 @@ def _format_minutes(minutes: int) -> dict[str, Any]:
     return {"value": str(hours), "suffix": f"h {mins:02d}m"}
 
 
-def _study_minutes_from_activity() -> int:
-    study_minutes = BASE_KPIS["study_minutes"]
+def _study_minutes_from_activity(day: date | None = None) -> int:
+    """Count only measured study sessions; missing historical timing remains zero."""
+    total_seconds = 0
+    seen: set[str] = set()
+    now = datetime.now(timezone.utc)
     for entry in ACTIVITY_LOG:
-        kind = entry["kind"]
-        if kind == "upload_processed":
-            study_minutes += 25
-        elif kind == "note_view":
-            study_minutes += 8
-        elif kind == "quiz_completed":
-            study_minutes += 20
-        elif kind == "planner_task_done":
-            study_minutes += 15
-        elif kind == "chat_message":
-            study_minutes += 5
-    return study_minutes
+        if entry.get("kind") not in {"study_session_completed", "study_session"}:
+            continue
+        identity = str(entry.get("session_id") or entry.get("event_id") or "")
+        if identity and identity in seen:
+            continue
+        if identity:
+            seen.add(identity)
+        try:
+            started_raw = entry.get("started_at") or entry.get("start_time")
+            ended_raw = entry.get("ended_at") or entry.get("end_time")
+            if started_raw and ended_raw:
+                started = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+                ended = datetime.fromisoformat(ended_raw.replace("Z", "+00:00"))
+                started = started.replace(tzinfo=timezone.utc) if started.tzinfo is None else started.astimezone(timezone.utc)
+                ended = ended.replace(tzinfo=timezone.utc) if ended.tzinfo is None else ended.astimezone(timezone.utc)
+                if day and started.date() != day:
+                    continue
+                total_seconds += max(0, min((ended - started).total_seconds(), 24 * 3600))
+            elif entry.get("duration_seconds") is not None:
+                stamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
+                stamp = stamp.replace(tzinfo=timezone.utc) if stamp.tzinfo is None else stamp.astimezone(timezone.utc)
+                if day and stamp.date() != day:
+                    continue
+                total_seconds += max(0, min(float(entry["duration_seconds"]), 24 * 3600))
+        except (ValueError, TypeError, KeyError, OverflowError):
+            continue
+    return int(total_seconds // 60)
 
 
 def _recent_quizzes(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -249,9 +296,12 @@ def _tips_from_activity(
 def _activity_heatmap(weeks: int = 18) -> list[list[dict[str, Any]]]:
     counts = Counter()
     for entry in ACTIVITY_LOG:
+        if entry.get("kind") not in STUDY_EVENT_KINDS:
+            continue
         try:
-            counts[datetime.fromisoformat(entry["timestamp"]).date()] += 1
-        except Exception:
+            parsed = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
+            counts[(parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).date()] += 1
+        except (ValueError, TypeError, KeyError):
             continue
 
     today = date.today()
@@ -337,11 +387,14 @@ def build_dashboard_payload() -> dict[str, Any]:
 
     month_counts = Counter()
     for entry in ACTIVITY_LOG:
-        try:
-            dt = datetime.fromisoformat(entry["timestamp"])
-        except Exception:
+        if entry.get("kind") not in STUDY_EVENT_KINDS:
             continue
-        month_counts[(dt.year, dt.month)] += 1
+        try:
+            dt = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
+            dt = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            month_counts[(dt.year, dt.month)] += 1
+        except (ValueError, TypeError, KeyError):
+            continue
 
     today = date.today().replace(day=1)
     months = []
@@ -350,8 +403,8 @@ def build_dashboard_payload() -> dict[str, Any]:
 
     bar_chart = []
     for month in months:
-        activity_boost = month_counts.get((month.year, month.month), 0) * 6
-        bar_chart.append({"month": month.strftime("%b"), "value": min(100, activity_boost)})
+        event_count = month_counts.get((month.year, month.month), 0)
+        bar_chart.append({"month": month.strftime("%b"), "value": min(100, event_count)})
 
     recent_quizzes = _recent_quizzes(attempts)
     tips = _tips_from_activity(attempts, recommendations)
@@ -384,7 +437,7 @@ def build_dashboard_payload() -> dict[str, Any]:
                 "icon": "⏱",
                 "label": "Study Time",
                 **_format_minutes(study_minutes),
-                "delta": "Tracked from logs" if ACTIVITY_LOG else "No study time yet",
+                "delta": "From recorded study-session durations" if study_minutes else "No timed study sessions recorded",
                 "positive": True,
                 "link": None,
             },
@@ -401,7 +454,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         ],
         "topics": topic_summary,
         "long_term_stats": {
-            "total_activities": f"{len(ACTIVITY_LOG):,}",
+            "total_activities": f"{sum(1 for e in ACTIVITY_LOG if e.get('kind') in STUDY_EVENT_KINDS):,}",
             "longest_streak": f"{streak} days",
             "active_days": len(days),
         },
@@ -410,7 +463,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         "tips": tips,
         "heatmap_weeks": 18,
         "activity_heatmap": _activity_heatmap(18),
-        "recent_activity": list(reversed(ACTIVITY_LOG[-8:])),
+        "recent_activity": list(reversed([e for e in ACTIVITY_LOG if e.get("kind") in STUDY_EVENT_KINDS][-8:])),
         "analytics": {
             "total_sessions": len(sessions),
             "uploaded_files_count": uploaded_files_count,
