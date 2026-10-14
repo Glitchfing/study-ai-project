@@ -13,7 +13,6 @@ from learner_model import build_topic_mastery
 from recommendation_service import build_recommendations
 from quiz_attempt_store import list_quiz_attempts
 from session_store import list_sessions
-from note_store import list_notes
 
 BASE_USER = {
     "name": "RUTU",
@@ -357,6 +356,10 @@ def _add_months(base: date, months: int) -> date:
 
 
 def build_dashboard_payload() -> dict[str, Any]:
+    # Load note metadata lazily to avoid coupling event logging to note-generation services.
+    from note_store import list_notes
+
+    notes_count = sum(1 for note in list_notes() if note.get("source") == "generated")
     days = _unique_days()
     streak = _streak_from_days(days)
     study_minutes = _study_minutes_from_activity()
@@ -505,7 +508,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             "study_minutes": study_minutes,
             "study_minutes_today": _study_minutes_from_activity(datetime.now(STUDY_TZ).date(), datetime.now(STUDY_TZ).date()),
             "study_minutes_week": _study_minutes_from_activity(datetime.now(STUDY_TZ).date() - timedelta(days=6), datetime.now(STUDY_TZ).date()),
-            "notes_count": sum(1 for note in list_notes() if note.get("source") == "generated"),
+            "notes_count": notes_count,
             "activity_breakdown": dict(activity_breakdown),
             "topics_mastered": mastered_topics,
             "emoji_performance_history": emoji_history[:8],
