@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Any
 
@@ -35,7 +36,9 @@ def _load_tasks() -> list[dict[str, Any]]:
     try:
         value = json.loads(TASKS_PATH.read_text(encoding="utf-8"))
         if isinstance(value, list):
-            return [item for item in value if isinstance(item, dict) and "id" in item]
+            loaded = [item for item in value if isinstance(item, dict) and "id" in item]
+            if loaded:
+                return loaded
     except (OSError, json.JSONDecodeError):
         pass
     return [dict(task) for task in _DEFAULT_TASKS]
@@ -80,7 +83,7 @@ def toggle_task(body: TaskToggle):
     previous = bool(task.get("done"))
     if previous != body.done:
         task["done"] = body.done
-        task["updated_at"] = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(timespec="seconds")
+        task["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         _save_tasks()
         # A completed task creates one activity event; repeating the same
         # toggle value is idempotent and does not inflate the heatmap.
