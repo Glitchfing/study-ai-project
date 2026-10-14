@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any, List, Optional
 
 
@@ -108,7 +108,7 @@ class DashboardAnalytics(BaseModel):
     study_minutes_today: int = 0
     study_minutes_week: int = 0
     notes_count: int = 0
-    activity_breakdown: dict[str, int] = {}
+    activity_breakdown: dict[str, int] = Field(default_factory=dict)
     topics_mastered: int
     emoji_performance_history: List[EmojiHistoryItem]
 
