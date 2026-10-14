@@ -430,6 +430,11 @@ def build_dashboard_payload() -> dict[str, Any]:
     ]
     mastery = int(round(sum(mastery_values) / len(mastery_values))) if mastery_values else 0
 
+    completed_activities = sum(
+        1 for entry in ACTIVITY_LOG
+        if entry.get("kind") in {"quiz_completed", "study_session_completed", "planner_task_done"}
+    )
+
     activity_breakdown = Counter()
     for entry in ACTIVITY_LOG:
         kind = entry.get("kind")
@@ -534,6 +539,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             "study_minutes_week": _study_minutes_from_activity(datetime.now(STUDY_TZ).date() - timedelta(days=6), datetime.now(STUDY_TZ).date()),
             "notes_count": notes_count,
             "activity_breakdown": dict(activity_breakdown),
+            "completed_activities": completed_activities,
             "topics_mastered": mastered_topics,
             "emoji_performance_history": emoji_history[:8],
         },
