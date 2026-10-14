@@ -109,6 +109,7 @@ class DashboardAnalytics(BaseModel):
     study_minutes_week: int = 0
     notes_count: int = 0
     activity_breakdown: dict[str, int] = Field(default_factory=dict)
+    completed_activities: int = 0
     topics_mastered: int
     emoji_performance_history: List[EmojiHistoryItem]
 
