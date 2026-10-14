@@ -62,7 +62,7 @@ ACTIVITY_PATH = DATA_DIR / "activity_events.json"
 def _load_activity() -> list[dict[str, Any]]:
     try:
         loaded = json.loads(ACTIVITY_PATH.read_text(encoding="utf-8"))
-        return loaded if isinstance(loaded, list) else []
+        return [entry for entry in loaded if isinstance(entry, dict)] if isinstance(loaded, list) else []
     except (OSError, json.JSONDecodeError):
         return []
 
@@ -403,6 +403,16 @@ def build_dashboard_payload() -> dict[str, Any]:
     ]
     mastery = int(round(sum(mastery_values) / len(mastery_values))) if mastery_values else 0
 
+    activity_breakdown = Counter()
+    for entry in ACTIVITY_LOG:
+        kind = entry.get("kind")
+        if kind == "quiz_completed":
+            activity_breakdown["quiz_practice"] += 1
+        elif kind in {"upload_processed", "targeted_study_generated", "note_created"}:
+            activity_breakdown["notes_uploads"] += 1
+        elif kind in {"note_view", "study_session_completed", "planner_task_done", "chat_message"}:
+            activity_breakdown["other"] += 1
+
     month_counts = Counter()
     for entry in ACTIVITY_LOG:
         if entry.get("kind") not in STUDY_EVENT_KINDS:
@@ -496,6 +506,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             "study_minutes_today": _study_minutes_from_activity(datetime.now(STUDY_TZ).date(), datetime.now(STUDY_TZ).date()),
             "study_minutes_week": _study_minutes_from_activity(datetime.now(STUDY_TZ).date() - timedelta(days=6), datetime.now(STUDY_TZ).date()),
             "notes_count": sum(1 for note in list_notes() if note.get("source") == "generated"),
+            "activity_breakdown": dict(activity_breakdown),
             "topics_mastered": mastered_topics,
             "emoji_performance_history": emoji_history[:8],
         },
