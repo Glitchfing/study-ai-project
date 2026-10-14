@@ -57,10 +57,9 @@ export const getNote = (id, format = "cornell") =>
   request("GET", `/notes/${id}?format=${format}`);
 
 // ── Quiz ─────────────────────────────────────────────────────────────────────
-export const getQuiz = (topic = "all", limit = 5, noteId = null, quizTopic = null) => {
+export const getQuiz = (topic = "all", limit = 5, noteId = null) => {
   const params = new URLSearchParams({ topic, limit: String(limit) });
   if (noteId) params.set("note_id", noteId);
-  if (quizTopic) params.set("quiz_topic", quizTopic);
   return request("GET", `/quiz?${params.toString()}`);
 };
 export const saveQuizAttempt = (attempt) =>
@@ -79,7 +78,16 @@ export const sendChatMessage = (message, context = null, history = []) =>
 export const getPlanner = () => request("GET", "/planner");
 export const toggleTask = (task_id, done) =>
   request("POST", "/planner/toggle", { task_id, done });
+export const updatePlannerTask = (task_id, changes) =>
+  request("PATCH", `/planner/tasks/${task_id}`, changes);
 export const autoSchedule = () => request("POST", "/planner/auto-schedule");
+
+// Measured study-session timer. The server owns timestamps and persistence.
+export const getActiveStudySession = () => request("GET", "/activity/study-sessions/active");
+export const startStudySession = (topic = null) =>
+  request("POST", "/activity/study-sessions/start", { topic });
+export const completeStudySession = (session_id) =>
+  request("POST", "/activity/study-sessions/complete", { session_id });
 
 // ── Activity ─────────────────────────────────────────────────────────────────
 export const logActivity = (event) => request("POST", "/activity", event);
