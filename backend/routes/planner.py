@@ -113,7 +113,7 @@ def update_task(task_id: int, changes: TaskEdit):
     if task is None:
         raise HTTPException(status_code=404, detail="Revision task not found.")
 
-    updates = changes.model_dump(exclude_unset=True)
+    updates = changes.model_dump(exclude_unset=True, exclude_none=True)
     if not updates:
         return {"task": dict(task), "updated": False}
     for key, value in updates.items():
