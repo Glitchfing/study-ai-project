@@ -13,6 +13,7 @@ from learner_model import build_topic_mastery
 from recommendation_service import build_recommendations
 from quiz_attempt_store import list_quiz_attempts
 from session_store import list_sessions
+from note_store import list_notes
 
 BASE_USER = {
     "name": "RUTU",
@@ -71,7 +72,7 @@ def _save_activity() -> None:
     temp.write_text(json.dumps(ACTIVITY_LOG[-5000:], ensure_ascii=False, indent=2), encoding="utf-8")
     temp.replace(ACTIVITY_PATH)
 
-STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "chat_message"}
+STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "targeted_study_generated", "chat_message"}
 STUDY_TZ = ZoneInfo("Asia/Kolkata")
 ACTIVITY_LOG: list[dict[str, Any]] = _load_activity()
 USER_PROFILE = deepcopy(BASE_USER)
@@ -405,9 +406,9 @@ def build_dashboard_payload() -> dict[str, Any]:
         if entry.get("kind") not in STUDY_EVENT_KINDS:
             continue
         try:
-            dt = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-            dt = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-            month_counts[(dt.year, dt.month)] += 1
+            dt = _parse_dt(entry.get("timestamp"))
+            if dt:
+                month_counts[(dt.year, dt.month)] += 1
         except (ValueError, TypeError, KeyError):
             continue
 
@@ -492,6 +493,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             "study_minutes": study_minutes,
             "study_minutes_today": _study_minutes_from_activity(datetime.now(STUDY_TZ).date(), datetime.now(STUDY_TZ).date()),
             "study_minutes_week": _study_minutes_from_activity(datetime.now(STUDY_TZ).date() - timedelta(days=6), datetime.now(STUDY_TZ).date()),
+            "notes_count": len(list_notes()),
             "topics_mastered": mastered_topics,
             "emoji_performance_history": emoji_history[:8],
         },
