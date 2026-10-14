@@ -346,7 +346,9 @@ def _activity_heatmap(weeks: int = 18) -> list[list[dict[str, Any]]]:
             continue
 
     today = datetime.now(STUDY_TZ).date()
+    # The UI labels rows Monday through Sunday, so the first cell must be Monday.
     start = today - timedelta(days=weeks * 7 - 1)
+    start -= timedelta(days=start.weekday())
     cells: list[list[dict[str, Any]]] = []
     for week in range(weeks):
         col = []
