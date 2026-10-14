@@ -80,13 +80,13 @@ def toggle_task(body: TaskToggle):
     previous = bool(task.get("done"))
     if previous != body.done:
         task["done"] = body.done
+        task["updated_at"] = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(timespec="seconds")
         _save_tasks()
         # A completed task creates one activity event; repeating the same
         # toggle value is idempotent and does not inflate the heatmap.
         if body.done:
             record_activity(
                 "planner_task_done",
-                event_id=f"planner-task:{body.task_id}:completed:{task.get('updated_at', '') or 'current'}:{len(TASKS)}",
                 task_id=body.task_id,
                 done=True,
                 title=task.get("title"),
