@@ -17,3 +17,19 @@
 .q-recent-copy>b .q-attempt-emoji{font-weight:400}
 @keyframes q-emoji-enter{from{transform:scale(.75);opacity:.35}to{transform:scale(1);opacity:1}}
 @media(prefers-reduced-motion:reduce){.q-result-emoji{animation:none}}
+
+
+/* Focused quiz-taking state: keep the builder and overview out of view during an attempt. */
+.q-view.q-attempt-mode{max-width:1120px;min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:flex-start;padding-top:30px!important}
+.q-attempt-mode .q-active-quiz{width:100%;margin:0 auto;padding:clamp(18px,3vw,30px);border-color:#246b69;box-shadow:0 18px 48px #0003}
+.q-attempt-pagebar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #1b4040}
+.q-attempt-pagebar>span{font-size:10px;letter-spacing:.16em;font-weight:700;color:#76cbc2}
+.q-attempt-mode .q-question-text{font-size:clamp(18px,2vw,23px);margin-top:5px;margin-bottom:21px}
+.q-attempt-mode .q-answer-options{gap:11px}
+.q-attempt-mode .q-answer-option{padding:14px 15px;min-height:52px}
+.q-attempt-mode .q-progress{margin-bottom:22px}
+@media(max-width:760px){
+ .q-view.q-attempt-mode{min-height:calc(100vh - 60px);padding-top:16px!important}
+ .q-attempt-pagebar{align-items:flex-start}
+ .q-attempt-pagebar .q-pill-btn{white-space:normal}
+}
