@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 import json
 from pathlib import Path
 import re
@@ -71,14 +72,20 @@ def _save_activity() -> None:
     temp.replace(ACTIVITY_PATH)
 
 STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "chat_message"}
+STUDY_TZ = ZoneInfo("Asia/Kolkata")
 ACTIVITY_LOG: list[dict[str, Any]] = _load_activity()
 USER_PROFILE = deepcopy(BASE_USER)
 
 
 def record_activity(kind: str, **payload: Any) -> dict[str, Any]:
-    event_id = payload.get("event_id") or payload.get("attempt_id") or payload.get("session_id")
+    event_id = payload.get("event_id") or payload.get("attempt_id")
+    session_id = payload.get("session_id")
     if event_id:
-        existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"), e.get("session_id"))), None)
+        existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"))), None)
+        if existing:
+            return existing
+    if session_id:
+        existing = next((e for e in ACTIVITY_LOG if e.get("kind") == kind and e.get("session_id") == session_id), None)
         if existing:
             return existing
     entry = {
@@ -93,19 +100,27 @@ def record_activity(kind: str, **payload: Any) -> dict[str, Any]:
     _save_activity()
     return entry
 
+def _parse_dt(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(STUDY_TZ)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
 
 def _unique_days() -> list[date]:
     days = set()
     for entry in ACTIVITY_LOG:
         if entry.get("kind") not in STUDY_EVENT_KINDS:
             continue
-        try:
-            dt = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-            days.add(dt.astimezone(timezone.utc).date() if dt.tzinfo else dt.date())
-        except (ValueError, TypeError, KeyError):
-            continue
+        parsed = _parse_dt(entry.get("timestamp"))
+        if parsed:
+            days.add(parsed.date())
     return sorted(days)
-
 
 def _streak_from_days(days: list[date]) -> int:
     if not days:
@@ -113,7 +128,7 @@ def _streak_from_days(days: list[date]) -> int:
 
     day_set = set(days)
     streak = 0
-    cursor = date.today()
+    cursor = datetime.now(STUDY_TZ).date()
     while cursor in day_set:
         streak += 1
         cursor -= timedelta(days=1)
@@ -180,40 +195,39 @@ def _format_minutes(minutes: int) -> dict[str, Any]:
     return {"value": str(hours), "suffix": f"h {mins:02d}m"}
 
 
-def _study_minutes_from_activity(day: date | None = None) -> int:
-    """Count only measured study sessions; missing historical timing remains zero."""
-    total_seconds = 0
+def _study_minutes_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
+    """Sum measured completed-session intervals within IST calendar days."""
+    total_seconds = 0.0
     seen: set[str] = set()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(STUDY_TZ)
+    window_start = datetime.combine(start_day, time.min, tzinfo=STUDY_TZ) if start_day else None
+    window_end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=STUDY_TZ) if end_day else None
     for entry in ACTIVITY_LOG:
-        if entry.get("kind") not in {"study_session_completed", "study_session"}:
+        if entry.get("kind") != "study_session_completed":
             continue
         identity = str(entry.get("session_id") or entry.get("event_id") or "")
         if identity and identity in seen:
             continue
         if identity:
             seen.add(identity)
-        try:
-            started_raw = entry.get("started_at") or entry.get("start_time")
-            ended_raw = entry.get("ended_at") or entry.get("end_time")
-            if started_raw and ended_raw:
-                started = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
-                ended = datetime.fromisoformat(ended_raw.replace("Z", "+00:00"))
-                started = started.replace(tzinfo=timezone.utc) if started.tzinfo is None else started.astimezone(timezone.utc)
-                ended = ended.replace(tzinfo=timezone.utc) if ended.tzinfo is None else ended.astimezone(timezone.utc)
-                if day and started.date() != day:
-                    continue
-                total_seconds += max(0, min((ended - started).total_seconds(), 24 * 3600))
-            elif entry.get("duration_seconds") is not None:
-                stamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-                stamp = stamp.replace(tzinfo=timezone.utc) if stamp.tzinfo is None else stamp.astimezone(timezone.utc)
-                if day and stamp.date() != day:
-                    continue
-                total_seconds += max(0, min(float(entry["duration_seconds"]), 24 * 3600))
-        except (ValueError, TypeError, KeyError, OverflowError):
-            continue
+        started = _parse_dt(entry.get("started_at") or entry.get("start_time"))
+        ended = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
+        if started and ended:
+            if ended <= started:
+                continue
+            ended = min(ended, started + timedelta(hours=24))
+            left = max(started, window_start) if window_start else started
+            right = min(ended, window_end) if window_end else min(ended, now)
+            total_seconds += max(0.0, (right - left).total_seconds())
+        elif entry.get("duration_seconds") is not None:
+            stamp = _parse_dt(entry.get("timestamp"))
+            if not stamp or (start_day and stamp.date() < start_day) or (end_day and stamp.date() > end_day):
+                continue
+            try:
+                total_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
+            except (TypeError, ValueError, OverflowError):
+                continue
     return int(total_seconds // 60)
-
 
 def _recent_quizzes(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Use persistent quiz attempts so recent quizzes survive backend restarts."""
@@ -299,12 +313,13 @@ def _activity_heatmap(weeks: int = 18) -> list[list[dict[str, Any]]]:
         if entry.get("kind") not in STUDY_EVENT_KINDS:
             continue
         try:
-            parsed = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-            counts[(parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).date()] += 1
+            parsed = _parse_dt(entry.get("timestamp"))
+            if parsed:
+                counts[parsed.date()] += 1
         except (ValueError, TypeError, KeyError):
             continue
 
-    today = date.today()
+    today = datetime.now(STUDY_TZ).date()
     start = today - timedelta(days=weeks * 7 - 1)
     cells: list[list[dict[str, Any]]] = []
     for week in range(weeks):
@@ -475,6 +490,8 @@ def build_dashboard_payload() -> dict[str, Any]:
             "diagrams_generated": diagrams_generated,
             "learning_progress": mastery,
             "study_minutes": study_minutes,
+            "study_minutes_today": _study_minutes_from_activity(datetime.now(STUDY_TZ).date(), datetime.now(STUDY_TZ).date()),
+            "study_minutes_week": _study_minutes_from_activity(datetime.now(STUDY_TZ).date() - timedelta(days=6), datetime.now(STUDY_TZ).date()),
             "topics_mastered": mastered_topics,
             "emoji_performance_history": emoji_history[:8],
         },
