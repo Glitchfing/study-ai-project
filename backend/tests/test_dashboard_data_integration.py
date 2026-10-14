@@ -8,6 +8,7 @@ from unittest.mock import patch
 import activity
 
 
+# Regression coverage for real dashboard data and persisted activity.
 class DashboardDataIntegrationTests(unittest.TestCase):
     def test_study_time_uses_completed_recorded_durations_only(self):
         now = datetime.now(activity.STUDY_TZ)
