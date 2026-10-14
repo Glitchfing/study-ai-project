@@ -56,6 +56,15 @@ class DashboardDataIntegrationTests(unittest.TestCase):
                 datetime(2026, 10, 15).date(), datetime(2026, 10, 15).date()
             ), 60)
 
+    def test_heatmap_starts_on_monday_and_includes_today(self):
+        today = datetime.now(activity.STUDY_TZ).date()
+        cells = [cell for week in activity._activity_heatmap(18) for cell in week]
+        first_date = datetime.fromisoformat(cells[0]["date"]).date()
+        all_dates = [datetime.fromisoformat(cell["date"]).date() for cell in cells]
+        self.assertEqual(first_date.weekday(), 0)
+        self.assertIn(today, all_dates)
+        self.assertTrue(all((right - left).days == 1 for left, right in zip(all_dates, all_dates[1:])))
+
     def test_heatmap_ignores_dashboard_open_events(self):
         today = datetime.now(activity.STUDY_TZ).date()
         event = {"kind": "dashboard_opened", "timestamp": datetime.now(activity.STUDY_TZ).isoformat()}
