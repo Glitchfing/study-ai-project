@@ -1,22 +1,33 @@
 import React, { useEffect, useState } from "react";
-import { getPlanner, toggleTask, autoSchedule } from "../services/api";
+import { getPlanner, toggleTask, autoSchedule, getDashboard, updatePlannerTask } from "../services/api";
 
 const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+const formatMinutes = (minutes) => `${Math.floor((Number(minutes)||0)/60)}h ${String((Number(minutes)||0)%60).padStart(2,"0")}m`;
 
 export default function RevisionPlanner({ toast, refreshDashboard }) {
   const [tasks, setTasks] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
-  const [streak] = useState(7);
+  const [streak, setStreak] = useState(0);
+  const [studyMinutesToday, setStudyMinutesToday] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  async function loadPlannerData() {
+    const [plannerResult, dashboardResult] = await Promise.allSettled([getPlanner(), getDashboard()]);
+    if (plannerResult.status === "fulfilled") {
+      setTasks(Array.isArray(plannerResult.value?.tasks) ? plannerResult.value.tasks : []);
+      setDeadlines(Array.isArray(plannerResult.value?.deadlines) ? plannerResult.value.deadlines : []);
+    } else {
+      toast("⚠️ Could not load planner", "coral");
+    }
+    if (dashboardResult.status === "fulfilled") {
+      setStreak(Number(dashboardResult.value?.user?.streak) || 0);
+      setStudyMinutesToday(Number(dashboardResult.value?.analytics?.study_minutes_today) || 0);
+    }
+    setLoading(false);
+  }
+
   useEffect(() => {
-    getPlanner()
-      .then((data) => {
-        setTasks(data.tasks);
-        setDeadlines(data.deadlines);
-      })
-      .catch(() => toast("⚠️ Could not load planner", "coral"))
-      .finally(() => setLoading(false));
+    loadPlannerData();
   }, []);
 
   async function handleToggle(id, currentDone) {
@@ -25,6 +36,7 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
     try {
       await toggleTask(id, newDone);
       if (newDone) toast("✅ Task completed! Keep going!", "teal");
+      await loadPlannerData();
       if (typeof refreshDashboard === "function") {
         refreshDashboard();
       }
@@ -32,6 +44,40 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
       // revert
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: currentDone } : t)));
       toast("⚠️ Could not update task", "coral");
+    }
+  }
+
+  async function handleEditTask(task) {
+    const title = window.prompt("Task title", task.title);
+    if (title === null) return;
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      toast("Task title cannot be empty.", "coral");
+      return;
+    }
+    const topic = window.prompt("Topic", task.topic || "");
+    if (topic === null) return;
+    const estimate = window.prompt("Planned duration (for example, 15 min)", task.est || "");
+    if (estimate === null) return;
+    const priority = window.prompt("Priority: high, med, or low", task.priority || "med");
+    if (priority === null) return;
+    const cleanPriority = priority.trim().toLowerCase();
+    if (!["high", "med", "low"].includes(cleanPriority)) {
+      toast("Priority must be high, med, or low.", "coral");
+      return;
+    }
+    try {
+      const result = await updatePlannerTask(task.id, {
+        title: cleanTitle,
+        topic: topic.trim() || "General",
+        est: estimate.trim() || "Unspecified",
+        priority: cleanPriority,
+      });
+      setTasks((current) => current.map((item) => item.id === task.id ? result.task : item));
+      toast("Revision task updated.", "teal");
+      if (typeof refreshDashboard === "function") refreshDashboard();
+    } catch (error) {
+      toast(error.message || "Could not update revision task.", "coral");
     }
   }
 
@@ -89,7 +135,7 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {todayTasks.map((t) => (
-                    <TaskRow key={t.id} task={t} onToggle={handleToggle} />
+                    <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={handleEditTask} />
                   ))}
                 </div>
               </div>
@@ -172,12 +218,12 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>
                   <span>Study Time Today</span>
-                  <span>1h 20m</span>
+                  <span>{formatMinutes(studyMinutesToday)}</span>
                 </div>
                 <div className="progress-bar">
                   <div
                     className="progress-fill"
-                    style={{ width: "55%", background: "linear-gradient(90deg,var(--c-coral),#c1694f)" }}
+                    style={{ width: `${Math.min(100, studyMinutesToday)}%`, background: "linear-gradient(90deg,var(--c-coral),#c1694f)" }}
                   />
                 </div>
               </div>
@@ -189,7 +235,7 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
   );
 }
 
-function TaskRow({ task, onToggle }) {
+function TaskRow({ task, onToggle, onEdit }) {
   const prioMap = { high: "coral", med: "teal", low: "green" };
   return (
     <div className={`planner-task${task.done ? " done" : ""}`} onClick={() => onToggle(task.id, task.done)}>
@@ -204,6 +250,7 @@ function TaskRow({ task, onToggle }) {
         </div>
       </div>
       <span className={`task-prio ${task.priority}`}>{task.priority?.toUpperCase()}</span>
+      <button type="button" className="task-time" title="Edit task" aria-label={`Edit ${task.title}`} onClick={(event) => { event.stopPropagation(); onEdit(task); }}>Edit</button>
     </div>
   );
 }
