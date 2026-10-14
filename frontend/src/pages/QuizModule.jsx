@@ -98,7 +98,8 @@ export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId
    return {question_id:question.id,question:question.question,type:question.type||(isChoice?"mcq":"short_answer"),topic:question.section_title||question.topic||quiz?.topic_label||"General",selected_index:isChoice?(val===undefined?null:Number(val)):null,selected_answer:isChoice?(question.options?.[Number(val)]||""):String(val||""),correct_index:question.correct??question.answer_index??null,expected_answer:question.correct_answer||question.options?.[question.correct??question.answer_index??0]||question.answer_hint||"",is_correct:ok,difficulty:question.difficulty||difficulty,question_data:question};
   });
   const correctCount=responses.filter(r=>r.is_correct).length;
-  const data={responses,correct:correctCount,total:questions.length,score:Math.round(correctCount/Math.max(questions.length,1)*100),saved:false};
+  const weakTopics=[...new Set(responses.filter(r=>!r.is_correct).map(r=>r.topic).filter(Boolean))];
+  const data={responses,correct:correctCount,total:questions.length,score:Math.round(correctCount/Math.max(questions.length,1)*100),weak_topics:weakTopics,saved:false};
   setResult(data);setSaving(true);
   try{
    const saved=await saveQuizAttempt({note_id:quiz?.note_id||null,note_title:quiz?.note_title||null,topic:quiz?.topic||subject,topic_label:quiz?.topic_label||"Practice Quiz",total:questions.length,correct:correctCount,score:data.score,responses,weak_topics:[...new Set(responses.filter(r=>!r.is_correct).map(r=>r.topic))]});
