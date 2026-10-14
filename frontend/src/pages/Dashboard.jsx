@@ -60,7 +60,7 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast}) {
   const activityBreakdown=a.activity_breakdown||{};
   const focusCounts=[Number(activityBreakdown.quiz_practice)||0,Number(activityBreakdown.notes_uploads)||0,Number(activityBreakdown.other)||0];
   const focusTotal=focusCounts.reduce((sum,value)=>sum+value,0);
-  const donut=focusTotal?(()=>{const p=focusCounts[0]/focusTotal*100,q=(focusCounts[0]+focusCounts[1])/focusTotal*100;return "conic-gradient(var(--rf-teal) 0 "+p+"%,var(--rf-mint) "+p+"% "+q+"%,var(--rf-coral) "+q+"% 100%)";})():"var(--rf-border)";
+  const donut=focusTotal?(()=>{const p=focusCounts[0]/focusTotal*100,q=(focusCounts[0]+focusCounts[1])/focusTotal*100;return "conic-gradient(var(--rf-teal) 0 "+p+"%,var(--rf-mint) "+p+"% "+q+"%,var(--rf-coral) "+q+"% 100%)";})():"var(--rf-panel)";
   if(loading)return <div className="rf-dashboard-loading">Loading your learning dashboard…</div>;
   if(!data)return <div className="rf-dashboard-loading">Dashboard data unavailable. <button onClick={onRefresh}>Try again</button></div>;
   const nav=[["dashboard","home","Dashboard"],["upload","upload","Upload content"],["notes","notes","Your notes"],["quiz","quiz","Practice quiz"],["chat","spark","Learn & Ask"],["planner","calendar","Revision planner"]];
