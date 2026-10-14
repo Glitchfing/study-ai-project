@@ -141,7 +141,9 @@ def _normalize_topic_name(value: str) -> str:
 
 
 def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    """Render dashboard topics from persisted quiz mastery, never activity counters."""
+    """Render only topics that have actual persisted quiz evidence."""
+    if not topic_mastery:
+        return []
     aliases = {
         "nlp": {"nlp", "nlp text", "natural language processing"},
         "ml": {"ml", "ml models", "machine learning", "machine learning models"},
@@ -412,7 +414,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         except (ValueError, TypeError, KeyError):
             continue
 
-    today = date.today().replace(day=1)
+    today = datetime.now(STUDY_TZ).date().replace(day=1)
     months = []
     for offset in range(-11, 1):
         months.append(_add_months(today, offset))
@@ -493,7 +495,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             "study_minutes": study_minutes,
             "study_minutes_today": _study_minutes_from_activity(datetime.now(STUDY_TZ).date(), datetime.now(STUDY_TZ).date()),
             "study_minutes_week": _study_minutes_from_activity(datetime.now(STUDY_TZ).date() - timedelta(days=6), datetime.now(STUDY_TZ).date()),
-            "notes_count": len(list_notes()),
+            "notes_count": sum(1 for note in list_notes() if note.get("source") == "generated"),
             "topics_mastered": mastered_topics,
             "emoji_performance_history": emoji_history[:8],
         },
