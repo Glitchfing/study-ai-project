@@ -113,6 +113,8 @@ def _normalize_question(question: dict[str, Any], index: int, note_id: str | Non
         "explanation": question.get("explanation") or "Review the related synthesized notes section.",
         "difficulty": question.get("difficulty") or "medium",
         "topic": question.get("topic") or question.get("section_title") or note_title,
+        # Preserve explicit tags from the source-grounded quiz generator only.
+        "concept_id": question.get("concept_id") or question.get("concept") or question.get("concept_tag") or None,
         "quality_score": question.get("quality_score") or rank_question_quality(question),
         "source": "generated" if note_id else question.get("source", "static"),
     }
