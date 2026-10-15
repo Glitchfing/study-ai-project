@@ -30,9 +30,9 @@ def get_recommendations(
     include_history: bool = Query(False),
 ):
     """Return current ranked recommendations, refreshing from persisted quiz data."""
-    _refresh_active(limit)
+    active = _refresh_active(limit)
     return {
-        "recommendations": list_recommendations(include_history=include_history, limit=500)[:limit],
+        "recommendations": list_recommendations(include_history=True, limit=500) if include_history else active,
         "model_version": "1.0",
     }
 
