@@ -265,14 +265,25 @@ def _normalize_question(question: dict[str, Any], index: int) -> dict[str, Any]:
     }
 
 
+def _normalize_for_match(value: Any) -> str:
+    """Normalize punctuation and case for option identity/answer matching."""
+    return re.sub(r"[^a-z0-9]+", " ", _clean(value).lower()).strip()
+
+
 def _valid_mcq(question: dict[str, Any], source_text: str = "", requested_topic: str = "") -> bool:
     if str(question.get("type") or "").lower().replace("-", "_").replace(" ", "_") != "mcq":
         return False
     stem = _clean(question.get("question"))
-    options = list(dict.fromkeys(_clean(option) for option in question.get("options") or [] if _clean(option)))
+    # Deduplicate options case/punctuation-insensitively, and match the answer
+    # to its option by normalized text. LLMs often differ only by punctuation
+    # or capitalization; those harmless differences should not discard a good MCQ.
+    raw_options = [_clean(option) for option in question.get("options") or [] if _clean(option)]
+    normalized_options = [_normalize_for_match(option) for option in raw_options]
+    options = list(dict.fromkeys(normalized_options))
     answer = _clean(question.get("correct_answer") or question.get("answer"))
+    normalized_answer = _normalize_for_match(answer)
     explanation = _clean(question.get("explanation"))
-    if not (len(stem.split()) >= 6 and stem.endswith("?") and len(options) == 4 and answer in options and explanation):
+    if not (len(stem.split()) >= 6 and stem.endswith("?") and len(options) == 4 and normalized_answer in options and explanation):
         return False
 
     # Ground the answer/explanation in the retrieved evidence, not just the prompt.
