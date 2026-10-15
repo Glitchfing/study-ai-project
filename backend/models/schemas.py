@@ -122,6 +122,7 @@ class DashboardResponse(BaseModel):
     bar_chart: List[BarDataPoint]
     recent_quizzes: List[RecentQuiz]
     tips: List[Tip]
+    recommendations: List[dict[str, Any]] = Field(default_factory=list)
     heatmap_weeks: int
     activity_heatmap: List[List[HeatmapCell]]
     recent_activity: List[ActivityEntry]
