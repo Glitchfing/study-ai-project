@@ -70,7 +70,7 @@ function sortNotesForQuiz(list, selectedNoteId) {
   }).map(item => item.note);
 }
 
-export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId,selectedQuizTopic=""}) {
+export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId,selectedQuizTopic="",selectedRecommendationId=null}) {
  const [subject,setSubject]=useState("ml"),[difficulty,setDifficulty]=useState("medium"),[count,setCount]=useState(10),[topicQuery,setTopicQuery]=useState("");
  const [notes,setNotes]=useState([]),[selectedNotes,setSelectedNotes]=useState([]),[search,setSearch]=useState(""),[showAll,setShowAll]=useState(false);
  const [attempts,setAttempts]=useState([]),[range,setRange]=useState(10),[loading,setLoading]=useState(true),[generating,setGenerating]=useState(false),[error,setError]=useState("");
@@ -103,7 +103,7 @@ export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId
   const data={responses,correct:correctCount,total:questions.length,score:Math.round(correctCount/Math.max(questions.length,1)*100),weak_topics:weakTopics,saved:false};
   setResult(data);setSaving(true);
   try{
-   const saved=await saveQuizAttempt({note_id:quiz?.note_id||null,note_title:quiz?.note_title||null,topic:quiz?.topic||subject,topic_label:quiz?.topic_label||"Practice Quiz",total:questions.length,correct:correctCount,score:data.score,responses,weak_topics:[...new Set(responses.filter(r=>!r.is_correct).map(r=>r.topic))]});
+   const saved=await saveQuizAttempt({note_id:quiz?.note_id||null,note_title:quiz?.note_title||null,topic:quiz?.topic||subject,topic_label:quiz?.topic_label||"Practice Quiz",recommendation_id:selectedRecommendationId||null,total:questions.length,correct:correctCount,score:data.score,responses,weak_topics:[...new Set(responses.filter(r=>!r.is_correct).map(r=>r.topic))]});
    const savedCorrect=Number.isFinite(Number(saved?.correct))?Number(saved.correct):correctCount;
    const savedTotal=Number.isFinite(Number(saved?.total))&&Number(saved.total)>0?Number(saved.total):questions.length;
    const finalData={...data,correct:savedCorrect,total:savedTotal,score:Number.isFinite(Number(saved?.score))?Number(saved.score):data.score,saved:true,savedAttempt:saved,performance:saved?.performance||null,responses:Array.isArray(saved?.responses)?saved.responses:responses};
