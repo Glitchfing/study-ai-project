@@ -19,6 +19,7 @@ export default function App() {
   const [selectedNoteId, setSelectedNoteId] = useState(null);
   const [selectedQuizNoteId, setSelectedQuizNoteId] = useState(null);
   const [selectedQuizTopic, setSelectedQuizTopic] = useState("");
+  const [selectedRecommendationId, setSelectedRecommendationId] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const { toasts, toast } = useToast();
@@ -44,6 +45,8 @@ export default function App() {
     else if (view === "quiz" && !options.noteId) setSelectedQuizNoteId(null);
     if (Object.prototype.hasOwnProperty.call(options, "quizTopic")) setSelectedQuizTopic(options.quizTopic || "");
     else if (view === "quiz") setSelectedQuizTopic("");
+    if (Object.prototype.hasOwnProperty.call(options, "recommendationId")) setSelectedRecommendationId(options.recommendationId || null);
+    else if (view === "quiz") setSelectedRecommendationId(null);
     setCurrentView(view);
     setSidebarOpen(false);
     window.scrollTo(0, 0);
@@ -62,7 +65,7 @@ export default function App() {
         {currentView === "dashboard" && <Dashboard data={dashboardData} loading={loadingDashboard} onNavigate={navigate} onRefresh={refreshDashboard} toast={toast} onToggleSidebar={() => setSidebarOpen((open) => !open)} />}
         {currentView === "upload" && <UploadPage {...sharedProps} />}
         {currentView === "notes" && <NotesView {...sharedProps} selectedNoteId={selectedNoteId} />}
-        {currentView === "quiz" && <QuizModule {...sharedProps} selectedNoteId={selectedQuizNoteId} selectedQuizTopic={selectedQuizTopic} />}
+        {currentView === "quiz" && <QuizModule {...sharedProps} selectedNoteId={selectedQuizNoteId} selectedQuizTopic={selectedQuizTopic} selectedRecommendationId={selectedRecommendationId} />}
         {currentView === "chat" && <ChatInterface {...sharedProps} />}
         {currentView === "planner" && <RevisionPlanner {...sharedProps} />}
       </div>
