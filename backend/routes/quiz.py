@@ -199,10 +199,14 @@ def _normalize_question(
         else None
     )
 
+    # Prefer an explicit topic from the question generator. Section titles are
+    # a fallback only, so topic-level mastery does not accidentally fragment
+    # into section-title buckets.
     topic = (
-        ", ".join(topic_values[:2])
-        if isinstance(topic_values, list)
-        and topic_values
+        str(question.get("topic")).strip()
+        if isinstance(question.get("topic"), str) and question.get("topic").strip()
+        else ", ".join(topic_values[:2])
+        if isinstance(topic_values, list) and topic_values
         else note_title
     )
 
