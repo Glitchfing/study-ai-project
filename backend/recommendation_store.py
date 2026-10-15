@@ -198,7 +198,10 @@ def record_recommendation_outcome(recommendation_id: str, attempt: dict[str, Any
 
     concept = _normalize_label(target.get("concept"))
     topic = _normalize_label(target.get("topic"))
-    responses = [item for item in (attempt.get("responses") or []) if isinstance(item, dict)]
+    responses = [
+        item for item in (attempt.get("responses") or [])
+        if isinstance(item, dict) and isinstance(item.get("is_correct"), bool)
+    ]
     matched = []
     for response in responses:
         response_concept = _normalize_label(
