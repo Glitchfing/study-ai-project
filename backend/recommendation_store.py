@@ -97,8 +97,15 @@ def upsert_recommendations(recommendations: list[dict[str, Any]]) -> list[dict[s
         row["evidence_signature"] = signature
         by_id[rec_id] = row
 
-    # Retain history for recently completed/dismissed recommendations; only
-    # remove stale pending items from current active display, not the audit trail.
+    # Recommendations which fell out of the current ranked candidate set are
+    # retained for history but no longer shown as active dashboard actions.
+    for rec_id, prior in by_id.items():
+        if rec_id not in current_ids and prior.get("status", "pending") in ACTIVE_STATUSES:
+            prior["status"] = "reevaluated"
+            prior["updated_at"] = now
+            history = list(prior.get("status_history") or [])
+            history.append({"status": "reevaluated", "at": now, "note": "No longer in the current top-ranked set."})
+            prior["status_history"] = history
     _write(list(by_id.values()))
     return [by_id[str(item["id"])] for item in recommendations if item.get("id") and str(item["id"]) in by_id]
 
@@ -149,6 +156,8 @@ def refresh_recommendations(
     candidates = build_recommendations(
         topics,
         concept_mastery=concepts,
-        limit=limit,
+        limit=max(limit * 3, limit),
     )
-    return upsert_recommendations(candidates)
+    persisted = upsert_recommendations(candidates)
+    active = [item for item in persisted if item.get("status", "pending") in ACTIVE_STATUSES]
+    return active[:limit]
