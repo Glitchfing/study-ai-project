@@ -60,6 +60,14 @@ class RecommendationStoreTests(unittest.TestCase):
     def test_unknown_recommendation_returns_none(self):
         self.assertIsNone(recommendation_store.update_recommendation_status("missing", "completed"))
 
+    def test_reevaluated_recommendation_becomes_pending_when_it_reenters(self):
+        recommendation_store.upsert_recommendations([self.row()])
+        recommendation_store.upsert_recommendations([])
+        hidden = recommendation_store.get_recommendation("rec-test")
+        self.assertEqual(hidden["status"], "reevaluated")
+        returned = recommendation_store.upsert_recommendations([self.row()])[0]
+        self.assertEqual(returned["status"], "pending")
+
     def test_writes_are_json_and_bounded_history_is_readable(self):
         recommendation_store.upsert_recommendations([self.row()])
         self.assertTrue(recommendation_store.RECOMMENDATIONS_PATH.exists())
