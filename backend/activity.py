@@ -160,7 +160,7 @@ def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, A
         if not stats:
             sub = "No quiz attempts yet"
         else:
-            trend = stats.get("trend", 0)
+            trend = float(stats.get("trend") or 0.0)
             trend_label = "improving" if trend > 0.03 else "declining" if trend < -0.03 else "stable"
             sub = f"{stats.get('attempts', 0)} quiz attempt(s) · {trend_label}"
         topics.append({**base, "pct": max(0, min(100, pct)), "sub": sub})
@@ -173,7 +173,7 @@ def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, A
         if len(topics) >= 6:
             break
         attempts_count = int(stats.get("attempts") or 0)
-        trend = stats.get("trend", 0)
+        trend = float(stats.get("trend") or 0.0)
         trend_label = "improving" if trend > 0.03 else "declining" if trend < -0.03 else "stable"
         color = ("teal", "coral", "aqua")[len(topics) % 3]
         pct = int(round(stats.get("mastery_pct") or 0))
