@@ -171,10 +171,13 @@ def build_recommendations(
         raw_questions = focus_stats.get("question_count")
         question_count = int(raw_questions) if isinstance(raw_questions, (int, float)) and raw_questions >= 0 else None
         confidence_value = focus_stats.get("evidence_confidence", stats.get("evidence_confidence"))
-        confidence = (min(1.0, max(0.0, float(confidence_value)))
-                      if isinstance(confidence_value, (int, float))
-                      else (min(1.0, attempt_count / 5.0) if attempt_count is not None else 0.5))
-        diagnostic = attempt_count is not None and attempt_count < 2 and not selected_concept
+        if isinstance(confidence_value, (int, float)):
+            confidence = min(1.0, max(0.0, float(confidence_value)))
+        elif attempt_count is not None:
+            confidence = min(1.0, attempt_count / 5.0)
+        else:
+            confidence = None
+        diagnostic = (attempt_count is None or attempt_count < 2) and not selected_concept
 
         raw_trend = focus_stats.get("trend")
         trend = float(raw_trend) if isinstance(raw_trend, (int, float)) else topic_trend
@@ -182,19 +185,34 @@ def build_recommendations(
         if elapsed is None:
             elapsed = topic_elapsed
 
-        weakness = 1.0 - focus_mastery
-        decline = min(1.0, max(0.0, -(trend or 0.0) / 0.25))
-        review_need = 0.0 if elapsed is None else min(1.0, elapsed / 7.0)
-        importance_value = focus_stats.get("learning_importance", stats.get("learning_importance", 0.5))
-        importance = min(1.0, max(0.0, float(importance_value))) if isinstance(importance_value, (int, float)) else 0.5
-        uncertainty = 1.0 - confidence
+        # A missing signal is excluded and the available weights are
+        # renormalized. Unknown trend/review dates must not be scored as
+        # observed stability or urgency.
+        components: dict[str, float | None] = {
+            "weakness": 1.0 - focus_mastery,
+            "decline": min(1.0, max(0.0, -trend / 0.25)) if trend is not None else None,
+            "review_need": min(1.0, elapsed / 7.0) if elapsed is not None else None,
+            "learning_importance": (
+                min(1.0, max(0.0, float(importance_value)))
+                if isinstance((importance_value := focus_stats.get("learning_importance", stats.get("learning_importance"))), (int, float))
+                else None
+            ),
+            "uncertainty": 1.0 - confidence if confidence is not None else None,
+        }
+        available_weight = sum(chosen_weights[key] for key, value in components.items() if value is not None)
         priority = (
-            chosen_weights["weakness"] * weakness
-            + chosen_weights["decline"] * decline
-            + chosen_weights["review_need"] * review_need
-            + chosen_weights["learning_importance"] * importance
-            + chosen_weights["uncertainty"] * uncertainty
+            sum(chosen_weights[key] * float(value) for key, value in components.items() if value is not None)
+            / available_weight
+            if available_weight > 0 else 0.0
         )
+        priority_components = {
+            key: {
+                "value": round(float(value), 4),
+                "configured_weight": chosen_weights[key],
+                "effective_weight": round(chosen_weights[key] / available_weight, 4),
+            }
+            for key, value in components.items() if value is not None
+        }
 
         action = _action_for(focus_mastery, trend, diagnostic=diagnostic)
         utilities = _action_utilities(focus_mastery, trend)
@@ -217,7 +235,7 @@ def build_recommendations(
             "trend_label": focus_stats.get("trend_label", stats.get("trend_label", "insufficient_data")),
             "attempts": attempt_count,
             "question_count": question_count,
-            "evidence_confidence": round(confidence, 2),
+            "evidence_confidence": round(confidence, 2) if confidence is not None else None,
             "evidence_level": "concept" if concept else "topic",
             "evidence": {
                 "attempt_count": attempt_count, "question_count": question_count,
@@ -226,8 +244,9 @@ def build_recommendations(
                 "last_reviewed_at": focus_stats.get("last_reviewed_at") or stats.get("last_reviewed_at"),
                 "incorrect_count": focus_stats.get("incorrect_count"),
                 "question_types": focus_stats.get("question_types") or [],
-                "confidence": round(confidence, 2),
+                "confidence": round(confidence, 2) if confidence is not None else None,
             },
+            "priority_components": priority_components,
             "priority_score": round(priority, 4),
             "priority": round(priority, 4),
             "reason": reason,
