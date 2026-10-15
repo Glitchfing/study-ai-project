@@ -79,9 +79,14 @@ def upsert_recommendations(recommendations: list[dict[str, Any]]) -> list[dict[s
             materially_changed = signature != old_signature
             row["created_at"] = prior.get("created_at") or row.get("created_at") or now
             row["updated_at"] = now
+            previous_status = prior.get("status", "pending")
+            # A recommendation that previously fell outside the ranked window
+            # should become active again when it re-enters the candidate set.
             row["status"] = (
-                "pending" if materially_changed and prior.get("status") in {"completed", "dismissed", "reevaluated"}
-                else prior.get("status", "pending")
+                "pending"
+                if previous_status == "reevaluated"
+                or (materially_changed and previous_status in {"completed", "dismissed"})
+                else previous_status
             )
             row["status_history"] = list(prior.get("status_history") or [])
             if materially_changed and prior.get("status") in {"completed", "dismissed"}:
