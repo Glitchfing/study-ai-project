@@ -560,6 +560,14 @@ def create_quiz_attempt(
 
     attach_quiz_attempt(payload.get("note_id"), attempt, performance)
 
+    recommendation_outcome = None
+    recommendation_id = payload.get("recommendation_id")
+    if recommendation_id:
+        # Link this intervention to its actual saved quiz result. The outcome
+        # helper only compares concept/topic responses when their tags match.
+        from recommendation_store import record_recommendation_outcome
+        recommendation_outcome = record_recommendation_outcome(str(recommendation_id), attempt)
+
     record_activity(
         "quiz_completed",
         topic=(
@@ -584,10 +592,16 @@ def create_quiz_attempt(
         weak_topics=weak_topics,
 
         attempt_id=attempt["id"],
+        recommendation_id=str(recommendation_id) if recommendation_id else None,
         performance=performance,
     )
 
-    return {**attempt, "performance": performance, "session": find_session_by_note_id(payload.get("note_id"))}
+    return {
+        **attempt,
+        "performance": performance,
+        "recommendation_outcome": recommendation_outcome,
+        "session": find_session_by_note_id(payload.get("note_id")),
+    }
 
 
 # =====================================================
