@@ -38,6 +38,19 @@ def _normalize_answer(value: Any) -> str:
     return " ".join(text.split())
 
 
+def _distinct_mcq_options(values: Any) -> list[str]:
+    """Keep one readable option per normalized answer identity."""
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        option = _clean(value)
+        key = _normalize_answer(option)
+        if option and key and key not in seen:
+            seen.add(key)
+            result.append(option)
+    return result
+
+
 def _initialism(value: str) -> str:
     words = [word for word in _normalize_answer(value).split() if word]
     return "".join(word[0] for word in words) if len(words) > 1 else ""
@@ -71,8 +84,15 @@ def _normalize_question(question: dict[str, Any], index: int, note_id: str | Non
     if q_type not in ALLOWED_TYPES:
         q_type = "mcq" if question.get("options") else "scenario"
 
-    options = [_clean(option) for option in question.get("options") or [] if _clean(option)]
+    options = _distinct_mcq_options(question.get("options"))
     correct_answer = _clean(question.get("correct_answer") or question.get("answer") or "")
+    if q_type == "mcq" and correct_answer:
+        # Canonicalize the answer to the actual option text so the frontend
+        # and answer shuffler do not lose the correct index over punctuation.
+        correct_answer = next(
+            (option for option in options if _normalize_answer(option) == _normalize_answer(correct_answer)),
+            correct_answer,
+        )
 
     if q_type == "true_false":
         options = ["True", "False"]
@@ -155,7 +175,22 @@ def generate_quiz_for_package(
     memory = _question_memory(note_id)
     raw_questions = generate_exam_style_questions(package, limit=max(requested_limit * 3, requested_limit + 10), memory=memory)
     # Only admit real MCQs with four distinct options and a correct answer present in those options.
-    raw_questions = [question for question in raw_questions if isinstance(question, dict) and str(question.get("type") or "").lower() == "mcq" and len(list(dict.fromkeys(_clean(option) for option in question.get("options") or [] if _clean(option))) ) == 4 and _clean(question.get("correct_answer") or question.get("answer")) in [_clean(option) for option in question.get("options") or []] and len(_clean(question.get("question")).split()) >= 6 and _clean(question.get("question")).endswith("?") and _clean(question.get("explanation"))]
+    def valid_generated_mcq(question: Any) -> bool:
+        if not isinstance(question, dict) or str(question.get("type") or "").lower().replace("-", "_") != "mcq":
+            return False
+        options = _distinct_mcq_options(question.get("options"))
+        answer = _normalize_answer(question.get("correct_answer") or question.get("answer"))
+        stem = _clean(question.get("question"))
+        return (
+            len(options) == 4
+            and bool(answer)
+            and any(_normalize_answer(option) == answer for option in options)
+            and len(stem.split()) >= 6
+            and stem.endswith("?")
+            and bool(_clean(question.get("explanation")))
+        )
+
+    raw_questions = [question for question in raw_questions if valid_generated_mcq(question)]
     normalized = [
         _normalize_question(question, index=index, note_id=note_id, note_title=note_title)
         for index, question in enumerate(raw_questions, start=1)
