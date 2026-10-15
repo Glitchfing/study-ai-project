@@ -208,10 +208,19 @@ def build_concept_mastery(
     for concept, rows in observations.items():
         scores = [row["score"] for row in rows]
         summary = _summary(concept, scores, [row["timestamp"] for row in rows], decay, evidence_level="concept")
+        observed_attempt_ids = {
+            str(row["attempt_id"]) for row in rows if row.get("attempt_id")
+        }
+        observed_timestamps = {
+            row["timestamp"].isoformat(timespec="seconds")
+            for row in rows if row.get("timestamp") is not None and not row.get("attempt_id")
+        }
+        distinct_attempts = len(observed_attempt_ids | observed_timestamps)
         summary.update({
             "concept": concept,
             "topic": rows[-1]["topic"],
-            "attempts": len({row["attempt_id"] for row in rows if row["attempt_id"]}) or len(rows),
+            "attempts": distinct_attempts,
+            "evidence_confidence": round(min(1.0, distinct_attempts / 5.0), 2),
             "question_count": len(rows),
             "incorrect_count": sum(score == 0 for score in scores),
             "question_types": sorted({row["question_type"] for row in rows if row["question_type"]}),
