@@ -10,7 +10,6 @@ import re
 from typing import Any
 
 from learner_model import build_topic_mastery
-from recommendation_service import build_recommendations
 from quiz_attempt_store import list_quiz_attempts
 from session_store import list_sessions
 
@@ -282,14 +281,8 @@ def _tips_from_activity(
         if entry.get("kind") == "planner_task_done" and entry.get("done")
     )
 
-    # Surface calculated recommendations in the existing dashboard AI Tips area.
-    for rec in recommendations[:2]:
-        tips.append({
-            "icon": "🎯",
-            "title": f"Recommended: {rec['action']}",
-            "body": rec["reason"] + f" Suggested review in {rec['next_review_days']} day(s).",
-        })
-
+    # Personalized learning recommendations are exposed separately as structured
+    # records. This legacy tips field remains for activity/planner nudges only.
     pending_tasks = _pending_revision_tasks()
     if pending_tasks and len(tips) < 3:
         next_task = pending_tasks[0]
@@ -420,7 +413,8 @@ def build_dashboard_payload() -> dict[str, Any]:
                 }
             )
     topic_mastery = build_topic_mastery(attempts)
-    recommendations = build_recommendations(topic_mastery)
+    from recommendation_store import refresh_recommendations
+    recommendations = refresh_recommendations(attempts=attempts, limit=3)
     topic_summary = _topic_summary(topic_mastery)
     mastered_topics = sum(
         1 for stats in topic_mastery.values()
@@ -524,6 +518,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         "bar_chart": bar_chart,
         "recent_quizzes": recent_quizzes,
         "tips": tips,
+        "recommendations": recommendations,
         "heatmap_weeks": 18,
         "activity_heatmap": _activity_heatmap(18),
         "recent_activity": list(reversed([e for e in ACTIVITY_LOG if e.get("kind") in STUDY_EVENT_KINDS][-8:])),
