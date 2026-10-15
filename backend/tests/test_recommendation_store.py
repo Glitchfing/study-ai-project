@@ -66,6 +66,41 @@ class RecommendationStoreTests(unittest.TestCase):
         rows = recommendation_store.list_recommendations(include_history=True)
         self.assertEqual(rows[0]["id"], "rec-test")
 
+    def test_follow_up_quiz_records_matched_outcome_and_completes_recommendation(self):
+        recommendation_store.upsert_recommendations([self.row(mastery=40.0)])
+        outcome = recommendation_store.record_recommendation_outcome("rec-test", {
+            "id": "attempt-123",
+            "score": 80,
+            "responses": [
+                {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": True},
+                {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": True},
+                {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": True},
+                {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": False},
+            ],
+        })
+        # This recommendation is topic-level, so matching topic responses provide
+        # the outcome measurement (not a causal claim).
+        self.assertEqual(outcome["attempt_id"], "attempt-123")
+        self.assertEqual(outcome["scope"], "topic")
+        self.assertEqual(outcome["post_accuracy_pct"], 75.0)
+        self.assertEqual(outcome["observed_change_percentage_points"], 35.0)
+        saved = recommendation_store.get_recommendation("rec-test")
+        self.assertEqual(saved["status"], "completed")
+        self.assertEqual(saved["last_outcome"]["interpretation"],
+                         "Observed follow-up performance; this comparison does not establish causation.")
+
+    def test_mismatched_concept_is_not_claimed_as_targeted_improvement(self):
+        recommendation_store.upsert_recommendations([self.row()])
+        outcome = recommendation_store.record_recommendation_outcome("rec-test", {
+            "id": "attempt-456",
+            "score": 100,
+            "responses": [
+                {"topic": "Probability Basics", "concept_id": "Independent Events", "is_correct": True},
+            ],
+        })
+        self.assertEqual(outcome["scope"], "overall_quiz_only")
+        self.assertIsNone(outcome["observed_change_percentage_points"])
+
 
 if __name__ == "__main__":
     unittest.main()
