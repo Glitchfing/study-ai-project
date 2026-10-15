@@ -161,3 +161,83 @@ def refresh_recommendations(
     persisted = upsert_recommendations(candidates)
     active = [item for item in persisted if item.get("status", "pending") in ACTIVE_STATUSES]
     return active[:limit]
+
+
+
+def record_recommendation_outcome(recommendation_id: str, attempt: dict[str, Any]) -> dict[str, Any] | None:
+    """Persist the linked quiz outcome without claiming the recommendation caused it."""
+    rows = _read()
+    target = next((row for row in rows if str(row.get("id")) == recommendation_id), None)
+    if target is None or not isinstance(attempt, dict):
+        return None
+
+    concept = _normalize_label(target.get("concept"))
+    topic = _normalize_label(target.get("topic"))
+    responses = [item for item in (attempt.get("responses") or []) if isinstance(item, dict)]
+    matched = []
+    for response in responses:
+        response_concept = _normalize_label(
+            response.get("concept_id") or response.get("concept") or response.get("concept_tag")
+        )
+        response_topic = _normalize_label(response.get("topic") or response.get("section_title"))
+        if concept and response_concept == concept:
+            matched.append(response)
+        elif not concept and topic and response_topic == topic:
+            matched.append(response)
+
+    if matched:
+        correct_count = sum(1 for row in matched if row.get("is_correct") is True)
+        response_count = len(matched)
+        post_accuracy = correct_count / response_count
+        outcome_scope = "concept" if concept else "topic"
+    else:
+        response_count = len(responses)
+        post_accuracy = (
+            max(0.0, min(100.0, float(attempt.get("score") or 0))) / 100.0
+            if attempt.get("score") is not None else None
+        )
+        outcome_scope = "overall_quiz_only"
+
+    evidence = target.get("evidence") if isinstance(target.get("evidence"), dict) else {}
+    baseline = evidence.get("mastery_pct", target.get("mastery_pct"))
+    baseline_pct = float(baseline) if isinstance(baseline, (int, float)) else None
+    outcome = {
+        "attempt_id": attempt.get("id"),
+        "recorded_at": _now(),
+        "scope": outcome_scope,
+        "matched_response_count": response_count if matched else 0,
+        "post_accuracy_pct": round(post_accuracy * 100, 1) if post_accuracy is not None else None,
+        "baseline_mastery_pct": round(baseline_pct, 1) if baseline_pct is not None else None,
+        "observed_change_percentage_points": (
+            round(post_accuracy * 100 - baseline_pct, 1)
+            if post_accuracy is not None and baseline_pct is not None and matched
+            else None
+        ),
+        "interpretation": (
+            "Observed follow-up performance; this comparison does not establish causation."
+            if matched else
+            "Quiz saved, but no response matched the recommended concept/topic, so targeted improvement is unknown."
+        ),
+    }
+    history = list(target.get("outcomes") or [])
+    history.append(outcome)
+    target["outcomes"] = history[-50:]
+    previous = target.get("status", "pending")
+    target["status"] = "completed"
+    target["updated_at"] = outcome["recorded_at"]
+    status_history = list(target.get("status_history") or [])
+    status_history.append({
+        "status": "completed",
+        "at": outcome["recorded_at"],
+        "previous_status": previous,
+        "note": "Linked quiz attempt submitted.",
+    })
+    target["status_history"] = status_history
+    target["last_outcome"] = outcome
+    _write(rows)
+    return outcome
+
+
+def _normalize_label(value: Any) -> str:
+    import re
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
