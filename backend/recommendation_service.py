@@ -148,7 +148,8 @@ def build_recommendations(
 
         eligible_concepts = [
             item for item in concepts_by_topic.get(_normalize(topic), [])
-            if int(item[1].get("question_count") or 0) >= 2
+            if int(item[1].get("attempts") or 0) >= 2
+            and int(item[1].get("question_count") or 0) >= 2
             and (float(item[1].get("mastery_pct") or 0) < 70
                  or (isinstance(item[1].get("trend"), (int, float)) and item[1]["trend"] < -0.05))
         ]
