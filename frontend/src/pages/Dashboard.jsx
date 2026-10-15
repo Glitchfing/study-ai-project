@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, MeshDistortMaterial, Sparkles } from "@react-three/drei";
-import { getNotesList, getQuizAttempts, getPlanner, getActiveStudySession, startStudySession, completeStudySession } from "../services/api";
+import { getNotesList, getQuizAttempts, getPlanner, getActiveStudySession, startStudySession, completeStudySession, startRecommendation, completeRecommendation, dismissRecommendation } from "../services/api";
 import "../styles/dashboard-reference.css";
 
 const paths = {
@@ -56,7 +56,45 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast,onTog
   const line=scores.map((p,i)=>(i?"L":"M")+p.x+" "+p.y).join(" "),area=scores.length?line+" L "+scores[scores.length-1].x+" 148 L "+scores[0].x+" 148 Z":"";
   const activity=(data?.activity_heatmap||[]).slice(-12).flatMap(c=>c).map(c=>({level:({"":0,l1:1,l2:2,l3:3,l4:4})[c.lvl]??0,label:(c.date||"")+" · "+(c.tip||"No activity")}));
   const studyMins=Number(a.study_minutes)||0,mastered=Number(a.topics_mastered)||0,topicCount=Math.max(topics.length,mastered);
-  const recommendations=(data?.tips||[]).slice(0,3);
+  const recommendations=(data?.recommendations||[]).slice(0,3);
+  async function startRecommendedAction(recommendation) {
+    try {
+      await startRecommendation(recommendation.id);
+    } catch (error) {
+      toast?.(error?.message || "Could not update recommendation status.", "coral");
+      return;
+    }
+    const action = recommendation.action_payload || {};
+    const topic = action.concept || recommendation.concept || action.topic || recommendation.topic || "";
+    const noteId = action.note_id || null;
+    if (action.type === "open_planner_task") {
+      onNavigate("planner");
+      return;
+    }
+    if ((action.type === "deep_study" || action.type === "revise_topic") && noteId) {
+      onNavigate("notes", { noteId });
+      return;
+    }
+    onNavigate("quiz", { quizNoteId: noteId, quizTopic: topic });
+  }
+  async function markRecommendationComplete(recommendation) {
+    try {
+      await completeRecommendation(recommendation.id);
+      toast?.("Recommendation marked complete.", "teal");
+      await onRefresh?.();
+    } catch (error) {
+      toast?.(error?.message || "Could not complete recommendation.", "coral");
+    }
+  }
+  async function dismissRecommendationCard(recommendation) {
+    try {
+      await dismissRecommendation(recommendation.id);
+      toast?.("Recommendation dismissed.", "teal");
+      await onRefresh?.();
+    } catch (error) {
+      toast?.(error?.message || "Could not dismiss recommendation.", "coral");
+    }
+  }
   const activityBreakdown=a.activity_breakdown||{};
   const focusCounts=[Number(activityBreakdown.quiz_practice)||0,Number(activityBreakdown.notes_uploads)||0,Number(activityBreakdown.other)||0];
   const focusTotal=focusCounts.reduce((sum,value)=>sum+value,0);
@@ -79,7 +117,7 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast,onTog
       <div className="rf-secondary-grid"><Panel cls="rf-notes-panel" icon="notes" title="Recent notes" subtitle="Pick up where you left off." action="All notes" onAction={()=>onNavigate("notes")}><div className="rf-recent-notes">{shownNotes.map((n,i)=><button key={n._id??n._title} className="rf-recent-note" onClick={()=>n._id?onNavigate("notes",{noteId:n._id}):onNavigate("notes")}><ThreeIcon kind={i===0?"notes":i===1?"chart":"calendar"} size={32}/><span><b>{n._title}</b><small>{n.page_count?n.page_count+" pages · ":""}{recent(n.updated_at||n.created_at||n.timestamp)}</small></span><i>›</i></button>)}{!shownNotes.length&&<p className="rf-empty">{loadingExtras?"Loading your notes…":notes.length?"No notes match your search.":"Your processed notes will appear here."}</p>}</div></Panel>
         <Panel cls="rf-heat-panel" icon="calendar" title="Study heat map" subtitle="Your activity across the last 12 weeks."><div className="rf-heatmap-wrap"><div className="rf-heat-days">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=><span key={d}>{d}</span>)}</div><div className="rf-heat-grid">{(activity.length?activity:Array.from({length:84},()=>({level:0,label:"No activity recorded"}))).map((c,i)=><i key={i} className={"rf-heat-cell rf-heat-"+c.level} title={c.label}/>)}</div></div><div className="rf-heat-legend">LESS {[0,1,2,3,4].map(i=><i key={i} className={"rf-heat-cell rf-heat-"+i}/>)} MORE</div></Panel></div>
       <div className="rf-main-grid rf-lower-grid"><Panel cls="rf-subjects-panel" icon="chart" title="Your subjects" subtitle="Progress across your learning map." action="All subjects" onAction={()=>onNavigate("notes")}><div className="rf-subject-grid">{topics.slice(0,4).map(t=><button key={t.id} className="rf-subject-card" onClick={()=>onNavigate("notes")}><span className="rf-subject-heading"><ThreeIcon kind={t.id==="ds"?"target":"chart"} size={30}/><b>{t.name}</b></span><span className="rf-subject-track"><i className={t.color} style={{width:Math.max(0,Math.min(100,t.pct))+"%"}}/></span><small>{t.pct}% mastered</small></button>)}{!topics.length&&<p className="rf-empty">Topic mastery appears after your first quiz.</p>}</div></Panel>
-        <Panel cls="rf-recommendations-panel" icon="bulb" title="AI recommendations" subtitle="A little direction for your next session." action="Explore" onAction={()=>onNavigate("chat")}><div className="rf-recommendation-list">{recommendations.map((r,i)=><button key={r.title} className="rf-recommendation" onClick={()=>onNavigate(i===1?"notes":"quiz")}><ThreeIcon kind={i===0?"target":i===1?"notes":"bulb"} size={30}/><span><b>{r.title}</b><small>{r.body}</small></span><i>›</i></button>)}{!recommendations.length&&<p className="rf-empty">Personalized tips appear as you complete activities.</p>}</div></Panel></div>
+        <Panel cls="rf-recommendations-panel" icon="bulb" title="AI recommendations" subtitle="Evidence-backed actions from your learning history." action="Refresh" onAction={onRefresh}><div className="rf-recommendation-list">{recommendations.map((r,i)=><article key={r.id} className="rf-recommendation-row"><button type="button" className="rf-recommendation" onClick={()=>startRecommendedAction(r)}><ThreeIcon kind={i===0?"target":r.action==="Practice Quiz"||r.action==="Reassessment"?"chart":"notes"} size={30}/><span><b>{r.title||("Recommended: "+r.action)}</b><small>{r.reason||"Suggested from your saved learning history."}</small><small className="rf-recommendation-evidence">{r.mastery_pct==null?"Planner evidence":("Estimated mastery "+r.mastery_pct+"%")+(r.attempts==null?"":" · "+r.attempts+" saved attempt(s)")} · {Math.round(Number(r.priority_score||0)*100)} priority</small>{r.evidence_confidence<0.4&&<small className="rf-recommendation-evidence">Evidence is limited; use this as a diagnostic check.</small>}</span><i>›</i></button><div className="rf-recommendation-controls"><button type="button" onClick={()=>markRecommendationComplete(r)}>Mark done</button><button type="button" onClick={()=>dismissRecommendationCard(r)}>Dismiss</button></div></article>)}{!recommendations.length&&<p className="rf-empty">{loadingExtras?"Refreshing your learner model…":(attempts.length?"No active recommendations. Your completed actions may be resolved.":"Complete a quiz to build a personalized learning profile.")}</p>}</div></Panel></div>
       <div className="rf-main-grid rf-analytics-grid"><Panel cls="rf-performance-panel" icon="chart" title="Quiz performance" subtitle={scores.length?"Saved quiz scores across your recent attempts.":"Your saved quiz scores will appear here."}><div className="rf-score-chart"><div className="rf-y-labels"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div><svg viewBox="0 0 660 155" preserveAspectRatio="none" aria-label="Saved quiz scores"><defs><linearGradient id="rfFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#64b6ac" stopOpacity=".38"/><stop offset="100%" stopColor="#119da4" stopOpacity="0"/></linearGradient></defs>{[8,43,78,113,148].map(y=><line key={y} x1="0" x2="660" y1={y} y2={y} className="rf-chart-gridline"/>)}{[0,94,188,282,376,470,564,659].map(x=><line key={x} x1={x} x2={x} y1="8" y2="148" className="rf-chart-gridline rf-vertical"/>)}{scores.length>1&&<><path d={area} fill="url(#rfFill)"/><path d={line} className="rf-score-line"/></>}{scores.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="4" className="rf-score-dot"><title>{p.title+": "+p.score+"%"}</title></circle>)}</svg></div><div className="rf-x-labels">{scores.map((s,i)=><span key={i} title={s.title}>Quiz {i+1}</span>)}</div></Panel>
         <Panel cls="rf-focus-panel" icon="pie" title="Study focus" subtitle="Where your learning activity is going."><div className="rf-focus-content"><div className="rf-focus-donut" style={{background:donut}}><div><b>{prettyMinutes(studyMins)}</b><small>recorded study time</small></div></div><div className="rf-focus-legend">{[["Quiz practice",focusCounts[0],"teal"],["Notes & uploads",focusCounts[1],"mint"],["Other activity",focusCounts[2],"peach"]].map(([label,val,tone])=><div className="rf-focus-row" key={label}><i className={tone}/><span>{label}</span><b>{focusTotal?Math.round(val/focusTotal*100):0}%</b></div>)}</div></div><footer className="rf-focus-foot"><Icon name="spark" size={14}/>{activeStudySession?"Study session in progress — finish to save its duration.":"Statistics use recorded activity and timed sessions."}</footer><button type="button" className="rf-link-button" disabled={studyBusy} onClick={async()=>{setStudyBusy(true);try{if(activeStudySession?.session_id){const result=await completeStudySession(activeStudySession.session_id);setActiveStudySession(null);const mins=Math.floor((Number(result?.session?.duration_seconds)||0)/60);toast?.("Study session saved: "+prettyMinutes(mins),"teal");if(onRefresh)await onRefresh();}else{const result=await startStudySession();setActiveStudySession(result?.session||null);toast?.("Study session started.","teal");}}catch(error){toast?.(error?.message||"Could not update study session.","coral");}finally{setStudyBusy(false);}}}>{studyBusy?"Saving…":activeStudySession?"Finish study session":"Start study session"}</button></Panel></div>
       <footer className="rf-footer">STUDYAI <span>·</span> Keep showing up. Your progress is adding up.</footer>
