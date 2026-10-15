@@ -210,7 +210,7 @@ def build_recommendations(
             key: {
                 "value": round(float(value), 4),
                 "configured_weight": chosen_weights[key],
-                "effective_weight": round(chosen_weights[key] / available_weight, 4),
+                "effective_weight": round(chosen_weights[key] / available_weight, 4) if available_weight > 0 else 0.0,
             }
             for key, value in components.items() if value is not None
         }
