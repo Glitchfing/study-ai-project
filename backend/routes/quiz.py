@@ -255,6 +255,10 @@ def _normalize_question(
 
         "topic": topic,
 
+        # Concept tags are supplied by the question generator. Do not infer an
+        # exact sub-concept from a topic or section title when no tag exists.
+        "concept_id": question.get("concept_id") or question.get("concept") or question.get("concept_tag") or None,
+
         "source": (
             "generated"
             if note_id
