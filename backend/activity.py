@@ -70,7 +70,10 @@ def _save_activity() -> None:
     temp.write_text(json.dumps(ACTIVITY_LOG[-5000:], ensure_ascii=False, indent=2), encoding="utf-8")
     temp.replace(ACTIVITY_PATH)
 
-STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "targeted_study_generated", "chat_message"}
+# Only completed recommendation work contributes to activity totals/heatmap.
+# Start and dismiss events remain visible in recent activity without inflating study activity.
+STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "targeted_study_generated", "chat_message", "recommendation_completed"}
+RECENT_ACTIVITY_KINDS = STUDY_EVENT_KINDS | {"recommendation_started", "recommendation_dismissed"}
 STUDY_TZ = ZoneInfo("Asia/Kolkata")
 ACTIVITY_LOG: list[dict[str, Any]] = _load_activity()
 USER_PROFILE = deepcopy(BASE_USER)
@@ -429,7 +432,7 @@ def build_dashboard_payload() -> dict[str, Any]:
 
     completed_activities = sum(
         1 for entry in ACTIVITY_LOG
-        if entry.get("kind") in {"quiz_completed", "study_session_completed", "planner_task_done"}
+        if entry.get("kind") in {"quiz_completed", "study_session_completed", "planner_task_done", "recommendation_completed"}
     )
 
     activity_breakdown = Counter()
@@ -439,7 +442,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             activity_breakdown["quiz_practice"] += 1
         elif kind in {"upload_processed", "targeted_study_generated", "note_created"}:
             activity_breakdown["notes_uploads"] += 1
-        elif kind in {"note_view", "study_session_completed", "planner_task_done", "chat_message"}:
+        elif kind in {"note_view", "study_session_completed", "planner_task_done", "chat_message", "recommendation_completed"}:
             activity_breakdown["other"] += 1
 
     month_counts = Counter()
@@ -521,7 +524,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         "recommendations": recommendations,
         "heatmap_weeks": 18,
         "activity_heatmap": _activity_heatmap(18),
-        "recent_activity": list(reversed([e for e in ACTIVITY_LOG if e.get("kind") in STUDY_EVENT_KINDS][-8:])),
+        "recent_activity": list(reversed([e for e in ACTIVITY_LOG if e.get("kind") in RECENT_ACTIVITY_KINDS][-8:])),
         "analytics": {
             "total_sessions": len(sessions),
             "uploaded_files_count": uploaded_files_count,
