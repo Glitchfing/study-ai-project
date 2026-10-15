@@ -70,7 +70,7 @@ function sortNotesForQuiz(list, selectedNoteId) {
   }).map(item => item.note);
 }
 
-export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId}) {
+export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId,selectedQuizTopic=""}) {
  const [subject,setSubject]=useState("ml"),[difficulty,setDifficulty]=useState("medium"),[count,setCount]=useState(10),[topicQuery,setTopicQuery]=useState("");
  const [notes,setNotes]=useState([]),[selectedNotes,setSelectedNotes]=useState([]),[search,setSearch]=useState(""),[showAll,setShowAll]=useState(false);
  const [attempts,setAttempts]=useState([]),[range,setRange]=useState(10),[loading,setLoading]=useState(true),[generating,setGenerating]=useState(false),[error,setError]=useState("");
@@ -78,6 +78,7 @@ export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId
 
  const reloadData=useCallback(async()=>{setLoading(true);try{const out=await Promise.allSettled([getNotesList(),getQuizAttempts(null,100)]);if(out[0].status==="fulfilled"){const list=sortNotesForQuiz(arr(out[0].value),selectedNoteId);setNotes(list);if(selectedNoteId){setSelectedNotes([String(selectedNoteId)]);setSearch("");setShowAll(false);}else setSelectedNotes(old=>{const kept=old.filter(id=>list.some(n=>idOf(n)===id));return kept.length?kept:(list.length&&idOf(list[0])?[idOf(list[0])]:[]);});}if(out[1].status==="fulfilled"){const list=arr(out[1].value);setAttempts(list.sort((a,b)=>new Date(b.created_at||b.completed_at||b.date||0)-new Date(a.created_at||a.completed_at||a.date||0)));}}finally{setLoading(false);}},[selectedNoteId]);
  useEffect(()=>{reloadData();},[reloadData]);
+ useEffect(()=>{setTopicQuery(selectedQuizTopic || "");if(selectedQuizTopic)setCount(5);},[selectedQuizTopic]);
  const filtered=useMemo(()=>{const q=norm(search);const list=notes.filter(n=>!q||norm(titleOf(n)).includes(q)||norm(n?.topic).includes(q));return showAll?list:list.slice(0,5);},[notes,search,showAll]);
  const average=attempts.length?Math.round(attempts.reduce((s,a)=>s+scoreOf(a),0)/attempts.length):0;
  const best=attempts.length?Math.max(...attempts.map(scoreOf)):0;
@@ -95,7 +96,7 @@ export default function QuizModule({toast=()=>{},refreshDashboard,selectedNoteId
   const responses=questions.map(question=>{
    const val=answers[question.id],isChoice=(question.options||[]).length>0;
    const ok=isChoice?Number(val)===Number(question.correct??question.answer_index??0):checkText(question,val);
-   return {question_id:question.id,question:question.question,type:question.type||(isChoice?"mcq":"short_answer"),topic:question.section_title||question.topic||quiz?.topic_label||"General",selected_index:isChoice?(val===undefined?null:Number(val)):null,selected_answer:isChoice?(question.options?.[Number(val)]||""):String(val||""),correct_index:question.correct??question.answer_index??null,expected_answer:question.correct_answer||question.options?.[question.correct??question.answer_index??0]||question.answer_hint||"",is_correct:ok,difficulty:question.difficulty||difficulty,question_data:question};
+   return {question_id:question.id,question:question.question,type:question.type||(isChoice?"mcq":"short_answer"),topic:question.topic||question.section_title||quiz?.topic_label||"General",concept_id:question.concept_id||question.concept||question.concept_tag||question.learning_objective||null,selected_index:isChoice?(val===undefined?null:Number(val)):null,selected_answer:isChoice?(question.options?.[Number(val)]||""):String(val||""),correct_index:question.correct??question.answer_index??null,expected_answer:question.correct_answer||question.options?.[question.correct??question.answer_index??0]||question.answer_hint||"",is_correct:ok,difficulty:question.difficulty||difficulty,question_data:question};
   });
   const correctCount=responses.filter(r=>r.is_correct).length;
   const weakTopics=[...new Set(responses.filter(r=>!r.is_correct).map(r=>r.topic).filter(Boolean))];
