@@ -164,7 +164,9 @@ def build_recommendations(
         focus_pct = min(100.0, max(0.0, float(focus_stats.get("mastery_pct", topic_pct))))
         focus_mastery = focus_pct / 100.0
 
-        raw_attempts = stats.get("attempts")
+        # Report the number of attempts supporting the actual focus. For a
+        # concept recommendation this is concept evidence, not the topic total.
+        raw_attempts = focus_stats.get("attempts", stats.get("attempts"))
         attempt_count = int(raw_attempts) if isinstance(raw_attempts, (int, float)) and raw_attempts >= 0 else None
         raw_questions = focus_stats.get("question_count")
         question_count = int(raw_questions) if isinstance(raw_questions, (int, float)) and raw_questions >= 0 else None
