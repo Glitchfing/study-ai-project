@@ -459,7 +459,20 @@ def get_quiz(
         limit=limit,
     )
 
-    if topic == "all":
+    if quiz_topic and quiz_topic.strip():
+        # For static quizzes, honor the requested topic across the available
+        # bank and return no questions rather than silently giving an unrelated quiz.
+        requested = " ".join(quiz_topic.lower().split())
+        all_questions = [question for rows in QUIZ_BANK.values() for question in rows]
+        questions = [
+            question for question in all_questions
+            if requested in " ".join([
+                str(question.get("topic") or ""),
+                str(question.get("question") or ""),
+                str(question.get("explanation") or ""),
+            ]).lower()
+        ]
+    elif topic == "all":
         questions = [
             q
             for qs in QUIZ_BANK.values()
@@ -479,7 +492,9 @@ def get_quiz(
         "topic": topic,
 
         "topic_label": (
-            topic.upper()
+            quiz_topic.strip()
+            if quiz_topic and quiz_topic.strip()
+            else topic.upper()
             if topic != "all"
             else "Mixed Quiz"
         ),
