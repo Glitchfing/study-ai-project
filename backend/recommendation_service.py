@@ -188,10 +188,11 @@ def build_recommendations(
         # A missing signal is excluded and the available weights are
         # renormalized. Unknown trend/review dates must not be scored as
         # observed stability or urgency.
+        review_need = min(1.0, elapsed / 7.0) if elapsed is not None else None
         components: dict[str, float | None] = {
             "weakness": 1.0 - focus_mastery,
             "decline": min(1.0, max(0.0, -trend / 0.25)) if trend is not None else None,
-            "review_need": min(1.0, elapsed / 7.0) if elapsed is not None else None,
+            "review_need": review_need,
             "learning_importance": (
                 min(1.0, max(0.0, float(importance_value)))
                 if isinstance((importance_value := focus_stats.get("learning_importance", stats.get("learning_importance"))), (int, float))
