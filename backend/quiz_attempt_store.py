@@ -34,6 +34,7 @@ def save_quiz_attempt(payload: dict[str, Any]) -> dict[str, Any]:
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "note_id": payload.get("note_id"),
         "note_title": payload.get("note_title"),
+        "recommendation_id": payload.get("recommendation_id"),
         "topic": payload.get("topic") or "all",
         "topic_label": payload.get("topic_label") or "Quiz",
         "score": int(payload.get("score") or 0),
