@@ -27,6 +27,7 @@ QUIZ_SCHEMA = {
                     "explanation": {"type": "string"},
                     "difficulty": {"type": "string"},
                     "topic": {"type": "string"},
+                    "concept_id": {"type": "string"},
                     "expected_keywords": {"type": "array", "items": {"type": "string"}},
                 },
                 "required": [
@@ -38,6 +39,7 @@ QUIZ_SCHEMA = {
                     "explanation",
                     "difficulty",
                     "topic",
+                    "concept_id",
                     "expected_keywords",
                 ],
             },
@@ -193,7 +195,8 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
             "acceptable_answers": [item["fact"]],
             "explanation": f"The selected statement matches the notes' description of {item['concept']} in '{item['topic']}'.",
             "difficulty": ["easy", "medium", "hard"][index % 3],
-            "topic": item["concept"],
+            "topic": item["topic"],
+            "concept_id": item["concept"],
             "expected_keywords": top_keywords(item["fact"], limit=6),
         })
         if len(candidates) >= max(limit * 3, limit + 10):
@@ -223,6 +226,7 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         "- Use only information supported by the supplied notes; do not create generic questions.\n"
         "- If the source lacks enough information, return fewer questions rather than guessing.\n"
         "- Include expected_keywords for semantic grading.\n"
+        "- Set concept_id to a concise, specific concept tested by the question; reuse the same name for the same concept across questions. Do not use the document title unless it is itself the concept.\n"
         "- Do not use repeated stems or generic wording.\n\n"
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)}\n\n"
         f"Synthesized note sections:\n{json.dumps(_section_payload(package), ensure_ascii=True)[:90000]}"
@@ -255,6 +259,7 @@ def _normalize_question(question: dict[str, Any], index: int) -> dict[str, Any]:
         "explanation": _clean(question.get("explanation") or ""),
         "difficulty": str(question.get("difficulty") or "medium").lower(),
         "topic": _clean(question.get("topic") or "Study Topic"),
+        "concept_id": _clean(question.get("concept_id") or question.get("concept") or ""),
         "expected_keywords": list(dict.fromkeys([_clean(item) for item in question.get("expected_keywords") or [] if _clean(item)]))[:6],
         "quality_score": rank_question_quality(question),
     }
