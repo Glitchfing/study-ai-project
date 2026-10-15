@@ -15,6 +15,10 @@ from typing import Any
 from learner_model import build_concept_mastery, build_topic_mastery
 from quiz_attempt_store import list_quiz_attempts
 from recommendation_service import build_recommendations
+try:
+    from recommendation_config import MAX_RECOMMENDATION_CANDIDATES
+except ImportError:
+    MAX_RECOMMENDATION_CANDIDATES = 100
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -149,19 +153,35 @@ def update_recommendation_status(recommendation_id: str, status: str) -> dict[st
     return found
 
 
+def _load_pending_revision_tasks() -> list[dict[str, Any]]:
+    """Load real saved planner tasks; never manufacture tasks from UI templates."""
+    path = DATA_DIR / "revision_tasks.json"
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(loaded, list):
+        return []
+    return [
+        dict(task) for task in loaded
+        if isinstance(task, dict) and task.get("id") is not None and not task.get("done")
+    ]
+
+
 def refresh_recommendations(
     *,
     attempts: list[dict[str, Any]] | None = None,
     limit: int = 3,
 ) -> list[dict[str, Any]]:
-    """Recompute ranked recommendations from persisted attempts."""
+    """Recompute ranked recommendations from persisted attempts and planner tasks."""
     current_attempts = attempts if attempts is not None else list_quiz_attempts(limit=1000)
     topics = build_topic_mastery(current_attempts)
     concepts = build_concept_mastery(current_attempts)
     candidates = build_recommendations(
         topics,
         concept_mastery=concepts,
-        limit=max(limit * 3, limit),
+        revision_tasks=_load_pending_revision_tasks(),
+        limit=max(MAX_RECOMMENDATION_CANDIDATES, limit * 10, limit),
     )
     persisted = upsert_recommendations(candidates)
     active = [item for item in persisted if item.get("status", "pending") in ACTIVE_STATUSES]
