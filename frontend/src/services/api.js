@@ -38,6 +38,20 @@ async function request(method, path, body = null, isFormData = false) {
 // ── Dashboard ────────────────────────────────────────────────────────────────
 export const getDashboard = () => request("GET", "/dashboard");
 
+// ── Personalized recommendations ────────────────────────────────────────────
+export const getRecommendations = (limit = 3, includeHistory = false) => {
+  const params = new URLSearchParams({ limit: String(limit), include_history: String(includeHistory) });
+  return request("GET", `/recommendations?${params.toString()}`);
+};
+export const refreshRecommendations = (limit = 3) =>
+  request("POST", `/recommendations/refresh?limit=${encodeURIComponent(limit)}`);
+export const startRecommendation = (id, note = null) =>
+  request("POST", `/recommendations/${encodeURIComponent(id)}/start`, note ? { note } : {});
+export const completeRecommendation = (id, note = null) =>
+  request("POST", `/recommendations/${encodeURIComponent(id)}/complete`, note ? { note } : {});
+export const dismissRecommendation = (id, note = null) =>
+  request("POST", `/recommendations/${encodeURIComponent(id)}/dismiss`, note ? { note } : {});
+
 // ── Upload ───────────────────────────────────────────────────────────────────
 export const uploadFile = (file) => {
   const fd = new FormData();
@@ -57,9 +71,10 @@ export const getNote = (id, format = "cornell") =>
   request("GET", `/notes/${id}?format=${format}`);
 
 // ── Quiz ─────────────────────────────────────────────────────────────────────
-export const getQuiz = (topic = "all", limit = 5, noteId = null) => {
+export const getQuiz = (topic = "all", limit = 5, noteId = null, quizTopic = null) => {
   const params = new URLSearchParams({ topic, limit: String(limit) });
   if (noteId) params.set("note_id", noteId);
+  if (quizTopic) params.set("quiz_topic", quizTopic);
   return request("GET", `/quiz?${params.toString()}`);
 };
 export const saveQuizAttempt = (attempt) =>
