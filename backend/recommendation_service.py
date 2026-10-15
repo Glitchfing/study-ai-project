@@ -167,7 +167,7 @@ def build_recommendations(
         attempt_count = int(raw_attempts) if isinstance(raw_attempts, (int, float)) and raw_attempts >= 0 else None
         raw_questions = focus_stats.get("question_count")
         question_count = int(raw_questions) if isinstance(raw_questions, (int, float)) and raw_questions >= 0 else None
-        confidence_value = stats.get("evidence_confidence")
+        confidence_value = focus_stats.get("evidence_confidence", stats.get("evidence_confidence"))
         confidence = (min(1.0, max(0.0, float(confidence_value)))
                       if isinstance(confidence_value, (int, float))
                       else (min(1.0, attempt_count / 5.0) if attempt_count is not None else 0.5))
