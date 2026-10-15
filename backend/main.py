@@ -22,6 +22,7 @@ from routes import (
     chat,
     planner,
     targeted_study,
+    recommendations,
 )
 
 # =====================================================
@@ -132,6 +133,12 @@ app.include_router(
     targeted_study.router,
     prefix="/study",
     tags=["Targeted Study"],
+)
+
+app.include_router(
+    recommendations.router,
+    prefix="/recommendations",
+    tags=["Recommendations"],
 )
 
 # =====================================================

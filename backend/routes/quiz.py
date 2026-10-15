@@ -199,10 +199,14 @@ def _normalize_question(
         else None
     )
 
+    # Prefer an explicit topic from the question generator. Section titles are
+    # a fallback only, so topic-level mastery does not accidentally fragment
+    # into section-title buckets.
     topic = (
-        ", ".join(topic_values[:2])
-        if isinstance(topic_values, list)
-        and topic_values
+        str(question.get("topic")).strip()
+        if isinstance(question.get("topic"), str) and question.get("topic").strip()
+        else ", ".join(topic_values[:2])
+        if isinstance(topic_values, list) and topic_values
         else note_title
     )
 
@@ -254,6 +258,10 @@ def _normalize_question(
         ),
 
         "topic": topic,
+
+        # Concept tags are supplied by the question generator. Do not infer an
+        # exact sub-concept from a topic or section title when no tag exists.
+        "concept_id": question.get("concept_id") or question.get("concept") or question.get("concept_tag") or None,
 
         "source": (
             "generated"
@@ -451,7 +459,20 @@ def get_quiz(
         limit=limit,
     )
 
-    if topic == "all":
+    if quiz_topic and quiz_topic.strip():
+        # For static quizzes, honor the requested topic across the available
+        # bank and return no questions rather than silently giving an unrelated quiz.
+        requested = " ".join(quiz_topic.lower().split())
+        all_questions = [question for rows in QUIZ_BANK.values() for question in rows]
+        questions = [
+            question for question in all_questions
+            if requested in " ".join([
+                str(question.get("topic") or ""),
+                str(question.get("question") or ""),
+                str(question.get("explanation") or ""),
+            ]).lower()
+        ]
+    elif topic == "all":
         questions = [
             q
             for qs in QUIZ_BANK.values()
@@ -471,7 +492,9 @@ def get_quiz(
         "topic": topic,
 
         "topic_label": (
-            topic.upper()
+            quiz_topic.strip()
+            if quiz_topic and quiz_topic.strip()
+            else topic.upper()
             if topic != "all"
             else "Mixed Quiz"
         ),
@@ -552,6 +575,14 @@ def create_quiz_attempt(
 
     attach_quiz_attempt(payload.get("note_id"), attempt, performance)
 
+    recommendation_outcome = None
+    recommendation_id = payload.get("recommendation_id")
+    if recommendation_id:
+        # Link this intervention to its actual saved quiz result. The outcome
+        # helper only compares concept/topic responses when their tags match.
+        from recommendation_store import record_recommendation_outcome
+        recommendation_outcome = record_recommendation_outcome(str(recommendation_id), attempt)
+
     record_activity(
         "quiz_completed",
         topic=(
@@ -576,10 +607,16 @@ def create_quiz_attempt(
         weak_topics=weak_topics,
 
         attempt_id=attempt["id"],
+        recommendation_id=str(recommendation_id) if recommendation_id else None,
         performance=performance,
     )
 
-    return {**attempt, "performance": performance, "session": find_session_by_note_id(payload.get("note_id"))}
+    return {
+        **attempt,
+        "performance": performance,
+        "recommendation_outcome": recommendation_outcome,
+        "session": find_session_by_note_id(payload.get("note_id")),
+    }
 
 
 # =====================================================

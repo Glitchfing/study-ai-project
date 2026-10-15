@@ -10,7 +10,6 @@ import re
 from typing import Any
 
 from learner_model import build_topic_mastery
-from recommendation_service import build_recommendations
 from quiz_attempt_store import list_quiz_attempts
 from session_store import list_sessions
 
@@ -71,7 +70,10 @@ def _save_activity() -> None:
     temp.write_text(json.dumps(ACTIVITY_LOG[-5000:], ensure_ascii=False, indent=2), encoding="utf-8")
     temp.replace(ACTIVITY_PATH)
 
-STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "targeted_study_generated", "chat_message"}
+# Only completed recommendation work contributes to activity totals/heatmap.
+# Start and dismiss events remain visible in recent activity without inflating study activity.
+STUDY_EVENT_KINDS = {"note_created", "note_view", "quiz_completed", "study_session_completed", "study_session", "planner_task_done", "upload_processed", "targeted_study_generated", "chat_message", "recommendation_completed"}
+RECENT_ACTIVITY_KINDS = STUDY_EVENT_KINDS | {"recommendation_started", "recommendation_dismissed"}
 STUDY_TZ = ZoneInfo("Asia/Kolkata")
 ACTIVITY_LOG: list[dict[str, Any]] = _load_activity()
 USER_PROFILE = deepcopy(BASE_USER)
@@ -161,7 +163,7 @@ def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, A
         if not stats:
             sub = "No quiz attempts yet"
         else:
-            trend = stats.get("trend", 0)
+            trend = float(stats.get("trend") or 0.0)
             trend_label = "improving" if trend > 0.03 else "declining" if trend < -0.03 else "stable"
             sub = f"{stats.get('attempts', 0)} quiz attempt(s) · {trend_label}"
         topics.append({**base, "pct": max(0, min(100, pct)), "sub": sub})
@@ -174,7 +176,7 @@ def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, A
         if len(topics) >= 6:
             break
         attempts_count = int(stats.get("attempts") or 0)
-        trend = stats.get("trend", 0)
+        trend = float(stats.get("trend") or 0.0)
         trend_label = "improving" if trend > 0.03 else "declining" if trend < -0.03 else "stable"
         color = ("teal", "coral", "aqua")[len(topics) % 3]
         pct = int(round(stats.get("mastery_pct") or 0))
@@ -282,14 +284,8 @@ def _tips_from_activity(
         if entry.get("kind") == "planner_task_done" and entry.get("done")
     )
 
-    # Surface calculated recommendations in the existing dashboard AI Tips area.
-    for rec in recommendations[:2]:
-        tips.append({
-            "icon": "🎯",
-            "title": f"Recommended: {rec['action']}",
-            "body": rec["reason"] + f" Suggested review in {rec['next_review_days']} day(s).",
-        })
-
+    # Personalized learning recommendations are exposed separately as structured
+    # records. This legacy tips field remains for activity/planner nudges only.
     pending_tasks = _pending_revision_tasks()
     if pending_tasks and len(tips) < 3:
         next_task = pending_tasks[0]
@@ -420,7 +416,8 @@ def build_dashboard_payload() -> dict[str, Any]:
                 }
             )
     topic_mastery = build_topic_mastery(attempts)
-    recommendations = build_recommendations(topic_mastery)
+    from recommendation_store import refresh_recommendations
+    recommendations = refresh_recommendations(attempts=attempts, limit=3)
     topic_summary = _topic_summary(topic_mastery)
     mastered_topics = sum(
         1 for stats in topic_mastery.values()
@@ -435,7 +432,7 @@ def build_dashboard_payload() -> dict[str, Any]:
 
     completed_activities = sum(
         1 for entry in ACTIVITY_LOG
-        if entry.get("kind") in {"quiz_completed", "study_session_completed", "planner_task_done"}
+        if entry.get("kind") in {"quiz_completed", "study_session_completed", "planner_task_done", "recommendation_completed"}
     )
 
     activity_breakdown = Counter()
@@ -445,7 +442,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             activity_breakdown["quiz_practice"] += 1
         elif kind in {"upload_processed", "targeted_study_generated", "note_created"}:
             activity_breakdown["notes_uploads"] += 1
-        elif kind in {"note_view", "study_session_completed", "planner_task_done", "chat_message"}:
+        elif kind in {"note_view", "study_session_completed", "planner_task_done", "chat_message", "recommendation_completed"}:
             activity_breakdown["other"] += 1
 
     month_counts = Counter()
@@ -524,9 +521,10 @@ def build_dashboard_payload() -> dict[str, Any]:
         "bar_chart": bar_chart,
         "recent_quizzes": recent_quizzes,
         "tips": tips,
+        "recommendations": recommendations,
         "heatmap_weeks": 18,
         "activity_heatmap": _activity_heatmap(18),
-        "recent_activity": list(reversed([e for e in ACTIVITY_LOG if e.get("kind") in STUDY_EVENT_KINDS][-8:])),
+        "recent_activity": list(reversed([e for e in ACTIVITY_LOG if e.get("kind") in RECENT_ACTIVITY_KINDS][-8:])),
         "analytics": {
             "total_sessions": len(sessions),
             "uploaded_files_count": uploaded_files_count,

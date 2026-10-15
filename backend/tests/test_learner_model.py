@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from learner_model import build_topic_mastery, calculate_mastery
+from learner_model import build_concept_mastery, build_topic_mastery, calculate_mastery
 from recommendation_service import build_recommendations
 
 
@@ -60,6 +60,47 @@ class LearnerModelTests(unittest.TestCase):
             "created_at": "2026-01-01T10:00:00",
         }]
         self.assertEqual(build_topic_mastery(attempts), {})
+
+    def test_concept_mastery_uses_explicit_tags_and_distinct_attempts(self):
+        attempts = [
+            {
+                "id": "attempt-a",
+                "topic": "Bayes Theorem",
+                "created_at": "2026-01-01T10:00:00",
+                "responses": [
+                    {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": False},
+                    {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": False},
+                ],
+            },
+            {
+                "id": "attempt-b",
+                "topic": "Bayes Theorem",
+                "created_at": "2026-01-02T10:00:00",
+                "responses": [
+                    {"topic": "Bayes Theorem", "concept_id": "Conditional Probability", "is_correct": True},
+                ],
+            },
+        ]
+        concepts = build_concept_mastery(attempts)
+        stats = concepts["Conditional Probability"]
+        self.assertEqual(stats["attempts"], 2)
+        self.assertEqual(stats["question_count"], 3)
+        self.assertEqual(stats["incorrect_count"], 2)
+        self.assertEqual(stats["evidence_level"], "concept")
+        self.assertEqual(stats["evidence_confidence"], 0.4)
+
+    def test_concept_mastery_does_not_infer_missing_concept_tags(self):
+        attempts = [{
+            "id": "attempt-a",
+            "topic": "Bayes Theorem",
+            "score": 20,
+            "created_at": "2026-01-01T10:00:00",
+            "responses": [
+                {"topic": "Bayes Theorem", "is_correct": False},
+                {"topic": "Bayes Theorem", "is_correct": True},
+            ],
+        }]
+        self.assertEqual(build_concept_mastery(attempts), {})
 
     def test_stored_score_of_one_means_one_percent(self):
         summary = build_topic_mastery([{

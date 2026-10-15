@@ -53,3 +53,40 @@
   .rf-dashboard .rf-main{padding-left:10px;padding-right:10px}
   .rf-dashboard .rf-topbar{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}
 }
+
+
+/* Evidence-backed recommendation actions */
+.rf-recommendation-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rf-border, rgba(255,255,255,.08));
+}
+.rf-recommendation-row:last-child { border-bottom: 0; }
+.rf-recommendation-evidence {
+  display: block;
+  margin-top: 5px;
+  opacity: .78;
+  font-size: 11px;
+}
+.rf-recommendation-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+}
+.rf-recommendation-controls button {
+  border: 1px solid var(--rf-border, rgba(255,255,255,.14));
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.rf-recommendation-controls button:hover {
+  border-color: var(--rf-teal, #119da4);
+}
