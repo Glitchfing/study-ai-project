@@ -281,6 +281,40 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
         kind = str(item.get("kind") or "")
         if kind in {"quiz_completed", "note_view", "study_session_completed", "planner_task_done", "planner_task_edited"}:
             events.append({"id": str(item.get("id") or uuid4()), "type": kind, "title": item.get("title") or item.get("topic_label") or kind.replace("_", " ").title(), "topic": item.get("topic") or item.get("topic_label"), "timestamp": item.get("created_at") or item.get("timestamp") or item.get("ended_at"), "status": "completed", "source": "activity"})
+    for attempt in attempts:
+        if not isinstance(attempt, dict):
+            continue
+        attempt_id = attempt.get("id")
+        attempt_topic = str(attempt.get("topic") or attempt.get("topic_label") or attempt.get("note_title") or "").strip()
+        attempt_time = _parse_datetime(attempt.get("created_at"))
+        if attempt_time is None:
+            continue
+        already_logged = any(
+            event.get("type") == "quiz_completed"
+            and (
+                (attempt_id is not None and str(event.get("attempt_id")) == str(attempt_id))
+                or (
+                    str(event.get("topic") or "").strip().lower() == attempt_topic.lower()
+                    and (logged_time := _parse_datetime(event.get("timestamp"))) is not None
+                    and abs((logged_time - attempt_time).total_seconds()) <= 120
+                )
+            )
+            for event in events
+        )
+        if not already_logged:
+            events.append({
+                "id": f"quiz-{attempt_id}" if attempt_id is not None else f"quiz-{attempt_time.isoformat()}",
+                "type": "quiz_completed",
+                "title": attempt.get("note_title") or attempt.get("topic_label") or attempt_topic or "Quiz completed",
+                "topic": attempt_topic or None,
+                "timestamp": attempt_time.isoformat(timespec="seconds"),
+                "status": "completed",
+                "source": "quiz",
+                "score": attempt.get("score"),
+                "correct": attempt.get("correct"),
+                "total": attempt.get("total"),
+                "attempt_id": attempt_id,
+            })
     for task in tasks:
         events.append({"id": f"task-{task['id']}", "type": "revision", "title": task.get("title"), "topic": task.get("topic"), "timestamp": task.get("scheduled_at") or task.get("due_date"), "status": task.get("status"), "source": "planner", "task_id": task.get("id"), "priority": task.get("priority"), "duration_minutes": task.get("duration_minutes"), "reason": task.get("priority_reason")})
     preferences = _read_preferences()
@@ -323,6 +357,11 @@ def update_preferences(body: PlannerPreferences):
     values = body.model_dump()
     if values["preferred_end_hour"] <= values["preferred_start_hour"]:
         raise HTTPException(status_code=400, detail="Preferred end hour must be after preferred start hour.")
+    for deadline in values.get("deadlines") or []:
+        if not isinstance(deadline, dict) or not str(deadline.get("topic") or "").strip():
+            raise HTTPException(status_code=400, detail="Each deadline must include a related topic.")
+        if _parse_datetime(deadline.get("date")) is None:
+            raise HTTPException(status_code=400, detail="Each deadline must include a valid ISO date or datetime.")
     with _LOCK:
         _write_preferences(values)
     return {"preferences": values, "saved": True}
@@ -539,13 +578,3 @@ def create_task(payload: TaskEdit):
         TASKS.append(task)
         _persist_tasks()
         return {"task": dict(task), "created": True}
-
-
-@router.put("/preferences")
-def update_preferences(body: PlannerPreferences):
-    values = body.model_dump()
-    if values["preferred_end_hour"] <= values["preferred_start_hour"]:
-        raise HTTPException(status_code=400, detail="Preferred end hour must be after preferred start hour.")
-    with _LOCK:
-        _write_preferences(values)
-    return {"preferences": values, "saved": True}
