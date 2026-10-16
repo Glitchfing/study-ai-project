@@ -214,7 +214,11 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
       }
       toast?.("Study session started for " + topic + ". End the session here when you finish to record measured time.", "teal");
       const noteId = selectedTask?.note_id || selectedTask?.linked_note_id;
-      if (noteId) onNavigate?.("notes", { noteId });
+      if (selectedTask?.activity_type === "assessment") {
+        onNavigate?.("quiz", { quizTopic: topic, quizNoteId: noteId || null });
+      } else if (noteId) {
+        onNavigate?.("notes", { noteId });
+      }
     } catch (err) {
       toast?.(err?.message || "Could not start a study session.", "coral");
     } finally { setBusy(""); }
@@ -290,6 +294,14 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
   }
 
   async function removeDeadline(index) {
+    if (deadlineEditIndex === index) {
+      setDeadlineEditIndex(null);
+      setDeadlineTopic("");
+      setDeadlineDate("");
+      setDeadlineText("");
+    } else if (deadlineEditIndex != null && deadlineEditIndex > index) {
+      setDeadlineEditIndex((value) => value - 1);
+    }
     const next = { ...preferences, deadlines: (preferences.deadlines || []).filter((_, i) => i !== index) };
     setBusy("deadline");
     try {
@@ -345,7 +357,7 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
 
     <section className="lj-stat-grid" aria-label="Learning overview">
       {[
-        { icon: "target", label: "Topics tracked", value: summary.topics_tracked ?? topics.length, note: "From saved quiz attempts", filter: "all" },
+        { icon: "target", label: "Topics tracked", value: summary.topics_tracked ?? topics.length, note: "From quizzes and generated notes", filter: "all" },
         { icon: "spark", label: "Need revision", value: summary.topics_needing_revision ?? topics.filter((topic) => topic.mastery_pct != null && topic.mastery_pct < 70).length, note: "Evidence-backed focus areas", filter: "weak" },
         { icon: "calendar", label: "Upcoming sessions", value: summary.upcoming_sessions ?? tasks.filter((task) => !isCompleted(task)).length, note: "Saved planner tasks", filter: "revision" },
         { icon: "clock", label: "Overdue tasks", value: summary.overdue_tasks ?? 0, note: "Incomplete past-due work", filter: "overdue" },
@@ -356,7 +368,7 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     </section>
 
     <section className="lj-panel lj-topic-panel">
-      <div className="lj-section-heading"><div><span className="lj-section-icon"><Icon name="target"/></span><div><h2>Topic mastery</h2><p>Measured from your saved quiz results, not note uploads.</p></div></div><span className="lj-count">{topics.length} topic{topics.length === 1 ? "" : "s"}</span></div>
+      <div className="lj-section-heading"><div><span className="lj-section-icon"><Icon name="target"/></span><div><h2>Topic mastery</h2><p>Mastery comes from quiz results; unassessed generated-note topics stay unassessed.</p></div></div><span className="lj-count">{topics.length} topic{topics.length === 1 ? "" : "s"}</span></div>
       {topics.length ? <div className="lj-topic-strip">{topics.map((topic) => {
         const state = masteryState(topic);
         return <button key={topic.topic} className={"lj-topic-card " + state.className + (topicFilter === topic.topic ? " selected" : "")} onClick={() => setTopicFilter(topicFilter === topic.topic ? "all" : topic.topic)}>
