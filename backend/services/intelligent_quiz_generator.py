@@ -208,7 +208,7 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
             or section.get("explanation")
             or ""
         )
-        for sentence in re.split(r"(?<=[.!?])\\s+|[\\n•]+", source_text):
+        for sentence in re.split(r"(?<=[.!?])\s+|[\n•]+", source_text):
             fact = _clean(sentence).strip(" •-–—")
             words = fact.split()
             if len(words) < 7 or not fact:
