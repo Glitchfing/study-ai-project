@@ -225,8 +225,8 @@ def _format_minutes(minutes: int) -> dict[str, Any]:
     return {"value": str(hours), "suffix": f"h {mins:02d}m"}
 
 
-def _study_minutes_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
-    """Sum measured completed-session intervals within IST calendar days."""
+def _study_seconds_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
+    """Sum deduplicated active intervals, intersected with inclusive IST calendar-day bounds."""
     total_seconds = 0.0
     seen: set[str] = set()
     now = datetime.now(STUDY_TZ)
@@ -240,24 +240,41 @@ def _study_minutes_from_activity(start_day: date | None = None, end_day: date | 
             continue
         if identity:
             seen.add(identity)
-        started = _parse_dt(entry.get("started_at") or entry.get("start_time"))
-        ended = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
-        if started and ended:
-            if ended <= started:
+        intervals = entry.get("intervals")
+        parsed_intervals: list[tuple[datetime, datetime]] = []
+        if isinstance(intervals, list):
+            for interval in intervals:
+                if not isinstance(interval, dict):
+                    continue
+                left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
+                if left and right and right > left:
+                    parsed_intervals.append((left, right))
+        # Backward compatibility for sessions recorded before interval tracking existed.
+        if not parsed_intervals:
+            started = _parse_dt(entry.get("started_at") or entry.get("start_time"))
+            ended = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
+            if started and ended and ended > started:
+                parsed_intervals.append((started, min(ended, started + timedelta(hours=24))))
+            elif entry.get("duration_seconds") is not None:
+                stamp = _parse_dt(entry.get("timestamp"))
+                if not stamp or (start_day and stamp.date() < start_day) or (end_day and stamp.date() > end_day):
+                    continue
+                try:
+                    total_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
+                except (TypeError, ValueError, OverflowError):
+                    continue
                 continue
-            ended = min(ended, started + timedelta(hours=24))
+        for started, ended in parsed_intervals:
             left = max(started, window_start) if window_start else started
             right = min(ended, window_end) if window_end else min(ended, now)
-            total_seconds += max(0.0, (right - left).total_seconds())
-        elif entry.get("duration_seconds") is not None:
-            stamp = _parse_dt(entry.get("timestamp"))
-            if not stamp or (start_day and stamp.date() < start_day) or (end_day and stamp.date() > end_day):
-                continue
-            try:
-                total_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
-            except (TypeError, ValueError, OverflowError):
-                continue
-    return int(total_seconds // 60)
+            if right > left:
+                total_seconds += (right - left).total_seconds()
+    return int(total_seconds)
+
+
+def _study_minutes_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
+    """Whole-minute display helper; calculations retain second precision until presentation."""
+    return _study_seconds_from_activity(start_day, end_day) // 60
 
 def _recent_quizzes(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Use persistent quiz attempts so recent quizzes survive backend restarts."""
