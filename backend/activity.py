@@ -111,7 +111,7 @@ def record_activity(kind: str, **payload: Any) -> dict[str, Any]:
             existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"))), None)
             if existing:
                 return existing
-        if session_id:
+        if session_id and not event_id:
             existing = next((e for e in ACTIVITY_LOG if e.get("kind") == kind and e.get("session_id") == session_id), None)
             if existing:
                 return existing
@@ -373,15 +373,46 @@ def _tips_from_activity(
 
 
 def _activity_heatmap(weeks: int = 18) -> list[list[dict[str, Any]]]:
+    # Preserve event-count intensity for ordinary activity. A measured study session
+    # contributes one activity to every local day on which an active interval occurred.
     counts = Counter()
+    seen_sessions: set[str] = set()
     for entry in ACTIVITY_LOG:
         if entry.get("kind") not in STUDY_EVENT_KINDS:
             continue
         try:
+            if entry.get("kind") == "study_session_completed":
+                session_id = str(entry.get("session_id") or entry.get("event_id") or "")
+                if session_id and session_id in seen_sessions:
+                    continue
+                if session_id:
+                    seen_sessions.add(session_id)
+                intervals = entry.get("intervals")
+                days_for_session: set[date] = set()
+                if isinstance(intervals, list):
+                    for interval in intervals:
+                        if not isinstance(interval, dict):
+                            continue
+                        left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
+                        if not left or not right or right <= left:
+                            continue
+                        cursor = left.date()
+                        last = (right - timedelta(microseconds=1)).date()
+                        while cursor <= last:
+                            days_for_session.add(cursor)
+                            cursor += timedelta(days=1)
+                # Legacy session events did not store active intervals.
+                if not days_for_session:
+                    parsed = _parse_dt(entry.get("timestamp"))
+                    if parsed:
+                        days_for_session.add(parsed.date())
+                for session_day in days_for_session:
+                    counts[session_day] += 1
+                continue
             parsed = _parse_dt(entry.get("timestamp"))
             if parsed:
                 counts[parsed.date()] += 1
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError, OverflowError):
             continue
 
     today = datetime.now(STUDY_TZ).date()
