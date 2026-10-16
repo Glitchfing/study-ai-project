@@ -169,7 +169,24 @@ def study_session_history(start: str | None = Query(None), end: str | None = Que
         ))
         sessions = [_session_state(session_id) for session_id in ids]
     sessions = [session for session in sessions if session]
-    start_dt, end_dt = _dt(start), _dt(end)
+    def history_boundary(raw: str | None, *, inclusive_end: bool = False) -> datetime | None:
+        if not raw:
+            return None
+        # Date-only filters mean local calendar days in the app's configured IST timezone.
+        try:
+            if len(raw) == 10 and raw[4] == "-" and raw[7] == "-":
+                day = datetime.fromisoformat(raw).date()
+                if inclusive_end:
+                    day += timedelta(days=1)
+                return datetime.combine(day, datetime.min.time(), tzinfo=STUDY_TZ).astimezone(timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="History date filters must be valid ISO dates or datetimes.")
+        parsed = _dt(raw)
+        if parsed is None:
+            raise HTTPException(status_code=400, detail="History date filters must be valid ISO dates or datetimes.")
+        return parsed
+
+    start_dt, end_dt = history_boundary(start), history_boundary(end, inclusive_end=True)
     if start_dt or end_dt:
         def matches(session: dict[str, Any]) -> bool:
             stamp = _dt(session.get("started_at"))
