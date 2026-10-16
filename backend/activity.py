@@ -393,19 +393,25 @@ def _activity_heatmap(weeks: int = 18) -> list[list[dict[str, Any]]]:
                     seen_sessions.add(session_id)
                 intervals = entry.get("intervals")
                 days_for_session: set[date] = set()
-                if isinstance(intervals, list):
-                    for interval in intervals:
-                        if not isinstance(interval, dict):
-                            continue
-                        left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
-                        if not left or not right or right <= left:
-                            continue
-                        cursor = left.date()
-                        last = (right - timedelta(microseconds=1)).date()
-                        while cursor <= last:
-                            days_for_session.add(cursor)
-                            cursor += timedelta(days=1)
-                # Legacy session events did not store active intervals.
+                candidate_intervals = intervals if isinstance(intervals, list) else []
+                # Legacy sessions have one start/end pair instead of interval history.
+                if not candidate_intervals:
+                    candidate_intervals = [{
+                        "started_at": entry.get("started_at") or entry.get("start_time"),
+                        "ended_at": entry.get("ended_at") or entry.get("end_time"),
+                    }]
+                for interval in candidate_intervals:
+                    if not isinstance(interval, dict):
+                        continue
+                    left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
+                    if not left or not right or right <= left:
+                        continue
+                    cursor = left.date()
+                    last = (right - timedelta(microseconds=1)).date()
+                    while cursor <= last:
+                        days_for_session.add(cursor)
+                        cursor += timedelta(days=1)
+                # Duration-only legacy records have no interval boundaries.
                 if not days_for_session:
                     parsed = _parse_dt(entry.get("timestamp"))
                     if parsed:
