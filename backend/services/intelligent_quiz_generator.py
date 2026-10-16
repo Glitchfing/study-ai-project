@@ -197,6 +197,29 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
             ):
                 facts.append({"topic": title, "concept": concept, "fact": fact})
 
+    # Synthesized notes commonly store the actual facts as prose rather than
+    # structured definitions. Extract complete source sentences so fallback
+    # generation still works when the provider is unavailable or returns invalid JSON.
+    for section in sections:
+        title = _clean(section.get("title") or package.get("document_title") or "Study topic")
+        source_text = _clean(
+            section.get("content")
+            or section.get("educational_explanation")
+            or section.get("explanation")
+            or ""
+        )
+        for sentence in re.split(r"(?<=[.!?])\\s+|[\\n•]+", source_text):
+            fact = _clean(sentence).strip(" •-–—")
+            words = fact.split()
+            if len(words) < 7 or not fact:
+                continue
+            concept = fact.split(":", 1)[0].strip() if ":" in fact else " ".join(words[:4])
+            concept = concept.strip(" .,:;!?-–—")
+            if not concept or concept.lower() == title.lower():
+                concept = " ".join(words[:4]).strip(" .,:;!?-–—")
+            if not any(item["fact"].lower() == fact.lower() for item in facts):
+                facts.append({"topic": title, "concept": concept, "fact": fact})
+
     candidates: list[dict[str, Any]] = []
     for index, item in enumerate(facts):
         distractors = [
@@ -247,7 +270,7 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         f"Document title: {package.get('document_title')}\n"
         f"Requested quiz topic: {package.get('quiz_topic') or 'entire note'}\n"
         "When a topic is specified, every question must test that topic and be answerable from the retrieved source evidence.\n"
-        f"Need {max(limit * 2, limit + 8)} candidate questions before filtering.\n"
+        f"Need {limit} candidate questions before filtering.\n"
         "Distribution target after filtering: 20% easy, 50% medium, 30% hard.\n"
         "Required type: mcq only. Every question must have exactly four non-empty options and exactly one correct option.\n"
         "Rules:\n"
