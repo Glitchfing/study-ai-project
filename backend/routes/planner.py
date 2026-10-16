@@ -338,7 +338,7 @@ def auto_schedule():
         # Prefer to reuse existing generated tasks with a matching topic. Preserve manual tasks.
         pending_generated: dict[str, dict[str, Any]] = {}
         for task in existing:
-            if task.get("origin") == "auto" and not _task_done(task):
+            if task.get("origin") == "auto" and not _task_done(task) and task.get("status") != "in_progress":
                 pending_generated.setdefault(str(task.get("topic_id") or task.get("topic") or "").lower(), task)
         slots = _eligible_slots(prefs, now, int(prefs["planning_days"]))
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
@@ -372,7 +372,7 @@ def auto_schedule():
                 # but never create a duplicate automatic task or overwrite its chosen slot.
                 manual_match = next((
                     item for item in current
-                    if item.get("origin") != "auto"
+                    if (item.get("origin") != "auto" or item.get("status") == "in_progress")
                     and re.sub(r"[^a-z0-9]+", "-", str(item.get("topic") or "").lower()).strip("-") == topic_id
                 ), None)
                 if manual_match:
@@ -445,7 +445,14 @@ def auto_schedule():
             task["day"] = "today" if chosen.astimezone(STUDY_TZ).date() == now.astimezone(STUDY_TZ).date() else "upcoming"
             task["date"] = chosen.astimezone(STUDY_TZ).strftime("%a, %d %b · %H:%M")
             task["updated_at"] = now.isoformat(timespec="seconds")
+            previous_status = task.get("status") or "planned"
+            if previous_status != "planned":
+                task.setdefault("status_history", []).append({
+                    "from": previous_status, "to": "planned", "at": now.isoformat(timespec="seconds"),
+                    "reason": "Task returned to the plan after schedule regeneration.",
+                })
             task["status"] = "planned"
+            task["done"] = False
             planned_day = chosen.astimezone(STUDY_TZ).date().isoformat()
             planned_today[planned_day] = planned_today.get(planned_day, 0) + duration
             occupied.append(task)
