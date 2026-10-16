@@ -283,9 +283,22 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
             events.append({"id": str(item.get("id") or uuid4()), "type": kind, "title": item.get("title") or item.get("topic_label") or kind.replace("_", " ").title(), "topic": item.get("topic") or item.get("topic_label"), "timestamp": item.get("created_at") or item.get("timestamp") or item.get("ended_at"), "status": "completed", "source": "activity"})
     for task in tasks:
         events.append({"id": f"task-{task['id']}", "type": "revision", "title": task.get("title"), "topic": task.get("topic"), "timestamp": task.get("scheduled_at") or task.get("due_date"), "status": task.get("status"), "source": "planner", "task_id": task.get("id"), "priority": task.get("priority"), "duration_minutes": task.get("duration_minutes"), "reason": task.get("priority_reason")})
-    events.sort(key=lambda item: str(item.get("timestamp") or ""))
     preferences = _read_preferences()
     deadlines = preferences.get("deadlines") or []
+    for index, deadline in enumerate(deadlines):
+        if not isinstance(deadline, dict) or not deadline.get("date"):
+            continue
+        topic = deadline.get("topic") or ""
+        events.append({
+            "id": f"deadline-{index}-{re.sub(r'[^a-z0-9]+', '-', str(topic).lower()).strip('-')}",
+            "type": "deadline",
+            "title": deadline.get("text") or f"Deadline: {topic or 'Assessment'}",
+            "topic": topic or None,
+            "timestamp": deadline.get("date"),
+            "status": "planned",
+            "source": "deadline",
+        })
+    events.sort(key=lambda item: str(item.get("timestamp") or ""))
     return {
         "tasks": tasks, "deadlines": deadlines, "topics": topics, "events": events,
         "preferences": {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "topic_importance": {}}, **preferences},
