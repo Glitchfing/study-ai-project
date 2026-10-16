@@ -5,8 +5,11 @@ from copy import deepcopy
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 import json
+import os
 from pathlib import Path
 import re
+import tempfile
+import threading
 from typing import Any
 
 from learner_model import build_topic_mastery
@@ -64,11 +67,31 @@ def _load_activity() -> list[dict[str, Any]]:
     except (OSError, json.JSONDecodeError):
         return []
 
+ACTIVITY_LOCK = threading.RLock()
+
+
 def _save_activity() -> None:
+    """Atomically persist events using a unique temp file (safe on Windows)."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    temp = ACTIVITY_PATH.with_suffix(".tmp")
-    temp.write_text(json.dumps(ACTIVITY_LOG[-5000:], ensure_ascii=False, indent=2), encoding="utf-8")
-    temp.replace(ACTIVITY_PATH)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=DATA_DIR,
+            prefix="activity_events_",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            json.dump(ACTIVITY_LOG[-5000:], temporary, ensure_ascii=False, indent=2)
+            temp_path = Path(temporary.name)
+        os.replace(temp_path, ACTIVITY_PATH)
+    finally:
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
 
 # Only completed recommendation work contributes to activity totals/heatmap.
 # Start and dismiss events remain visible in recent activity without inflating study activity.
@@ -80,27 +103,30 @@ USER_PROFILE = deepcopy(BASE_USER)
 
 
 def record_activity(kind: str, **payload: Any) -> dict[str, Any]:
-    event_id = payload.get("event_id") or payload.get("attempt_id")
-    session_id = payload.get("session_id")
-    if event_id:
-        existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"))), None)
-        if existing:
-            return existing
-    if session_id:
-        existing = next((e for e in ACTIVITY_LOG if e.get("kind") == kind and e.get("session_id") == session_id), None)
-        if existing:
-            return existing
-    entry = {
-        "kind": kind,
-        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "event_id": event_id or f"{kind}:{datetime.now(timezone.utc).timestamp()}:{len(ACTIVITY_LOG)}",
-        **payload,
-    }
-    ACTIVITY_LOG.append(entry)
-    if len(ACTIVITY_LOG) > 5000:
-        del ACTIVITY_LOG[:-5000]
-    _save_activity()
-    return entry
+    # Protect deduplication, list mutation and file replacement as one operation.
+    with ACTIVITY_LOCK:
+        event_id = payload.get("event_id") or payload.get("attempt_id")
+        session_id = payload.get("session_id")
+        if event_id:
+            existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"))), None)
+            if existing:
+                return existing
+        if session_id:
+            existing = next((e for e in ACTIVITY_LOG if e.get("kind") == kind and e.get("session_id") == session_id), None)
+            if existing:
+                return existing
+        now = datetime.now(timezone.utc)
+        entry = {
+            "kind": kind,
+            "timestamp": now.isoformat(timespec="seconds"),
+            "event_id": event_id or f"{kind}:{now.timestamp()}:{len(ACTIVITY_LOG)}",
+            **payload,
+        }
+        ACTIVITY_LOG.append(entry)
+        if len(ACTIVITY_LOG) > 5000:
+            del ACTIVITY_LOG[:-5000]
+        _save_activity()
+        return entry
 
 def _parse_dt(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():

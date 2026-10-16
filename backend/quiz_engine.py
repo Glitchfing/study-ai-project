@@ -169,7 +169,10 @@ def generate_quiz_for_package(
 ) -> list[dict[str, Any]]:
     requested_limit = max(1, limit)
     memory = _question_memory(note_id)
-    raw_questions = generate_exam_style_questions(package, limit=max(requested_limit * 3, requested_limit + 10), memory=memory)
+    # A small candidate buffer is enough for validation/deduplication; multiplying by 3
+    # here and again inside the generator caused unnecessary provider token usage.
+    candidate_limit = max(requested_limit + 6, int(requested_limit * 1.5))
+    raw_questions = generate_exam_style_questions(package, limit=candidate_limit, memory=memory)
     # Only admit real MCQs with four distinct options and a correct answer present in those options.
     def valid_generated_mcq(question: Any) -> bool:
         if not isinstance(question, dict) or str(question.get("type") or "").lower().replace("-", "_") != "mcq":

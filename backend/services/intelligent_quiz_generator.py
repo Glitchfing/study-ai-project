@@ -104,6 +104,46 @@ def _section_payload(package: dict[str, Any]) -> list[dict[str, Any]]:
     return payload
 
 
+def _compact_section_payload(package: dict[str, Any], max_chars: int = 10000) -> list[dict[str, Any]]:
+    """Keep representative note content in the prompt without exceeding provider token limits."""
+    selected: list[dict[str, Any]] = []
+    used = 0
+    sections = _section_payload(package)
+    topic_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", str(package.get("quiz_topic") or "").lower()))
+    if topic_terms:
+        def section_relevance(section: dict[str, Any]) -> tuple[int, int]:
+            heading = " ".join([str(section.get("title") or ""), " ".join(str(item) for item in (section.get("topics") or []))]).lower()
+            body = " ".join([str(section.get("content") or ""), " ".join(str(item) for item in (section.get("key_points") or []))]).lower()
+            heading_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", heading))
+            body_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", body))
+            return (len(topic_terms & heading_terms), len(topic_terms & body_terms))
+        # Stable sorting preserves source order among equally relevant sections.
+        sections.sort(key=section_relevance, reverse=True)
+    for section in sections:
+        compact = {
+            "title": section.get("title"),
+            "topics": section.get("topics") or [],
+            "content": section.get("content") or "",
+            "key_points": section.get("key_points") or [],
+            "definitions": section.get("definitions") or [],
+            "examples": section.get("examples") or [],
+        }
+        serialized = json.dumps(compact, ensure_ascii=True)
+        remaining = max_chars - used
+        if remaining <= 0:
+            break
+        if len(serialized) > remaining:
+            if selected:
+                continue
+            compact["content"] = str(compact.get("content") or "")[:max(1000, remaining // 2)]
+            compact["key_points"] = (compact.get("key_points") or [])[:4]
+            serialized = json.dumps(compact, ensure_ascii=True)
+        if len(serialized) <= remaining:
+            selected.append(compact)
+            used += len(serialized)
+    return selected
+
+
 def rank_question_quality(question: dict[str, Any]) -> float:
     text = _question_text(question)
     q_type = str(question.get("type") or "").lower()
@@ -168,6 +208,47 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
             ):
                 facts.append({"topic": title, "concept": concept, "fact": fact})
 
+    # Synthesized notes commonly store the actual facts as prose rather than
+    # structured definitions. Extract complete source sentences so fallback
+    # generation still works when the provider is unavailable or returns invalid JSON.
+    for section in sections:
+        title = _clean(section.get("title") or package.get("document_title") or "Study topic")
+        source_text = _clean(
+            section.get("content")
+            or section.get("educational_explanation")
+            or section.get("explanation")
+            or ""
+        )
+        for sentence in re.split(r"(?<=[.!?])\s+|[\n•]+", source_text):
+            fact = _clean(sentence).strip(" •-–—")
+            words = fact.split()
+            if len(words) < 7 or not fact:
+                continue
+            if ":" in fact:
+                concept = fact.split(":", 1)[0].strip()
+            else:
+                predicates = {
+                    "is", "are", "refers", "means", "protects", "ensures", "enables",
+                    "provides", "allows", "describes", "defines", "uses", "prevents",
+                    "supports", "verifies", "represents", "consists", "includes",
+                    "involves", "helps", "maintains", "contains", "requires",
+                }
+                predicate_index = next(
+                    (i for i, word in enumerate(words[:6]) if i > 0 and word.lower().strip(".,:;!?") in predicates),
+                    None,
+                )
+                if predicate_index is not None:
+                    concept = " ".join(words[:predicate_index])
+                elif words[0].lower().strip(".,:;!?") in {"the", "a", "an", "when", "if", "this", "that"}:
+                    concept = " ".join(words[:4])
+                else:
+                    concept = words[0]
+            concept = concept.strip(" .,:;!?-–—")
+            if not concept or concept.lower() == title.lower():
+                concept = " ".join(words[:4]).strip(" .,:;!?-–—")
+            if not any(item["fact"].lower() == fact.lower() for item in facts):
+                facts.append({"topic": title, "concept": concept, "fact": fact})
+
     candidates: list[dict[str, Any]] = []
     for index, item in enumerate(facts):
         distractors = [
@@ -218,7 +299,7 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         f"Document title: {package.get('document_title')}\n"
         f"Requested quiz topic: {package.get('quiz_topic') or 'entire note'}\n"
         "When a topic is specified, every question must test that topic and be answerable from the retrieved source evidence.\n"
-        f"Need {max(limit * 2, limit + 8)} candidate questions before filtering.\n"
+        f"Need {limit} candidate questions before filtering.\n"
         "Distribution target after filtering: 20% easy, 50% medium, 30% hard.\n"
         "Required type: mcq only. Every question must have exactly four non-empty options and exactly one correct option.\n"
         "Rules:\n"
@@ -228,8 +309,8 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         "- Include expected_keywords for semantic grading.\n"
         "- Set concept_id to a concise, specific concept tested by the question; reuse the same name for the same concept across questions. Do not use the document title unless it is itself the concept.\n"
         "- Do not use repeated stems or generic wording.\n\n"
-        f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)}\n\n"
-        f"Synthesized note sections:\n{json.dumps(_section_payload(package), ensure_ascii=True)[:90000]}"
+        f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)[:2500]}\n\n"
+        f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package, max_chars=10000), ensure_ascii=True)}"
     )
     payload = generate_structured_json(system_prompt, user_prompt, "intelligent_quiz", QUIZ_SCHEMA, temperature=0.32)
     return payload.get("questions") or []
@@ -355,17 +436,54 @@ def generate_exam_style_questions(
     limit: int,
     memory: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    candidate_limit = max(limit * 3, limit + 10)
+    # The caller may already request extra questions for filtering. Avoid
+    # multiplying that pool again and overwhelming providers' token-per-minute limits.
+    candidate_limit = min(40, max(limit + 6, int(limit * 1.5)))
+    source_text = str(package.get("retrieved_source_text") or "").strip()
+    if not source_text:
+        # Existing saved notes may have no Qdrant document IDs. Their synthesized
+        # sections are still valid grounding evidence for quiz validation.
+        section_text = []
+        for section in package.get("sections") or []:
+            title = _clean(section.get("title") or "")
+            topics = section.get("topics") or []
+            if title:
+                section_text.append(title)
+            if isinstance(topics, list):
+                section_text.extend(_clean(topic) for topic in topics if _clean(topic))
+            text = _clean(
+                section.get("content")
+                or section.get("educational_explanation")
+                or section.get("explanation")
+                or ""
+            )
+            if text:
+                section_text.append(text)
+        source_text = "\n\n".join(section_text)
+    source_text = source_text[:100000]
+    requested_topic = str(package.get("quiz_topic") or "")
+
+    candidates: list[dict[str, Any]] = []
     if has_llm_support():
         try:
             candidates = _llm_candidates(package, candidate_limit)
         except Exception:
-            candidates = _fallback_candidates(package, candidate_limit)
-    else:
-        candidates = _fallback_candidates(package, candidate_limit)
-    source_text = str(package.get("retrieved_source_text") or "")
-    requested_topic = str(package.get("quiz_topic") or "")
-    candidates = [question for question in candidates if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)]
+            candidates = []
+    candidates = [
+        question for question in candidates
+        if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)
+    ]
+
+    # Invalid/insufficient structured output is not always an exception.
+    # Supplement the LLM set with strictly validated note-derived questions when needed.
+    if len(candidates) < limit:
+        fallback = _fallback_candidates(package, candidate_limit)
+        fallback = [
+            question for question in fallback
+            if isinstance(question, dict)
+            and _valid_mcq(question, source_text, requested_topic)
+        ]
+        candidates.extend(fallback)
     selected = _select_diverse(candidates, limit, memory=memory)
     random.shuffle(selected)
     return selected

@@ -399,6 +399,11 @@ def _generated_questions_for_note(
 
     rag = _retrieve_quiz_evidence(record, topic=topic)
     package = rag["package"]
+
+    # Saved synthesized notes may not have indexed source-document IDs, so
+    # RAG setup can return early. Preserve a user-requested topic either way.
+    if topic and str(topic).strip():
+        package["quiz_topic"] = str(topic).strip()
     questions = generate_quiz_for_package(
         package,
         note_id=note_id,
