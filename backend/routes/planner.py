@@ -195,7 +195,8 @@ def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[
     for offset in range(horizon):
         day = (local_now + timedelta(days=offset)).date()
         cursor = datetime.combine(day, time(hour=start_hour), tzinfo=local_now.tzinfo)
-        end = datetime.combine(day, time(hour=end_hour), tzinfo=local_now.tzinfo)
+        end_day = day + timedelta(days=1) if end_hour == 24 else day
+        end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=local_now.tzinfo)
         if offset == 0:
             cursor = max(cursor, now.astimezone(local_now.tzinfo).replace(second=0, microsecond=0) + timedelta(minutes=5))
         while cursor + timedelta(minutes=5) <= end:
@@ -297,6 +298,8 @@ def auto_schedule():
         slots = _eligible_slots(prefs, now, int(prefs["planning_days"]))
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
         current = [task for task in existing if not _task_done(task)]
+        pending_ids = {task.get("id") for task in pending_generated.values()}
+        occupied = [task for task in current if task.get("origin") != "auto" or task.get("id") not in pending_ids]
         planned_today: dict[str, int] = {}
         updated_tasks = [dict(task) for task in existing]
         for reserved_task in occupied:
@@ -304,7 +307,6 @@ def auto_schedule():
             if reserved_at:
                 day_key = reserved_at.astimezone(STUDY_TZ).date().isoformat()
                 planned_today[day_key] = planned_today.get(day_key, 0) + _duration(reserved_task)
-        occupied = [task for task in current if task.get("origin") != "auto" or task.get("id") not in {v.get("id") for v in pending_generated.values()}]
         for candidate in topics:
             topic = candidate["topic"]
             topic_id = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")
@@ -334,6 +336,13 @@ def auto_schedule():
                 break
             if chosen is None:
                 unscheduled.append({"topic": topic, "reason": "No slot fits the daily time budget, available time window, existing tasks, and applicable deadline."})
+                if task is not None:
+                    # Keep existing generated work instead of silently dropping it.
+                    occupied.append(task)
+                    old_slot = _scheduled_timestamp(task)
+                    if old_slot:
+                        old_day = old_slot.astimezone(STUDY_TZ).date().isoformat()
+                        planned_today[old_day] = planned_today.get(old_day, 0) + _duration(task)
                 continue
             if task is None:
                 max_id = max([int(t.get("id")) for t in updated_tasks if str(t.get("id", "")).isdigit()] or [0])
@@ -348,21 +357,30 @@ def auto_schedule():
                 updated_tasks.append(task)
                 created += 1
             else:
-                old = _task_timestamp(task)
+                old = _scheduled_timestamp(task)
                 if old and old != chosen:
                     task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": chosen.isoformat(timespec="seconds"), "at": now.isoformat(timespec="seconds"), "reason": "Schedule refreshed using latest learning evidence and availability."})
                     rescheduled += 1
+                elif old == chosen:
+                    retained += 1
                 task["title"] = candidate["title"]
-                task["duration_minutes"] = duration
-                task["est"] = f"{duration} min"
-                task["scheduled_at"] = chosen.isoformat(timespec="seconds")
-                task["due_date"] = task.get("original_due_date") or (candidate["due_at"].isoformat(timespec="seconds") if candidate["due_at"] else None)
-                task["day"] = "today" if chosen.astimezone(STUDY_TZ).date() == now.astimezone(STUDY_TZ).date() else "upcoming"
-                task["date"] = chosen.astimezone(STUDY_TZ).strftime("%a, %d %b · %H:%M")
-                task["updated_at"] = now.isoformat(timespec="seconds")
-                task["status"] = "planned"
-                planned_today[chosen.astimezone(STUDY_TZ).date().isoformat()] = planned_today.get(chosen.astimezone(STUDY_TZ).date().isoformat(), 0) + duration
-                occupied.append(task)
+                task["priority_score"] = candidate["priority_score"]
+                task["priority"] = _priority_label(candidate["priority_score"])
+                task["priority_reason"] = candidate["reason"]
+                task["evidence"] = {"mastery": candidate["stats"].get("mastery"), "trend": candidate["stats"].get("trend_label"), "factors": candidate["factors"]}
+                task["activity_type"] = candidate["activity_type"]
+            # Shared scheduling fields must be persisted for both created and reused tasks.
+            task["duration_minutes"] = duration
+            task["est"] = f"{duration} min"
+            task["scheduled_at"] = chosen.isoformat(timespec="seconds")
+            task["due_date"] = task.get("original_due_date") or (candidate["due_at"].isoformat(timespec="seconds") if candidate["due_at"] else None)
+            task["day"] = "today" if chosen.astimezone(STUDY_TZ).date() == now.astimezone(STUDY_TZ).date() else "upcoming"
+            task["date"] = chosen.astimezone(STUDY_TZ).strftime("%a, %d %b · %H:%M")
+            task["updated_at"] = now.isoformat(timespec="seconds")
+            task["status"] = "planned"
+            planned_day = chosen.astimezone(STUDY_TZ).date().isoformat()
+            planned_today[planned_day] = planned_today.get(planned_day, 0) + duration
+            occupied.append(task)
         TASKS[:] = updated_tasks
         _persist_tasks()
         record_activity("planner_schedule_generated", created=created, rescheduled=rescheduled, retained=retained, unscheduled=len(unscheduled))
