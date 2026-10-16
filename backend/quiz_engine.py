@@ -96,9 +96,7 @@ def _normalize_question(question: dict[str, Any], index: int, note_id: str | Non
         options = ["True", "False"]
         correct_answer = "True" if _normalize_answer(correct_answer) in {"true", "t", "yes", "1"} else "False"
 
-    if q_type == "mcq":
-        # Never fabricate placeholder options. Invalid MCQs are rejected before normalization.
-
+    # Never fabricate placeholder options. Invalid MCQs are rejected before normalization.
     acceptable = [_clean(item) for item in question.get("acceptable_answers") or [] if _clean(item)]
     if correct_answer:
         acceptable.append(correct_answer)
