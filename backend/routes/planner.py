@@ -206,7 +206,10 @@ def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[
         end_day = day + timedelta(days=1) if end_hour == 24 else day
         end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=local_now.tzinfo)
         if offset == 0:
-            cursor = max(cursor, now.astimezone(local_now.tzinfo).replace(second=0, microsecond=0) + timedelta(minutes=5))
+            base = now.astimezone(local_now.tzinfo).replace(second=0, microsecond=0)
+            minutes_to_next_slot = 5 - (base.minute % 5)
+            next_slot = base + timedelta(minutes=minutes_to_next_slot)
+            cursor = max(cursor, next_slot)
         while cursor + timedelta(minutes=5) <= end:
             slots.append(cursor.astimezone(timezone.utc))
             cursor += timedelta(minutes=5)
