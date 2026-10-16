@@ -108,7 +108,18 @@ def _compact_section_payload(package: dict[str, Any], max_chars: int = 10000) ->
     """Keep representative note content in the prompt without exceeding provider token limits."""
     selected: list[dict[str, Any]] = []
     used = 0
-    for section in _section_payload(package):
+    sections = _section_payload(package)
+    topic_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", str(package.get("quiz_topic") or "").lower()))
+    if topic_terms:
+        def section_relevance(section: dict[str, Any]) -> tuple[int, int]:
+            heading = " ".join([str(section.get("title") or ""), " ".join(str(item) for item in (section.get("topics") or []))]).lower()
+            body = " ".join([str(section.get("content") or ""), " ".join(str(item) for item in (section.get("key_points") or []))]).lower()
+            heading_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", heading))
+            body_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9_-]{2,}", body))
+            return (len(topic_terms & heading_terms), len(topic_terms & body_terms))
+        # Stable sorting preserves source order among equally relevant sections.
+        sections.sort(key=section_relevance, reverse=True)
+    for section in sections:
         compact = {
             "title": section.get("title"),
             "topics": section.get("topics") or [],
@@ -298,7 +309,7 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         "- Include expected_keywords for semantic grading.\n"
         "- Set concept_id to a concise, specific concept tested by the question; reuse the same name for the same concept across questions. Do not use the document title unless it is itself the concept.\n"
         "- Do not use repeated stems or generic wording.\n\n"
-        f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)}\n\n"
+        f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)[:2500]}\n\n"
         f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package, max_chars=10000), ensure_ascii=True)}"
     )
     payload = generate_structured_json(system_prompt, user_prompt, "intelligent_quiz", QUIZ_SCHEMA, temperature=0.32)
