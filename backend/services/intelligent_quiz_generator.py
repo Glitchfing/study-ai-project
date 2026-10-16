@@ -434,6 +434,12 @@ def generate_exam_style_questions(
         # sections are still valid grounding evidence for quiz validation.
         section_text = []
         for section in package.get("sections") or []:
+            title = _clean(section.get("title") or "")
+            topics = section.get("topics") or []
+            if title:
+                section_text.append(title)
+            if isinstance(topics, list):
+                section_text.extend(_clean(topic) for topic in topics if _clean(topic))
             text = _clean(
                 section.get("content")
                 or section.get("educational_explanation")
