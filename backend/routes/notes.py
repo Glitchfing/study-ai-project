@@ -1,10 +1,39 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from activity import record_activity
-from note_store import get_normalized_note, get_note_content, get_note_record, list_notes
+from note_store import (
+    delete_generated_note,
+    get_normalized_note,
+    get_note_content,
+    get_note_record,
+    list_notes,
+)
 from session_store import update_session_note_format
 
 router = APIRouter()
+
+
+@router.delete("/{note_id}")
+def delete_note(note_id: str):
+    """Delete a saved generated note permanently."""
+    try:
+        deleted = delete_generated_note(note_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete note. Please try again.",
+        ) from exc
+
+    if not deleted:
+        note = get_note_record(note_id)
+        if note is not None and note.get("source") != "generated":
+            raise HTTPException(
+                status_code=403,
+                detail="Example notes cannot be deleted.",
+            )
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    return {"deleted": True, "id": note_id}
 
 
 @router.get("")

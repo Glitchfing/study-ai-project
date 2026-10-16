@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { getAssetUrl, getNotesList, getNote } from "../services/api";
+import { getAssetUrl, getNotesList, getNote, deleteNote } from "../services/api";
 
 let mermaidModulePromise = null;
 
@@ -408,6 +408,27 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
     }
   }
 
+  async function handleDeleteNote(event, note) {
+    event.stopPropagation();
+    if (note.source !== "generated") {
+      toast("Example notes cannot be deleted.", "coral");
+      return;
+    }
+    if (!window.confirm(`Permanently delete "${note.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteNote(note.id);
+      setNotesList((current) => current.filter((item) => item.id !== note.id));
+      if (activeNote === note.id) {
+        setActiveNote(null);
+        setContent(null);
+      }
+      if (typeof refreshDashboard === "function") refreshDashboard();
+      toast("Note deleted successfully", "teal");
+    } catch (error) {
+      toast(error.message || "Could not delete note", "coral");
+    }
+  }
+
   const activeNoteMeta = notesList.find((note) => note.id === activeNote);
   const canAttemptQuiz = activeNoteMeta?.source === "generated";
 
@@ -423,12 +444,27 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
                 key={note.id}
                 className={`note-item${activeNote === note.id ? " active" : ""}`}
                 onClick={() => loadNote(note.id, format)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer" }}
               >
-                <div style={{ fontWeight: 600, fontSize: 12 }}>{note.title}</div>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
-                  <span className="tag tag-teal" style={{ fontSize: 9 }}>{note.topic}</span>
-                  {" "}Updated {note.updated}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, overflowWrap: "anywhere" }}>{note.title}</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                    <span className="tag tag-teal" style={{ fontSize: 9 }}>{note.topic}</span>
+                    {" "}Updated {note.updated}
+                  </div>
                 </div>
+                {note.source === "generated" ? (
+                  <button
+                    type="button"
+                    title={`Delete ${note.title}`}
+                    aria-label={`Delete ${note.title}`}
+                    className="btn btn-secondary btn-sm"
+                    onClick={(event) => handleDeleteNote(event, note)}
+                    style={{ flex: "0 0 auto", padding: "6px 8px", color: "#ff9b8f", borderColor: "rgba(255,120,100,0.35)" }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>

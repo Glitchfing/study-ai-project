@@ -65,6 +65,7 @@ export const uploadFiles = (files) => {
 export const getNotesList = () => request("GET", "/notes");
 export const getNote = (id, format = "cornell") =>
   request("GET", `/notes/${id}?format=${format}`);
+export const deleteNote = (id) => request("DELETE", `/notes/${encodeURIComponent(id)}`);
 
 // Quiz
 export const getQuiz = (topic = "all", limit = 5, noteId = null, quizTopic = null) => {

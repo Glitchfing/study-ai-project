@@ -5,6 +5,7 @@ import {
   uploadAndTargetStudy,
   generateTargetedStudy,
   getIndexedDocuments,
+  deleteNote,
 } from "../services/api";
 
 const FULL_PIPELINE_STEPS = [
@@ -52,6 +53,19 @@ export default function UploadPage({ toast, onNavigate, refreshDashboard }) {
   const [existingDocTopic, setExistingDocTopic] = useState("");
   const [existingDocLoading, setExistingDocLoading] = useState(false);
   const inputRef = useRef();
+
+  async function handleDeleteSavedNote(event, note) {
+    event.stopPropagation();
+    if (!window.confirm(`Permanently delete "${note.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteNote(note.id);
+      setUploadHistory((current) => current.filter((item) => item.id !== note.id));
+      if (typeof refreshDashboard === "function") refreshDashboard();
+      toast("Note deleted successfully", "teal");
+    } catch (error) {
+      toast(error.message || "Could not delete note", "coral");
+    }
+  }
 
   function refreshUploadHistory() {
     getNotesList()
@@ -525,18 +539,28 @@ export default function UploadPage({ toast, onNavigate, refreshDashboard }) {
                   key={note.id}
                   className="tip-row"
                   onClick={() => onNavigate("notes", { noteId: note.id })}
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
                 >
                   <div className="tip-ico">
                     {note.topic?.toLowerCase().includes("targeted") || note.title?.toLowerCase().includes("targeted") ? "🎯" : "DOC"}
                   </div>
-                  <div className="tip-body">
+                  <div className="tip-body" style={{ minWidth: 0, flex: 1 }}>
                     <strong>{note.title}</strong>
                     <br />
                     <span style={{ fontSize: 11, color: "var(--muted)" }}>
                       {note.total_sections ?? 0} sections · {note.estimated_read_time ?? 0} min read · {note.updated}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    title={`Delete ${note.title}`}
+                    aria-label={`Delete ${note.title}`}
+                    className="btn btn-secondary btn-sm"
+                    onClick={(event) => handleDeleteSavedNote(event, note)}
+                    style={{ flex: "0 0 auto", padding: "7px 9px", color: "#ff9b8f", borderColor: "rgba(255,120,100,0.35)" }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                  </button>
                 </div>
               ))}
             </div>
