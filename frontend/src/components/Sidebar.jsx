@@ -6,6 +6,7 @@ const NAV = [
   { view: "notes", icon: "notes", label: "My Notes" },
   { view: "quiz", icon: "quiz", label: "Quizzes" },
   { view: "chat", icon: "chat", label: "Learn & Ask" },
+  { view: "journey", icon: "chart", label: "Learning Journey" },
   { view: "planner", icon: "calendar", label: "Revision Planner" },
 ];
 
@@ -15,6 +16,7 @@ const icons = {
   notes: <><path d="M6 3h9l4 4v14H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM14 3v5h5M8 12h8M8 16h6" /></>,
   quiz: <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 14l2 2 5-5" /></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6" /></>,
+  chart: <><path d="M4 20V12h4v8M10 20V5h4v15M16 20V9h4v11" /></>,
   chat: <><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M8 11h8M8 14h5" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="m19 13 2 1-2 3-2-1a7 7 0 0 1-2 1l-.5 2h-4L10 17a7 7 0 0 1-2-1l-2 1-2-3 2-1a7 7 0 0 1 0-2L4 10l2-3 2 1a7 7 0 0 1 2-1l.5-2h4l.5 2a7 7 0 0 1 2 1l2-1 2 3-2 1a7 7 0 0 1 0 2Z" /></>,
 };
