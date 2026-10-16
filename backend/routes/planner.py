@@ -58,6 +58,55 @@ def _load_tasks() -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict) and "id" in item] if isinstance(value, list) else []
 
 
+def _tracked_topics(attempts: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Combine measured quiz topics with generated-note metadata that is not assessed yet."""
+    measured = build_topic_mastery(attempts)
+    topics: dict[str, dict[str, Any]] = {}
+    for name, stats in measured.items():
+        row = dict(stats)
+        row.setdefault("topic", name)
+        row.setdefault("note_id", None)
+        row["evidence_source"] = "quiz"
+        topics[name] = row
+
+    # Generated notes are legitimate candidates for an initial review/diagnostic,
+    # but static demo notes are intentionally excluded.
+    try:
+        from note_store import list_notes
+        notes = list_notes()
+    except Exception:
+        notes = []
+
+    def normalized(value: Any) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", str(value or "").lower()).strip("-")
+
+    for note in notes:
+        if not isinstance(note, dict) or note.get("source") != "generated":
+            continue
+        name = str(note.get("topic") or note.get("title") or "").strip()
+        key = normalized(name)
+        if not name or not key:
+            continue
+        matched_name = next((known for known in topics if normalized(known) == key), None)
+        if matched_name:
+            if not topics[matched_name].get("note_id"):
+                topics[matched_name]["note_id"] = note.get("id")
+            continue
+        topics[name] = {
+            "topic": name,
+            "mastery": None,
+            "mastery_pct": None,
+            "trend": None,
+            "trend_label": "insufficient_data",
+            "attempts": 0,
+            "last_reviewed_at": None,
+            "evidence_confidence": 0.0,
+            "note_id": note.get("id"),
+            "evidence_source": "generated_note",
+        }
+    return topics
+
+
 TASKS: list[dict[str, Any]] = _load_tasks()
 
 
@@ -159,7 +208,7 @@ def _write_preferences(values: dict[str, Any]) -> None:
 
 def _candidate_topics() -> list[dict[str, Any]]:
     attempts = list_quiz_attempts(limit=1000)
-    mastery = build_topic_mastery(attempts)
+    mastery = _tracked_topics(attempts)
     candidates = []
     preferences = _read_preferences()
     importance_map = preferences.get("topic_importance") or {}
@@ -210,6 +259,7 @@ def _candidate_topics() -> list[dict[str, Any]]:
             "activity_type": kind, "title": title, "duration_minutes": minutes,
             "reason": "; ".join(explanation_parts) or "Prioritized using the available learning evidence.",
             "due_at": due_at,
+            "note_id": stats.get("note_id"),
         })
     return sorted(candidates, key=lambda item: (-item["priority_score"], item["due_at"] or datetime.max.replace(tzinfo=timezone.utc)))
 
@@ -273,7 +323,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
             return (not start or stamp.date().isoformat() >= start[:10]) and (not end or stamp.date().isoformat() <= end[:10])
         tasks = [task for task in tasks if in_range(task)]
     attempts = list_quiz_attempts(limit=1000)
-    topics = list(build_topic_mastery(attempts).values())
+    topics = list(_tracked_topics(attempts).values())
     events = []
     for item in ACTIVITY_LOG[-300:]:
         if not isinstance(item, dict):
@@ -457,6 +507,7 @@ def auto_schedule():
                     "priority": _priority_label(candidate["priority_score"]), "priority_score": candidate["priority_score"],
                     "priority_reason": candidate["reason"], "evidence": {"mastery": candidate["stats"].get("mastery"), "trend": candidate["stats"].get("trend_label"), "factors": candidate["factors"]},
                     "activity_type": candidate["activity_type"], "est": f"{duration} min", "duration_minutes": duration,
+                    "note_id": candidate.get("note_id"),
                     "done": False, "status": "planned", "origin": "auto", "created_at": now.isoformat(timespec="seconds"),
                     "original_due_date": candidate["due_at"].isoformat(timespec="seconds") if candidate["due_at"] else None,
                 }
@@ -476,6 +527,7 @@ def auto_schedule():
                 task["priority_reason"] = candidate["reason"]
                 task["evidence"] = {"mastery": candidate["stats"].get("mastery"), "trend": candidate["stats"].get("trend_label"), "factors": candidate["factors"]}
                 task["activity_type"] = candidate["activity_type"]
+                task["note_id"] = candidate.get("note_id") or task.get("note_id")
             # Shared scheduling fields must be persisted for both created and reused tasks.
             task["duration_minutes"] = duration
             task["est"] = f"{duration} min"
