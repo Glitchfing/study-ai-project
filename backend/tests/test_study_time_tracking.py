@@ -98,5 +98,30 @@ class AccurateStudyTimeTests(unittest.TestCase):
             self.assertEqual(activity._study_minutes_from_activity(), 45)
 
 
+    def test_overlapping_legacy_sessions_do_not_double_count(self):
+        events = [
+            {"kind": "study_session_completed", "session_id": "one",
+             "started_at": "2026-10-16T10:00:00+00:00", "ended_at": "2026-10-16T10:30:00+00:00"},
+            {"kind": "study_session_completed", "session_id": "two",
+             "started_at": "2026-10-16T10:15:00+00:00", "ended_at": "2026-10-16T10:45:00+00:00"},
+        ]
+        with patch.object(activity, "ACTIVITY_LOG", events):
+            self.assertEqual(activity._study_minutes_from_activity(), 45)
+
+    def test_stale_active_session_pauses_at_last_confirmed_heartbeat(self):
+        times = [
+            datetime(2026, 10, 16, 10, 0, tzinfo=timezone.utc),
+            datetime(2026, 10, 16, 10, 4, tzinfo=timezone.utc),
+            datetime(2026, 10, 16, 10, 10, tzinfo=timezone.utc),
+        ]
+        with patch.object(study_routes, "_utc_now", side_effect=times):
+            session = study_routes.start_study_session(StudySessionStart(topic="DBMS"))["session"]
+            sid = session["session_id"]
+            study_routes.heartbeat_study_session(StudySessionAction(session_id=sid))
+            recovered = study_routes.get_active_study_session()["active"]
+        self.assertEqual(recovered["status"], "paused")
+        self.assertEqual(recovered["intervals"][-1]["duration_seconds"], 4 * 60)
+
+
 if __name__ == "__main__":
     unittest.main()
