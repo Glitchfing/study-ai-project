@@ -382,6 +382,16 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
 
     <section className="lj-panel lj-timeline-panel">
       <div className="lj-section-heading"><div><span className="lj-section-icon"><Icon name="calendar"/></span><div><h2>Learning timeline</h2><p>Past activity and future tasks in one connected view.</p></div></div><button className="lj-btn subtle" onClick={() => setShowCreateTask((value) => !value)}>＋ Add task</button></div>
+      <nav className="lj-timeline-tabs" aria-label="Learning journey views">
+        {[
+          ["all", "All activity", "Everything recorded"],
+          ["revision", "Revision plan", "Scheduled work"],
+          ["quizzes", "Assessments", "Quiz performance"],
+          ["notes", "Notes reviewed", "Study material"],
+          ["weak", "Weak topics", "Focus areas"],
+          ["overdue", "Overdue", "Needs attention"],
+        ].map(([value, label, description]) => <button key={value} type="button" className={eventFilter === value ? "active" : ""} aria-pressed={eventFilter === value} onClick={() => { setEventFilter(value); setStatusFilter("all"); }}><span>{label}</span><small>{description}</small></button>)}
+      </nav>
       <div className="lj-controls">
         <div className="lj-control-group"><label htmlFor="lj-range">View</label><select id="lj-range" value={range} onChange={(event) => setRange(event.target.value)}><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="all">All activity</option></select></div>
         <div className="lj-range-nav"><button aria-label="Previous date range" onClick={() => setAnchor((value) => changeAnchor(value, range, -1))}>‹</button><b>{headingDate}</b><button aria-label="Next date range" onClick={() => setAnchor((value) => changeAnchor(value, range, 1))}>›</button><button className="lj-today" onClick={() => setAnchor(new Date())}>Today</button></div>
