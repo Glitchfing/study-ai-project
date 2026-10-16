@@ -107,6 +107,18 @@ export const startStudySession = (topic = null) =>
   request("POST", "/activity/study-sessions/start", { topic });
 export const completeStudySession = (session_id) =>
   request("POST", "/activity/study-sessions/complete", { session_id });
+export const pauseStudySession = (session_id) =>
+  request("POST", "/activity/study-sessions/pause", { session_id });
+export const resumeStudySession = (session_id) =>
+  request("POST", "/activity/study-sessions/resume", { session_id });
+export const heartbeatStudySession = (session_id) =>
+  request("POST", "/activity/study-sessions/heartbeat", { session_id });
+export const getStudySessionHistory = (start, end) => {
+  const params = new URLSearchParams();
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+  return request("GET", "/activity/study-sessions/history" + (params.size ? "?" + params.toString() : ""));
+};
 
 // Activity
 export const logActivity = (event) => request("POST", "/activity", event);

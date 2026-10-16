@@ -111,7 +111,7 @@ def record_activity(kind: str, **payload: Any) -> dict[str, Any]:
             existing = next((e for e in ACTIVITY_LOG if event_id in (e.get("event_id"), e.get("attempt_id"))), None)
             if existing:
                 return existing
-        if session_id:
+        if session_id and not event_id:
             existing = next((e for e in ACTIVITY_LOG if e.get("kind") == kind and e.get("session_id") == session_id), None)
             if existing:
                 return existing
@@ -220,18 +220,24 @@ def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, A
 
 
 def _format_minutes(minutes: int) -> dict[str, Any]:
-    hours = minutes // 60
-    mins = minutes % 60
-    return {"value": str(hours), "suffix": f"h {mins:02d}m"}
+    minutes = max(0, int(minutes))
+    hours, mins = divmod(minutes, 60)
+    if hours == 0:
+        return {"value": str(mins), "suffix": "m"}
+    if mins == 0:
+        return {"value": str(hours), "suffix": "h"}
+    return {"value": str(hours), "suffix": f"h {mins}m"}
 
 
-def _study_minutes_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
-    """Sum measured completed-session intervals within IST calendar days."""
-    total_seconds = 0.0
+def _study_seconds_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
+    """Sum the union of measured active intervals, intersected with inclusive IST day bounds."""
     seen: set[str] = set()
     now = datetime.now(STUDY_TZ)
     window_start = datetime.combine(start_day, time.min, tzinfo=STUDY_TZ) if start_day else None
     window_end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=STUDY_TZ) if end_day else None
+    clipped_intervals: list[tuple[datetime, datetime]] = []
+    duration_only_seconds = 0.0
+
     for entry in ACTIVITY_LOG:
         if entry.get("kind") != "study_session_completed":
             continue
@@ -240,24 +246,58 @@ def _study_minutes_from_activity(start_day: date | None = None, end_day: date | 
             continue
         if identity:
             seen.add(identity)
-        started = _parse_dt(entry.get("started_at") or entry.get("start_time"))
-        ended = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
-        if started and ended:
-            if ended <= started:
-                continue
-            ended = min(ended, started + timedelta(hours=24))
-            left = max(started, window_start) if window_start else started
-            right = min(ended, window_end) if window_end else min(ended, now)
-            total_seconds += max(0.0, (right - left).total_seconds())
-        elif entry.get("duration_seconds") is not None:
+
+        raw_intervals = entry.get("intervals")
+        intervals: list[tuple[datetime, datetime]] = []
+        if isinstance(raw_intervals, list):
+            for interval in raw_intervals:
+                if not isinstance(interval, dict):
+                    continue
+                left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
+                if left and right and right > left:
+                    intervals.append((left, right))
+
+        # Legacy session records stored only one start/end pair.
+        if not intervals:
+            left = _parse_dt(entry.get("started_at") or entry.get("start_time"))
+            right = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
+            if left and right and right > left:
+                intervals.append((left, min(right, left + timedelta(hours=24))))
+
+        if intervals:
+            for left, right in intervals:
+                left = max(left, window_start) if window_start else left
+                right = min(right, window_end) if window_end else min(right, now)
+                if right > left:
+                    clipped_intervals.append((left, right))
+            continue
+
+        # Duration-only legacy rows have no timestamps to intersect or union.
+        if entry.get("duration_seconds") is not None:
             stamp = _parse_dt(entry.get("timestamp"))
             if not stamp or (start_day and stamp.date() < start_day) or (end_day and stamp.date() > end_day):
                 continue
             try:
-                total_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
+                duration_only_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
             except (TypeError, ValueError, OverflowError):
                 continue
-    return int(total_seconds // 60)
+
+    # Merge overlapping intervals across distinct sessions so corrupted/legacy
+    # overlapping records cannot inflate the authoritative total.
+    clipped_intervals.sort(key=lambda item: item[0])
+    merged: list[list[datetime]] = []
+    for left, right in clipped_intervals:
+        if merged and left <= merged[-1][1]:
+            if right > merged[-1][1]:
+                merged[-1][1] = right
+        else:
+            merged.append([left, right])
+    interval_seconds = sum(int((right - left).total_seconds()) for left, right in merged)
+    return int(interval_seconds + duration_only_seconds)
+
+def _study_minutes_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
+    """Whole-minute display helper; calculations retain second precision until presentation."""
+    return _study_seconds_from_activity(start_day, end_day) // 60
 
 def _recent_quizzes(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Use persistent quiz attempts so recent quizzes survive backend restarts."""
@@ -356,15 +396,52 @@ def _tips_from_activity(
 
 
 def _activity_heatmap(weeks: int = 18) -> list[list[dict[str, Any]]]:
+    # Preserve event-count intensity for ordinary activity. A measured study session
+    # contributes one activity to every local day on which an active interval occurred.
     counts = Counter()
+    seen_sessions: set[str] = set()
     for entry in ACTIVITY_LOG:
         if entry.get("kind") not in STUDY_EVENT_KINDS:
             continue
         try:
+            if entry.get("kind") == "study_session_completed":
+                session_id = str(entry.get("session_id") or entry.get("event_id") or "")
+                if session_id and session_id in seen_sessions:
+                    continue
+                if session_id:
+                    seen_sessions.add(session_id)
+                intervals = entry.get("intervals")
+                days_for_session: set[date] = set()
+                candidate_intervals = intervals if isinstance(intervals, list) else []
+                # Legacy sessions have one start/end pair instead of interval history.
+                if not candidate_intervals:
+                    candidate_intervals = [{
+                        "started_at": entry.get("started_at") or entry.get("start_time"),
+                        "ended_at": entry.get("ended_at") or entry.get("end_time"),
+                    }]
+                for interval in candidate_intervals:
+                    if not isinstance(interval, dict):
+                        continue
+                    left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
+                    if not left or not right or right <= left:
+                        continue
+                    cursor = left.date()
+                    last = (right - timedelta(microseconds=1)).date()
+                    while cursor <= last:
+                        days_for_session.add(cursor)
+                        cursor += timedelta(days=1)
+                # Duration-only legacy records have no interval boundaries.
+                if not days_for_session:
+                    parsed = _parse_dt(entry.get("timestamp"))
+                    if parsed:
+                        days_for_session.add(parsed.date())
+                for session_day in days_for_session:
+                    counts[session_day] += 1
+                continue
             parsed = _parse_dt(entry.get("timestamp"))
             if parsed:
                 counts[parsed.date()] += 1
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError, OverflowError):
             continue
 
     today = datetime.now(STUDY_TZ).date()
