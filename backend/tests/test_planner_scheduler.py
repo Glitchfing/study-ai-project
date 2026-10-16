@@ -67,5 +67,51 @@ class RevisionSchedulerUnitTests(unittest.TestCase):
         self.assertTrue(_overlap(scheduled, 20, task))
 
 
+    def test_schedule_generation_persists_times_and_is_idempotent(self):
+        from contextlib import ExitStack
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from routes import planner
+
+        fixed_now = datetime(2026, 10, 16, 10, 0, tzinfo=timezone.utc)
+        candidate = [{
+            "topic": "Topic A",
+            "stats": {"mastery": 0.45, "trend_label": "stable", "evidence_confidence": 0.6},
+            "priority_score": 0.55,
+            "factors": {"weakness": 0.55, "decline": 0, "urgency": 0, "importance": 0.5, "uncertainty": 0.4},
+            "activity_type": "targeted_practice",
+            "title": "Targeted revision: Topic A",
+            "duration_minutes": 20,
+            "reason": "Measured mastery 45%",
+            "due_at": None,
+        }]
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(planner, "TASKS", []))
+                stack.enter_context(patch.object(planner, "TASKS_PATH", root / "revision_tasks.json"))
+                stack.enter_context(patch.object(planner, "DATA_DIR", root))
+                stack.enter_context(patch.object(planner, "_utc_now", return_value=fixed_now))
+                stack.enter_context(patch.object(planner, "_candidate_topics", return_value=candidate))
+                stack.enter_context(patch.object(planner, "_read_preferences", return_value={
+                    "daily_minutes": 60, "planning_days": 7,
+                    "preferred_start_hour": 18, "preferred_end_hour": 22,
+                    "topic_importance": {}, "deadlines": [],
+                }))
+                stack.enter_context(patch.object(planner, "record_activity"))
+                first = planner.auto_schedule()
+                first_snapshot = (root / "revision_tasks.json").read_text(encoding="utf-8")
+                second = planner.auto_schedule()
+                second_snapshot = (root / "revision_tasks.json").read_text(encoding="utf-8")
+
+        self.assertEqual(first["created_count"], 1)
+        self.assertEqual(len(first["tasks"]), 1)
+        self.assertTrue(first["tasks"][0].get("scheduled_at"))
+        self.assertEqual(second["created_count"], 0)
+        self.assertEqual(len(second["tasks"]), 1)
+        self.assertEqual(first_snapshot, second_snapshot)
+
+
 if __name__ == "__main__":
     unittest.main()
