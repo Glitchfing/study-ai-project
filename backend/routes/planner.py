@@ -488,19 +488,33 @@ def update_task(task_id: str, changes: TaskEdit):
         if task is None:
             raise HTTPException(status_code=404, detail="Revision task not found.")
         updates = changes.model_dump(exclude_unset=True, exclude_none=True)
+        now = _utc_now()
+        now_text = now.isoformat(timespec="seconds")
+        for date_key in ("scheduled_at", "due_date"):
+            if date_key in updates and updates[date_key] and _parse_datetime(updates[date_key]) is None:
+                raise HTTPException(status_code=400, detail=f"{date_key} must be an ISO date or datetime.")
         if "scheduled_at" in updates:
-            try:
-                datetime.fromisoformat(updates["scheduled_at"].replace("Z", "+00:00"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail="scheduled_at must be an ISO date or datetime.") from exc
-            old = _task_timestamp(task)
-            if old and old.isoformat(timespec="seconds") != updates["scheduled_at"]:
-                task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": updates["scheduled_at"], "at": _utc_now().isoformat(timespec="seconds"), "reason": "User rescheduled task."})
+            old = _scheduled_timestamp(task)
+            new_time = _parse_datetime(updates["scheduled_at"])
+            if old and new_time and old != new_time:
+                task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": new_time.isoformat(timespec="seconds"), "at": now_text, "reason": "User rescheduled task."})
+        if "status" in updates:
+            new_status = updates["status"]
+            if _task_done(task) and new_status != "completed":
+                raise HTTPException(status_code=409, detail="Completed tasks cannot be reopened by editing status; use the task toggle action.")
+            old_status = task.get("status") or ("completed" if _task_done(task) else "planned")
+            if old_status != new_status:
+                task.setdefault("status_history", []).append({"from": old_status, "to": new_status, "at": now_text})
         for key, value in updates.items():
             task[key] = value
         if "duration_minutes" in updates:
             task["est"] = f"{updates['duration_minutes']} min"
-        task["updated_at"] = _utc_now().isoformat(timespec="seconds")
+        if updates.get("status") == "completed":
+            task["done"] = True
+            task.setdefault("completed_at", now_text)
+        elif updates.get("status") and not _task_done(task):
+            task["done"] = False
+        task["updated_at"] = now_text
         _persist_tasks()
         record_activity("planner_task_edited", task_id=task_id, title=task.get("title"), topic=str(task.get("topic") or "").lower() or None)
         return {"task": dict(task), "updated": bool(updates)}
