@@ -145,7 +145,7 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast,onTog
   const completedActivities=Number(a.completed_activities)||0;
   const stats=[
     {title:"Notes created",value:String(noteCount),pct:Math.min(100,noteCount*10),note:noteCount?"Saved generated notes":"Upload or create a note to begin",icon:"notes",tone:"peach",view:"notes"},
-    {title:"Study time",value:prettyMinutes(studyMins),pct:studyMins?Math.min(100,studyMins/12):0,note:studyMins?"From recorded study-session durations":"Start a timer to record study time",icon:"clock",tone:"mint"},
+    {title:"Study time",value:prettyMinutes(studyMins+Math.floor(liveStudySeconds/60)),pct:(studyMins+Math.floor(liveStudySeconds/60))?Math.min(100,(studyMins+Math.floor(liveStudySeconds/60))/12):0,note:activeStudySession?(activeStudySession.status==="paused"?"Timer paused · active intervals preserved":"Live timer · updates every second"):(studyMins?"From recorded study-session durations":"Start a timer to record study time"),icon:"clock",tone:"mint"},
     {title:"Quizzes completed",value:String(a.quizzes_attempted??kpi("quizzes")?.value??0),pct:Math.min(100,Number(a.quizzes_attempted||0)*5),note:a.average_score!==undefined&&a.quizzes_attempted?a.average_score+"% average score":"Saved attempts appear here",icon:"notes",tone:"ice",view:"quiz"},
     {title:"Learning progress",value:mastered+" / "+topicCount,pct:topicCount?mastered/topicCount*100:0,note:completedActivities+" completed activities · "+topics.length+" tracked topics",icon:"chart",tone:"coral",view:"notes"}
   ];
