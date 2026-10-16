@@ -104,7 +104,7 @@ def _section_payload(package: dict[str, Any]) -> list[dict[str, Any]]:
     return payload
 
 
-def _compact_section_payload(package: dict[str, Any], max_chars: int = 18000) -> list[dict[str, Any]]:
+def _compact_section_payload(package: dict[str, Any], max_chars: int = 10000) -> list[dict[str, Any]]:
     """Keep representative note content in the prompt without exceeding provider token limits."""
     selected: list[dict[str, Any]] = []
     used = 0
@@ -299,7 +299,7 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         "- Set concept_id to a concise, specific concept tested by the question; reuse the same name for the same concept across questions. Do not use the document title unless it is itself the concept.\n"
         "- Do not use repeated stems or generic wording.\n\n"
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)}\n\n"
-        f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package), ensure_ascii=True)}"
+        f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package, max_chars=10000), ensure_ascii=True)}"
     )
     payload = generate_structured_json(system_prompt, user_prompt, "intelligent_quiz", QUIZ_SCHEMA, temperature=0.32)
     return payload.get("questions") or []
@@ -427,7 +427,7 @@ def generate_exam_style_questions(
 ) -> list[dict[str, Any]]:
     # The caller may already request extra questions for filtering. Avoid
     # multiplying that pool again and overwhelming providers' token-per-minute limits.
-    candidate_limit = min(60, max(limit + 8, int(limit * 1.5)))
+    candidate_limit = min(40, max(limit + 6, int(limit * 1.5)))
     source_text = str(package.get("retrieved_source_text") or "")
     requested_topic = str(package.get("quiz_topic") or "")
 
@@ -442,14 +442,16 @@ def generate_exam_style_questions(
         if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)
     ]
 
-    # Invalid structured output is not an exception; still try the strict
-    # source-note fallback when no candidate survives validation.
-    if not candidates:
+    # Invalid/insufficient structured output is not always an exception.
+    # Supplement the LLM set with strictly validated note-derived questions when needed.
+    if len(candidates) < limit:
         fallback = _fallback_candidates(package, candidate_limit)
-        candidates = [
+        fallback = [
             question for question in fallback
-            if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)
+            if isinstance(question, dict)
+            and _valid_mcq(question, source_text, requested_topic)
         ]
+        candidates.extend(fallback)
     selected = _select_diverse(candidates, limit, memory=memory)
     random.shuffle(selected)
     return selected
