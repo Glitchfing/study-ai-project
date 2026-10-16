@@ -332,7 +332,7 @@ def update_preferences(body: PlannerPreferences):
 def auto_schedule():
     with _LOCK:
         now = _utc_now()
-        prefs = {**{"daily_minutes": 60, "planning_days": 7, "preferred_start_hour": 18, "preferred_end_hour": 22, "topic_importance": {}, "deadlines": []}, **_read_preferences()}
+        prefs = {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "topic_importance": {}, "deadlines": []}, **_read_preferences()}
         topics = _candidate_topics()
         existing = [dict(task) for task in TASKS]
         # Prefer to reuse existing generated tasks with a matching topic. Preserve manual tasks.
@@ -387,9 +387,15 @@ def auto_schedule():
             chosen = None
             duration = candidate["duration_minutes"]
             for slot in slots:
-                if planned_today.get(slot.astimezone(STUDY_TZ).date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
+                local_slot = slot.astimezone(STUDY_TZ)
+                if planned_today.get(local_slot.date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
                     continue
-                if candidate["due_at"] and candidate["due_at"] >= now and slot > candidate["due_at"]:
+                end_hour = int(prefs.get("preferred_end_hour", DEFAULT_END_HOUR))
+                window_end_day = local_slot.date() + timedelta(days=1) if end_hour == 24 else local_slot.date()
+                window_end = datetime.combine(window_end_day, time(hour=end_hour % 24), tzinfo=STUDY_TZ)
+                if local_slot + timedelta(minutes=duration) > window_end:
+                    continue
+                if candidate["due_at"] and candidate["due_at"] >= now and slot + timedelta(minutes=duration) > candidate["due_at"]:
                     continue
                 if any(_overlap(slot, duration, other) for other in occupied):
                     continue
