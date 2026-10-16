@@ -230,12 +230,14 @@ def _format_minutes(minutes: int) -> dict[str, Any]:
 
 
 def _study_seconds_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
-    """Sum deduplicated active intervals, intersected with inclusive IST calendar-day bounds."""
-    total_seconds = 0.0
+    """Sum the union of measured active intervals, intersected with inclusive IST day bounds."""
     seen: set[str] = set()
     now = datetime.now(STUDY_TZ)
     window_start = datetime.combine(start_day, time.min, tzinfo=STUDY_TZ) if start_day else None
     window_end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=STUDY_TZ) if end_day else None
+    clipped_intervals: list[tuple[datetime, datetime]] = []
+    duration_only_seconds = 0.0
+
     for entry in ACTIVITY_LOG:
         if entry.get("kind") != "study_session_completed":
             continue
@@ -244,37 +246,54 @@ def _study_seconds_from_activity(start_day: date | None = None, end_day: date | 
             continue
         if identity:
             seen.add(identity)
-        intervals = entry.get("intervals")
-        parsed_intervals: list[tuple[datetime, datetime]] = []
-        if isinstance(intervals, list):
-            for interval in intervals:
+
+        raw_intervals = entry.get("intervals")
+        intervals: list[tuple[datetime, datetime]] = []
+        if isinstance(raw_intervals, list):
+            for interval in raw_intervals:
                 if not isinstance(interval, dict):
                     continue
                 left, right = _parse_dt(interval.get("started_at")), _parse_dt(interval.get("ended_at"))
                 if left and right and right > left:
-                    parsed_intervals.append((left, right))
-        # Backward compatibility for sessions recorded before interval tracking existed.
-        if not parsed_intervals:
-            started = _parse_dt(entry.get("started_at") or entry.get("start_time"))
-            ended = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
-            if started and ended and ended > started:
-                parsed_intervals.append((started, min(ended, started + timedelta(hours=24))))
-            elif entry.get("duration_seconds") is not None:
-                stamp = _parse_dt(entry.get("timestamp"))
-                if not stamp or (start_day and stamp.date() < start_day) or (end_day and stamp.date() > end_day):
-                    continue
-                try:
-                    total_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
-                except (TypeError, ValueError, OverflowError):
-                    continue
-                continue
-        for started, ended in parsed_intervals:
-            left = max(started, window_start) if window_start else started
-            right = min(ended, window_end) if window_end else min(ended, now)
-            if right > left:
-                total_seconds += (right - left).total_seconds()
-    return int(total_seconds)
+                    intervals.append((left, right))
 
+        # Legacy session records stored only one start/end pair.
+        if not intervals:
+            left = _parse_dt(entry.get("started_at") or entry.get("start_time"))
+            right = _parse_dt(entry.get("ended_at") or entry.get("end_time"))
+            if left and right and right > left:
+                intervals.append((left, min(right, left + timedelta(hours=24))))
+
+        if intervals:
+            for left, right in intervals:
+                left = max(left, window_start) if window_start else left
+                right = min(right, window_end) if window_end else min(right, now)
+                if right > left:
+                    clipped_intervals.append((left, right))
+            continue
+
+        # Duration-only legacy rows have no timestamps to intersect or union.
+        if entry.get("duration_seconds") is not None:
+            stamp = _parse_dt(entry.get("timestamp"))
+            if not stamp or (start_day and stamp.date() < start_day) or (end_day and stamp.date() > end_day):
+                continue
+            try:
+                duration_only_seconds += max(0.0, min(float(entry["duration_seconds"]), 24 * 3600))
+            except (TypeError, ValueError, OverflowError):
+                continue
+
+    # Merge overlapping intervals across distinct sessions so corrupted/legacy
+    # overlapping records cannot inflate the authoritative total.
+    clipped_intervals.sort(key=lambda item: item[0])
+    merged: list[list[datetime]] = []
+    for left, right in clipped_intervals:
+        if merged and left <= merged[-1][1]:
+            if right > merged[-1][1]:
+                merged[-1][1] = right
+        else:
+            merged.append([left, right])
+    interval_seconds = sum(int((right - left).total_seconds()) for left, right in merged)
+    return int(interval_seconds + duration_only_seconds)
 
 def _study_minutes_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
     """Whole-minute display helper; calculations retain second precision until presentation."""
