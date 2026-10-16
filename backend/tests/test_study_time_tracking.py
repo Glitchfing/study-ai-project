@@ -61,7 +61,8 @@ class AccurateStudyTimeTests(unittest.TestCase):
         with patch.object(study_routes, "_utc_now", return_value=datetime(2026, 10, 16, 10, 0, tzinfo=timezone.utc)):
             first = study_routes.start_study_session(StudySessionStart(topic="DBMS"))
             second = study_routes.start_study_session(StudySessionStart(topic="Python"))
-        self.assertNotEqual(first["session"]["session_id"], second["session"]["session_id"])
+        self.assertEqual(first["session"]["session_id"], second["session"]["session_id"])
+        self.assertFalse(first["already_active"])
         self.assertTrue(second["already_active"])
         self.assertEqual(second["session"]["topic"], "DBMS")
 
