@@ -322,7 +322,6 @@ def auto_schedule():
             key = topic_id.lower()
             task = pending_generated.get(key)
             if task:
-                retained += 1
                 idx = next((i for i, row in enumerate(updated_tasks) if row.get("id") == task.get("id")), None)
                 if idx is not None:
                     updated_tasks[idx]["priority_score"] = candidate["priority_score"]
@@ -335,7 +334,7 @@ def auto_schedule():
             chosen = None
             duration = candidate["duration_minutes"]
             for slot in slots:
-                if (slot.date().isoformat(),) and planned_today.get(slot.astimezone(STUDY_TZ).date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
+                if planned_today.get(slot.astimezone(STUDY_TZ).date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
                     continue
                 if candidate["due_at"] and candidate["due_at"] >= now and slot > candidate["due_at"]:
                     continue
@@ -370,7 +369,8 @@ def auto_schedule():
                 if old and old != chosen:
                     task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": chosen.isoformat(timespec="seconds"), "at": now.isoformat(timespec="seconds"), "reason": "Schedule refreshed using latest learning evidence and availability."})
                     rescheduled += 1
-                elif old == chosen:
+                else:
+                    # Reusing the same task record is retained work, even without a previous slot.
                     retained += 1
                 task["title"] = candidate["title"]
                 task["priority_score"] = candidate["priority_score"]
