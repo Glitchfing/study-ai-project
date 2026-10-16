@@ -22,3 +22,14 @@
 .lj-node-dot{user-select:none}
 .lj-event-status.in-progress{color:#c0fdfb;border-color:#398b8a;background:#123b3d}
 .lj-timeline-node.in-progress .lj-node-dot{border-color:#64b6ac;box-shadow:0 0 12px #64b6ac40}
+
+/* Preferences additions: topic weighting and editable deadlines. */
+.lj-topic-importance{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #1b4647;border-radius:9px;background:#071819}
+.lj-topic-importance>b,.lj-topic-importance>p,.lj-topic-importance>small{grid-column:1/-1}
+.lj-topic-importance>b{font-size:10px}
+.lj-topic-importance>p{margin:0;color:var(--lj-muted);font-size:8px}
+.lj-topic-importance>label{display:flex;align-items:center;justify-content:space-between;gap:7px;min-width:0;padding:6px;border:1px solid #173d3e;border-radius:7px;font-size:8px}
+.lj-topic-importance>label span{overflow-wrap:anywhere}
+.lj-topic-importance select{max-width:105px;border:1px solid #245657;border-radius:6px;padding:5px;background:#0a2223;color:var(--lj-text);font-size:9px;min-width:0}
+.lj-deadline-row .lj-deadline-edit{width:auto;height:25px;padding:0 7px;font-size:8px;border:1px solid #245657;border-radius:6px;background:#0a2223;color:var(--lj-aqua)}
+@media(max-width:650px){.lj-topic-importance{grid-template-columns:1fr}}
