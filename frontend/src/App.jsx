@@ -36,7 +36,10 @@ export default function App() {
   useEffect(() => { refreshDashboard(); }, [refreshDashboard]);
 
   useEffect(() => {
-    const onPopState = () => setCurrentView(window.location.pathname === "/learning-journey" ? "journey" : "dashboard");
+    const onPopState = (event) => {
+      const view = event.state?.view;
+      setCurrentView(view || (window.location.pathname === "/learning-journey" ? "journey" : "dashboard"));
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -55,10 +58,9 @@ export default function App() {
     else if (view === "quiz") setSelectedQuizTopic("");
     if (Object.prototype.hasOwnProperty.call(options, "recommendationId")) setSelectedRecommendationId(options.recommendationId || null);
     else if (view === "quiz") setSelectedRecommendationId(null);
-    if (view === "journey") {
-      if (window.location.pathname !== "/learning-journey") window.history.pushState({ view }, "", "/learning-journey");
-    } else if (window.location.pathname === "/learning-journey") {
-      window.history.pushState({ view }, "", "/");
+    const targetPath = view === "journey" ? "/learning-journey" : "/";
+    if (window.location.pathname !== targetPath || window.history.state?.view !== view) {
+      window.history.pushState({ view }, "", targetPath);
     }
     setCurrentView(view);
     setSidebarOpen(false);
