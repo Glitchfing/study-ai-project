@@ -104,6 +104,35 @@ def _section_payload(package: dict[str, Any]) -> list[dict[str, Any]]:
     return payload
 
 
+def _compact_section_payload(package: dict[str, Any], max_chars: int = 18000) -> list[dict[str, Any]]:
+    """Keep representative note content in the prompt without exceeding provider token limits."""
+    selected: list[dict[str, Any]] = []
+    used = 0
+    for section in _section_payload(package):
+        compact = {
+            "title": section.get("title"),
+            "topics": section.get("topics") or [],
+            "content": section.get("content") or "",
+            "key_points": section.get("key_points") or [],
+            "definitions": section.get("definitions") or [],
+            "examples": section.get("examples") or [],
+        }
+        serialized = json.dumps(compact, ensure_ascii=True)
+        remaining = max_chars - used
+        if remaining <= 0:
+            break
+        if len(serialized) > remaining:
+            if selected:
+                continue
+            compact["content"] = str(compact.get("content") or "")[:max(1000, remaining // 2)]
+            compact["key_points"] = (compact.get("key_points") or [])[:4]
+            serialized = json.dumps(compact, ensure_ascii=True)
+        if len(serialized) <= remaining:
+            selected.append(compact)
+            used += len(serialized)
+    return selected
+
+
 def rank_question_quality(question: dict[str, Any]) -> float:
     text = _question_text(question)
     q_type = str(question.get("type") or "").lower()
@@ -229,7 +258,7 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         "- Set concept_id to a concise, specific concept tested by the question; reuse the same name for the same concept across questions. Do not use the document title unless it is itself the concept.\n"
         "- Do not use repeated stems or generic wording.\n\n"
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)}\n\n"
-        f"Synthesized note sections:\n{json.dumps(_section_payload(package), ensure_ascii=True)[:90000]}"
+        f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package), ensure_ascii=True)}"
     )
     payload = generate_structured_json(system_prompt, user_prompt, "intelligent_quiz", QUIZ_SCHEMA, temperature=0.32)
     return payload.get("questions") or []
@@ -355,17 +384,31 @@ def generate_exam_style_questions(
     limit: int,
     memory: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    candidate_limit = max(limit * 3, limit + 10)
+    # The caller may already request extra questions for filtering. Avoid
+    # multiplying that pool again and overwhelming providers' token-per-minute limits.
+    candidate_limit = min(60, max(limit + 8, int(limit * 1.5)))
+    source_text = str(package.get("retrieved_source_text") or "")
+    requested_topic = str(package.get("quiz_topic") or "")
+
+    candidates: list[dict[str, Any]] = []
     if has_llm_support():
         try:
             candidates = _llm_candidates(package, candidate_limit)
         except Exception:
-            candidates = _fallback_candidates(package, candidate_limit)
-    else:
-        candidates = _fallback_candidates(package, candidate_limit)
-    source_text = str(package.get("retrieved_source_text") or "")
-    requested_topic = str(package.get("quiz_topic") or "")
-    candidates = [question for question in candidates if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)]
+            candidates = []
+    candidates = [
+        question for question in candidates
+        if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)
+    ]
+
+    # Invalid structured output is not an exception; still try the strict
+    # source-note fallback when no candidate survives validation.
+    if not candidates:
+        fallback = _fallback_candidates(package, candidate_limit)
+        candidates = [
+            question for question in fallback
+            if isinstance(question, dict) and _valid_mcq(question, source_text, requested_topic)
+        ]
     selected = _select_diverse(candidates, limit, memory=memory)
     random.shuffle(selected)
     return selected
