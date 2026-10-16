@@ -97,6 +97,7 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
   const [deadlineTopic, setDeadlineTopic] = useState("");
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineText, setDeadlineText] = useState("");
+  const [deadlineEditIndex, setDeadlineEditIndex] = useState(null);
   const [rescheduleAt, setRescheduleAt] = useState("");
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -272,14 +273,17 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
       toast?.("Enter the topic and deadline date.", "coral");
       return;
     }
-    const deadlines = [...(preferences.deadlines || []), { topic: deadlineTopic.trim(), text: deadlineText.trim() || deadlineTopic.trim(), date: new Date(deadlineDate + "T23:59:00").toISOString() }];
+    const deadlines = [...(preferences.deadlines || [])];
+    const item = { topic: deadlineTopic.trim(), text: deadlineText.trim() || deadlineTopic.trim(), date: new Date(deadlineDate + "T23:59:00").toISOString() };
+    if (deadlineEditIndex == null) deadlines.push(item);
+    else deadlines[deadlineEditIndex] = item;
     const next = { ...preferences, deadlines };
     setBusy("deadline");
     try {
       const result = await savePlannerPreferences(next);
       setPreferences({ ...DEFAULT_PREFS, ...(result.preferences || next) });
-      setDeadlineTopic(""); setDeadlineDate(""); setDeadlineText("");
-      toast?.("Deadline saved. Generate the plan again to apply it.", "teal");
+      setDeadlineTopic(""); setDeadlineDate(""); setDeadlineText(""); setDeadlineEditIndex(null);
+      toast?.(deadlineEditIndex == null ? "Deadline saved. Generate the plan again to apply it." : "Deadline updated. Generate the plan again to apply it.", "teal");
     } catch (err) {
       toast?.(err?.message || "Could not save this deadline.", "coral");
     } finally { setBusy(""); }
@@ -442,16 +446,20 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
           <label>Plan ahead (days)<input type="number" min="1" max="60" value={preferences.planning_days} onChange={(event) => setPreferences((value) => ({ ...value, planning_days: Number(event.target.value) }))} required/></label>
           <label>Start hour (0–23)<input type="number" min="0" max="23" value={preferences.preferred_start_hour} onChange={(event) => setPreferences((value) => ({ ...value, preferred_start_hour: Number(event.target.value) }))} required/></label>
           <label>End hour (1–24)<input type="number" min="1" max="24" value={preferences.preferred_end_hour} onChange={(event) => setPreferences((value) => ({ ...value, preferred_end_hour: Number(event.target.value) }))} required/></label>
+          <div className="lj-topic-importance"><b>Topic importance</b><p>Increase a topic's importance when an exam or goal makes it especially relevant.</p>
+            {topicNames.length ? topicNames.map((topic) => <label key={topic}><span>{topic}</span><select value={preferences.topic_importance?.[topic] ?? 0.5} onChange={(event) => setPreferences((value) => ({ ...value, topic_importance: { ...(value.topic_importance || {}), [topic]: Number(event.target.value) } }))}><option value={0.25}>Low</option><option value={0.5}>Normal</option><option value={0.75}>High</option><option value={1}>Critical</option></select></label>) : <small>No topics available yet. Complete a quiz to establish tracked topics.</small>}
+          </div>
           <button className="lj-btn primary" disabled={busy === "preferences"}>{busy === "preferences" ? "Saving…" : "Save preferences"}</button>
         </form>}
         <form className="lj-deadline-form" onSubmit={addDeadline}>
-          <b>Add exam or deadline</b>
+          <b>{deadlineEditIndex == null ? "Add exam or deadline" : "Edit exam or deadline"}</b>
           <label>Related topic<input value={deadlineTopic} onChange={(event) => setDeadlineTopic(event.target.value)} placeholder="Topic to prioritize" maxLength={120} required/></label>
           <label>Due date<input type="date" value={deadlineDate} onChange={(event) => setDeadlineDate(event.target.value)} required/></label>
           <label>Label (optional)<input value={deadlineText} onChange={(event) => setDeadlineText(event.target.value)} placeholder="Exam / assignment" maxLength={160}/></label>
-          <button className="lj-btn" disabled={busy === "deadline"}>{busy === "deadline" ? "Saving…" : "Save deadline"}</button>
+          <button className="lj-btn" disabled={busy === "deadline"}>{busy === "deadline" ? "Saving…" : deadlineEditIndex == null ? "Save deadline" : "Update deadline"}</button>
+          {deadlineEditIndex != null && <button type="button" className="lj-btn subtle" onClick={() => { setDeadlineEditIndex(null); setDeadlineTopic(""); setDeadlineDate(""); setDeadlineText(""); }}>Cancel edit</button>}
         </form>
-        {(preferences.deadlines || []).length > 0 && <div className="lj-deadlines">{preferences.deadlines.map((deadline, index) => <div className="lj-deadline-row" key={deadline.topic + deadline.date + index}><span><b>{deadline.text || deadline.topic}</b><small>{deadline.topic} · {formatDate(deadline.date, { day: "numeric", month: "short", year: "numeric" })}</small></span><button aria-label={"Remove " + (deadline.text || deadline.topic)} onClick={() => removeDeadline(index)}>×</button></div>)}</div>}
+        {(preferences.deadlines || []).length > 0 && <div className="lj-deadlines">{preferences.deadlines.map((deadline, index) => <div className="lj-deadline-row" key={deadline.topic + deadline.date + index}><span><b>{deadline.text || deadline.topic}</b><small>{deadline.topic} · {formatDate(deadline.date, { day: "numeric", month: "short", year: "numeric" })}</small></span><button className="lj-deadline-edit" type="button" onClick={() => { const parsed = parseDate(deadline.date); const localDay = parsed ? new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : ""; setDeadlineEditIndex(index); setDeadlineTopic(deadline.topic || ""); setDeadlineDate(localDay); setDeadlineText(deadline.text || ""); }}>{ "Edit" }</button><button className="lj-deadline-remove" type="button" aria-label={"Remove " + (deadline.text || deadline.topic)} onClick={() => removeDeadline(index)}>×</button></div>)}</div>}
       </div>
     </section>
     {error && <div className="lj-inline-error" role="alert">{error} <button onClick={load}>Retry</button></div>}
