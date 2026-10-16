@@ -213,7 +213,25 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
             words = fact.split()
             if len(words) < 7 or not fact:
                 continue
-            concept = fact.split(":", 1)[0].strip() if ":" in fact else " ".join(words[:4])
+            if ":" in fact:
+                concept = fact.split(":", 1)[0].strip()
+            else:
+                predicates = {
+                    "is", "are", "refers", "means", "protects", "ensures", "enables",
+                    "provides", "allows", "describes", "defines", "uses", "prevents",
+                    "supports", "verifies", "represents", "consists", "includes",
+                    "involves", "helps", "maintains", "contains", "requires",
+                }
+                predicate_index = next(
+                    (i for i, word in enumerate(words[:6]) if i > 0 and word.lower().strip(".,:;!?") in predicates),
+                    None,
+                )
+                if predicate_index is not None:
+                    concept = " ".join(words[:predicate_index])
+                elif words[0].lower().strip(".,:;!?") in {"the", "a", "an", "when", "if", "this", "that"}:
+                    concept = " ".join(words[:4])
+                else:
+                    concept = words[0]
             concept = concept.strip(" .,:;!?-–—")
             if not concept or concept.lower() == title.lower():
                 concept = " ".join(words[:4]).strip(" .,:;!?-–—")
