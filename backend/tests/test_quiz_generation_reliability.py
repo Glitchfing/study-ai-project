@@ -36,6 +36,18 @@ class QuizGenerationReliabilityTests(unittest.TestCase):
         self.assertIn("Need 12 candidate questions before filtering.", prompt)
         self.assertLess(len(prompt), 22000)
 
+    def test_compaction_prioritizes_the_requested_topic(self):
+        package = {
+            "quiz_topic": "tokenization",
+            "sections": [
+                {"title": "Servlet basics", "topics": ["Java"], "content": "Servlet lifecycle handles web requests."},
+                {"title": "Tokenization", "topics": ["NLP tokenization"], "content": "Tokenization splits text into tokens."},
+            ],
+        }
+        sections = quiz._compact_section_payload(package, max_chars=1000)
+        self.assertGreaterEqual(len(sections), 1)
+        self.assertEqual(sections[0]["title"], "Tokenization")
+
     def test_fallback_generates_only_grounded_four_option_mcqs_from_prose(self):
         candidates = quiz._fallback_candidates(self._prose_package(), limit=5)
         self.assertGreaterEqual(len(candidates), 1)
