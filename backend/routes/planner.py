@@ -88,8 +88,7 @@ def _task_done(task: dict[str, Any]) -> bool:
     return bool(task.get("done")) or task.get("status") == "completed"
 
 
-def _task_timestamp(task: dict[str, Any]) -> datetime | None:
-    raw = task.get("scheduled_at") or task.get("due_date")
+def _parse_datetime(raw: Any) -> datetime | None:
     if not raw:
         return None
     try:
@@ -97,6 +96,15 @@ def _task_timestamp(task: dict[str, Any]) -> datetime | None:
         return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
     except (ValueError, TypeError):
         return None
+
+
+def _task_timestamp(task: dict[str, Any]) -> datetime | None:
+    return _parse_datetime(task.get("scheduled_at") or task.get("due_date"))
+
+
+def _deadline_timestamp(task: dict[str, Any]) -> datetime | None:
+    """Prioritize the original due date when reporting overdue work."""
+    return _parse_datetime(task.get("original_due_date") or task.get("due_date") or task.get("scheduled_at"))
 
 
 def _duration(task: dict[str, Any]) -> int:
@@ -173,7 +181,7 @@ def _candidate_topics() -> list[dict[str, Any]]:
         if stats.get("trend_label") == "declining":
             explanation_parts.append("recent performance is declining")
         if due_at:
-            explanation_parts.append("a matching user-provided deadline is relevant")
+            explanation_parts.append("the user-provided deadline has passed; schedule catch-up revision" if due_at < now else "a matching user-provided deadline is relevant")
         if stats.get("mastery") is None:
             explanation_parts.append("assessment evidence is insufficient; use a diagnostic")
         candidates.append({
@@ -259,9 +267,9 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
         "preferences": {**{"daily_minutes": 60, "planning_days": 7, "preferred_start_hour": 18, "preferred_end_hour": 22, "topic_importance": {}}, **preferences},
         "summary": {
             "topics_tracked": len(topics),
-            "topics_needing_revision": sum(1 for topic in topics if isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7),
-            "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and (_task_timestamp(task) or datetime.min.replace(tzinfo=timezone.utc)) >= _utc_now()),
-            "overdue_tasks": sum(1 for task in tasks if not _task_done(task) and _task_timestamp(task) and _task_timestamp(task) < _utc_now()),
+            "topics_needing_revision": sum(1 for topic in topics if (isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7) or topic.get("trend_label") == "declining"),
+            "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and _scheduled_timestamp(task) and _scheduled_timestamp(task) >= _utc_now()),
+            "overdue_tasks": sum(1 for task in tasks if not _task_done(task) and _deadline_timestamp(task) and _deadline_timestamp(task) < _utc_now()),
             "completed_milestones": sum(1 for task in tasks if _task_done(task)),
         },
     }
@@ -298,8 +306,9 @@ def auto_schedule():
         slots = _eligible_slots(prefs, now, int(prefs["planning_days"]))
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
         current = [task for task in existing if not _task_done(task)]
-        pending_ids = {task.get("id") for task in pending_generated.values()}
-        occupied = [task for task in current if task.get("origin") != "auto" or task.get("id") not in pending_ids]
+        candidate_topic_ids = {re.sub(r"[^a-z0-9]+", "-", str(item["topic"]).lower()).strip("-") for item in topics}
+        pending_ids = {task.get("id") for key, task in pending_generated.items() if key in candidate_topic_ids}
+        occupied = [task for task in current if task.get("id") not in pending_ids]
         planned_today: dict[str, int] = {}
         updated_tasks = [dict(task) for task in existing]
         for reserved_task in occupied:
@@ -328,7 +337,7 @@ def auto_schedule():
             for slot in slots:
                 if (slot.date().isoformat(),) and planned_today.get(slot.astimezone(STUDY_TZ).date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
                     continue
-                if candidate["due_at"] and slot > candidate["due_at"]:
+                if candidate["due_at"] and candidate["due_at"] >= now and slot > candidate["due_at"]:
                     continue
                 if any(_overlap(slot, duration, other) for other in occupied):
                     continue
