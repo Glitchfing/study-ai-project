@@ -22,7 +22,15 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 TASKS_PATH = DATA_DIR / "revision_tasks.json"
 PREFERENCES_PATH = DATA_DIR / "planner_preferences.json"
 _LOCK = threading.RLock()
-from scheduling_config import PRIORITY_WEIGHTS as _PRIORITY_WEIGHTS, DEFAULT_DURATIONS as _DURATION_MINUTES
+from scheduling_config import (
+    PRIORITY_WEIGHTS as _PRIORITY_WEIGHTS,
+    DEFAULT_DURATIONS as _DURATION_MINUTES,
+    DEFAULT_DAILY_MINUTES,
+    DEFAULT_PLANNING_DAYS,
+    DEFAULT_START_HOUR,
+    DEFAULT_END_HOUR,
+    MASTERY_THRESHOLDS,
+)
 
 STUDY_TZ = ZoneInfo("Asia/Kolkata")
 
@@ -76,10 +84,10 @@ class TaskEdit(BaseModel):
 
 
 class PlannerPreferences(BaseModel):
-    daily_minutes: int = Field(default=60, ge=15, le=600)
-    planning_days: int = Field(default=7, ge=1, le=60)
-    preferred_start_hour: int = Field(default=18, ge=0, le=23)
-    preferred_end_hour: int = Field(default=22, ge=1, le=24)
+    daily_minutes: int = Field(default=DEFAULT_DAILY_MINUTES, ge=15, le=600)
+    planning_days: int = Field(default=DEFAULT_PLANNING_DAYS, ge=1, le=60)
+    preferred_start_hour: int = Field(default=DEFAULT_START_HOUR, ge=0, le=23)
+    preferred_end_hour: int = Field(default=DEFAULT_END_HOUR, ge=1, le=24)
     topic_importance: dict[str, float] = Field(default_factory=dict)
     deadlines: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -122,14 +130,14 @@ def _priority_label(score: float) -> str:
     return "high" if score >= .68 else "med" if score >= .40 else "low"
 
 
-def calculate_priority(topic: dict[str, Any], *, now: datetime, due_at: datetime | None, importance: float = 0.5) -> tuple[float, dict[str, float]]:
+def calculate_priority(topic: dict[str, Any], *, now: datetime, due_at: datetime | None, importance: float = 0.5, overdue: bool = False) -> tuple[float, dict[str, float]]:
     mastery = topic.get("mastery")
     weakness = max(0.0, min(1.0, 1 - float(mastery))) if isinstance(mastery, (int, float)) else 0.0
     trend = topic.get("trend_label")
     decline = min(1.0, abs(float(topic.get("trend") or 0)) / .5) if trend == "declining" else 0.0
     if due_at:
         hours = (due_at - now).total_seconds() / 3600
-        urgency = 1.0 if hours < 0 else max(0.0, min(1.0, 1 - hours / (24 * 14)))
+        urgency = 1.0 if hours < 0 or overdue else max(0.0, min(1.0, 1 - hours / (24 * 14)))
     else:
         urgency = 0.0
     uncertainty = max(0.0, 1 - float(topic.get("evidence_confidence") or 0)) if mastery is not None else 1.0
@@ -165,13 +173,24 @@ def _candidate_topics() -> list[dict[str, Any]]:
             if target and (target == name.lower() or name.lower() in target or target in name.lower()):
                 due_at = _task_timestamp({"due_date": deadline.get("date")})
                 break
-        priority, factors = calculate_priority(stats, now=now, due_at=due_at, importance=float(importance_map.get(name, .5)))
+        topic_key = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        overdue_task = next((
+            task for task in TASKS
+            if not _task_done(task)
+            and re.sub(r"[^a-z0-9]+", "-", str(task.get("topic") or "").lower()).strip("-") == topic_key
+            and _deadline_timestamp(task) is not None
+            and _deadline_timestamp(task) < now
+        ), None)
+        priority, factors = calculate_priority(
+            stats, now=now, due_at=due_at, importance=float(importance_map.get(name, .5)),
+            overdue=overdue_task is not None,
+        )
         # Low-confidence topics receive a short diagnostic, not a false weak label.
         if stats.get("mastery") is None:
             kind, title, minutes = "assessment", f"Assess understanding: {name}", _DURATION_MINUTES["assessment"]
-        elif float(stats["mastery"]) < .6 or stats.get("trend_label") == "declining":
+        elif float(stats["mastery"]) < MASTERY_THRESHOLDS["needs_practice"] or stats.get("trend_label") == "declining":
             kind, title, minutes = "targeted_practice", f"Targeted revision: {name}", _DURATION_MINUTES["targeted_practice"]
-        elif float(stats["mastery"]) < .8:
+        elif float(stats["mastery"]) < MASTERY_THRESHOLDS["strong"]:
             kind, title, minutes = "deep_revision", f"Review topic: {name}", _DURATION_MINUTES["deep_revision"]
         else:
             kind, title, minutes = "quick_review", f"Spaced review: {name}", _DURATION_MINUTES["quick_review"]
@@ -180,6 +199,8 @@ def _candidate_topics() -> list[dict[str, Any]]:
             explanation_parts.append(f"measured mastery {round(stats['mastery'] * 100)}%")
         if stats.get("trend_label") == "declining":
             explanation_parts.append("recent performance is declining")
+        if overdue_task:
+            explanation_parts.append("an existing task for this topic is overdue")
         if due_at:
             explanation_parts.append("the user-provided deadline has passed; schedule catch-up revision" if due_at < now else "a matching user-provided deadline is relevant")
         if stats.get("mastery") is None:
@@ -267,7 +288,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
     deadlines = preferences.get("deadlines") or []
     return {
         "tasks": tasks, "deadlines": deadlines, "topics": topics, "events": events,
-        "preferences": {**{"daily_minutes": 60, "planning_days": 7, "preferred_start_hour": 18, "preferred_end_hour": 22, "topic_importance": {}}, **preferences},
+        "preferences": {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "topic_importance": {}}, **preferences},
         "summary": {
             "topics_tracked": len(topics),
             "topics_needing_revision": sum(1 for topic in topics if (isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7) or topic.get("trend_label") == "declining"),
@@ -281,7 +302,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
 @router.get("/preferences")
 def get_preferences():
     saved = _read_preferences()
-    return {**{"daily_minutes": 60, "planning_days": 7, "preferred_start_hour": 18, "preferred_end_hour": 22, "topic_importance": {}, "deadlines": []}, **saved}
+    return {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "topic_importance": {}, "deadlines": []}, **saved}
 
 
 @router.put("/preferences")
@@ -334,6 +355,22 @@ def auto_schedule():
                     task = updated_tasks[idx]
             else:
                 task = None
+                # A pending manual task already covers this topic; enrich its evidence,
+                # but never create a duplicate automatic task or overwrite its chosen slot.
+                manual_match = next((
+                    item for item in current
+                    if item.get("origin") != "auto"
+                    and re.sub(r"[^a-z0-9]+", "-", str(item.get("topic") or "").lower()).strip("-") == topic_id
+                ), None)
+                if manual_match:
+                    manual_index = next((i for i, row in enumerate(updated_tasks) if row.get("id") == manual_match.get("id")), None)
+                    if manual_index is not None:
+                        updated_tasks[manual_index]["priority_score"] = candidate["priority_score"]
+                        updated_tasks[manual_index]["priority"] = _priority_label(candidate["priority_score"])
+                        updated_tasks[manual_index]["priority_reason"] = candidate["reason"]
+                        updated_tasks[manual_index]["evidence"] = {"mastery": candidate["stats"].get("mastery"), "trend": candidate["stats"].get("trend_label"), "factors": candidate["factors"]}
+                    retained += 1
+                    continue
             chosen = None
             duration = candidate["duration_minutes"]
             for slot in slots:
