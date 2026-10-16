@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -86,6 +87,25 @@ class DashboardDataIntegrationTests(unittest.TestCase):
                 saved = json.loads(log_path.read_text(encoding="utf-8"))
                 self.assertEqual(len(saved), 1)
                 self.assertEqual(saved[0]["score"], 80)
+
+    def test_concurrent_activity_writes_preserve_all_events(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            log_path = data_dir / "activity_events.json"
+            with patch.object(activity, "DATA_DIR", data_dir), \
+                 patch.object(activity, "ACTIVITY_PATH", log_path), \
+                 patch.object(activity, "ACTIVITY_LOG", []):
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    list(pool.map(
+                        lambda index: activity.record_activity(
+                            "quiz_completed", attempt_id=f"attempt-{index}", score=index
+                        ),
+                        range(40),
+                    ))
+                saved = json.loads(log_path.read_text(encoding="utf-8"))
+                self.assertEqual(len(saved), 40)
+                self.assertEqual(len({item["attempt_id"] for item in saved}), 40)
+                self.assertFalse(list(data_dir.glob("activity_events_*.tmp")))
 
 
 if __name__ == "__main__":
