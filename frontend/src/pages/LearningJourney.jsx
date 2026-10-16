@@ -8,7 +8,7 @@ import "../styles/learning-journey.css";
 
 const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 7, preferred_start_hour: 18, preferred_end_hour: 22, topic_importance: {}, deadlines: [] };
 const TYPE_LABELS = {
-  quiz_completed: "Quiz completed", note_view: "Note reviewed",
+  quiz_completed: "Quiz completed", note_view: "Note reviewed", deadline: "Upcoming deadline",
   study_session_completed: "Study session", planner_task_done: "Revision completed",
   planner_task_edited: "Task updated", revision: "Revision task",
 };
@@ -197,7 +197,20 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     setBusy("start");
     try {
       const result = await startStudySession(topic);
-      setActiveSession(result?.session || result?.active || null);
+      const session = result?.session || result?.active || null;
+      setActiveSession(session);
+      if (result?.already_active && session?.topic && session.topic.toLowerCase() !== topic.toLowerCase()) {
+        toast?.("A study session is already active for " + session.topic + ". Finish it before starting another topic.", "coral");
+        return;
+      }
+      if (selectedTask) {
+        try {
+          await updatePlannerTask(selectedTask.id, { status: "in_progress" });
+          await load();
+        } catch (statusError) {
+          toast?.("Study session started, but the task status could not be updated: " + (statusError?.message || "please retry."), "coral");
+        }
+      }
       toast?.("Study session started for " + topic + ". End the session here when you finish to record measured time.", "teal");
       const noteId = selectedTask?.note_id || selectedTask?.linked_note_id;
       if (noteId) onNavigate?.("notes", { noteId });
@@ -345,7 +358,7 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
         return <button key={topic.topic} className={"lj-topic-card " + state.className + (topicFilter === topic.topic ? " selected" : "")} onClick={() => setTopicFilter(topicFilter === topic.topic ? "all" : topic.topic)}>
           <span className="lj-topic-top"><b>{topic.topic}</b><span className={"lj-state " + state.className}>{state.label}</span></span>
           {topic.mastery_pct == null ? <div className="lj-topic-unknown">Not enough assessment evidence</div> : <><div className="lj-topic-score">{Math.round(topic.mastery_pct)}<small>%</small></div><div className="lj-track"><i style={{ width: Math.max(0, Math.min(100, topic.mastery_pct)) + "%" }}/></div></>}
-          <div className="lj-topic-meta"><span>{topic.attempts || 0} attempt{topic.attempts === 1 ? "" : "s"}</span><span>{topic.last_reviewed_at ? "Last " + formatDate(topic.last_reviewed_at) : "No review date"}</span></div>
+          <div className="lj-topic-meta"><span>{topic.attempts || 0} attempt{topic.attempts === 1 ? "" : "s"}</span><span>{topic.last_reviewed_at ? "Assessed " + formatDate(topic.last_reviewed_at) : "No assessment date"}</span></div>
           <div className="lj-topic-foot">{topic.trend_label === "improving" ? "↗ Improving" : topic.trend_label === "declining" ? "↘ Declining" : topic.trend_label === "stable" ? "→ Stable" : "Evidence limited"}</div>
         </button>;
       })}</div> : <div className="lj-empty-inline"><Icon name="quiz"/><div><b>No topics assessed yet</b><p>Complete a quiz to establish topic-level performance. The timeline will not invent mastery scores.</p></div><button className="lj-btn" onClick={() => onNavigate?.("quiz")}>Practice a quiz <Icon name="arrow"/></button></div>}
@@ -375,9 +388,10 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
               const selectedNode = String(selected?.id) === String(event.id);
               const overdue = eventIsOverdue(event, tasks);
               const completed = String(event.status || "").includes("completed");
-              return <button key={event.id} className={"lj-timeline-node " + (event.source === "planner" ? "planned" : "historical") + (selectedNode ? " active" : "") + (overdue ? " overdue" : "") + (completed ? " completed" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
+              const inProgress = event.status === "in_progress";
+              return <button key={event.id} className={"lj-timeline-node " + ((event.source === "planner" || event.source === "deadline") ? "planned" : "historical") + (selectedNode ? " active" : "") + (overdue ? " overdue" : "") + (completed ? " completed" : "") + (inProgress ? " in-progress" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
                 <span className="lj-node-line" aria-hidden="true"/><span className="lj-node-dot">{completed ? "✓" : event.type === "quiz_completed" ? "Q" : event.type === "note_view" ? "N" : event.source === "planner" ? "↻" : "•"}</span>
-                <span className="lj-node-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}</span><b>{event.title || eventLabel(event)}</b><small>{event.topic || eventLabel(event)}</small><span className={"lj-event-status " + (overdue ? "overdue" : completed ? "completed" : event.source === "planner" ? "planned" : "history")}>{overdue ? "Overdue" : completed ? "Completed" : event.source === "planner" ? "Planned" : "Recorded"}</span>
+                <span className="lj-node-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}</span><b>{event.title || eventLabel(event)}</b><small>{event.topic || eventLabel(event)}</small><span className={"lj-event-status " + (overdue ? "overdue" : completed ? "completed" : event.source === "planner" ? "planned" : "history")}>{overdue ? "Overdue" : completed ? "Completed" : inProgress ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</span>
                 <span className="lj-timeline-card"><b>{event.title || eventLabel(event)}</b><small>{event.reason || eventLabel(event)}</small><span>{formatDateTime(event.timestamp)}</span></span>
                 {index === 0 && <span className="lj-first-marker">EARLIER</span>}
               </button>;
@@ -393,7 +407,7 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
             <div className="lj-detail-facts">
               <div><small>Topic</small><b>{selected.topic || "Not linked"}</b></div>
               <div><small>Date / time</small><b>{formatDateTime(selected.timestamp)}</b></div>
-              <div><small>Status</small><b>{selectedTask ? (isCompleted(selectedTask) ? "Completed" : (eventIsOverdue(selected, tasks) ? "Overdue" : "Planned")) : "Recorded activity"}</b></div>
+              <div><small>Status</small><b>{selectedTask ? (isCompleted(selectedTask) ? "Completed" : selectedTask.status === "in_progress" ? "In progress" : (eventIsOverdue(selected, tasks) ? "Overdue" : "Planned")) : selected.source === "deadline" ? "Upcoming deadline" : "Recorded activity"}</b></div>
               <div><small>Duration</small><b>{selected.duration_minutes ? selected.duration_minutes + " min estimated" : selectedTask ? (selectedTask.est || "Not specified") + " estimated" : "Not recorded"}</b></div>
               {selectedTask?.priority && <div><small>Priority</small><b className={"lj-priority " + selectedTask.priority}>{selectedTask.priority.toUpperCase()}</b></div>}
               {selectedTask?.original_due_date && <div><small>Original deadline</small><b>{formatDateTime(selectedTask.original_due_date)}</b></div>}
