@@ -90,3 +90,10 @@
 .rf-recommendation-controls button:hover {
   border-color: var(--rf-teal, #119da4);
 }
+
+
+/* Measured study-session lifecycle controls; preserves the existing dashboard theme. */
+.rf-study-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rf-study-controls .rf-link-button{margin:0}
+.rf-study-controls .rf-link-button.secondary{border:1px solid var(--rf-border,rgba(255,255,255,.14));background:transparent;color:var(--rf-text,#e7ffff)}
+.rf-study-controls .rf-link-button:disabled{opacity:.6;cursor:wait}
