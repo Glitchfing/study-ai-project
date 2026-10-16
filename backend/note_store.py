@@ -813,3 +813,58 @@ def is_note_quality_valid(
 GENERATED_NOTES.update(
     _load_generated_notes()
 )
+
+# ============================================================
+# DELETE SAVED GENERATED NOTE
+# ============================================================
+def _collect_diagram_paths(value: Any) -> set[Path]:
+    """Collect only local diagram files owned by a generated note."""
+    paths: set[Path] = set()
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in {"image_url", "diagram_url", "src"} and isinstance(child, str):
+                normalized = child.split("?", 1)[0].replace("\\", "/")
+                marker = "/static/diagrams/"
+                if marker in normalized:
+                    relative = normalized.split(marker, 1)[1]
+                    candidate = (BASE_DIR / "static" / "diagrams" / relative).resolve()
+                    diagrams_root = (BASE_DIR / "static" / "diagrams").resolve()
+                    if candidate != diagrams_root and diagrams_root in candidate.parents:
+                        paths.add(candidate)
+            else:
+                paths.update(_collect_diagram_paths(child))
+    elif isinstance(value, list):
+        for child in value:
+            paths.update(_collect_diagram_paths(child))
+    return paths
+
+
+def delete_generated_note(note_id: str) -> bool:
+    """
+    Permanently delete a generated note and its exclusively referenced local
+    diagram images. Static/example notes are intentionally not deletable.
+    """
+    record = GENERATED_NOTES.get(note_id)
+    if record is None:
+        return False
+
+    diagram_paths = _collect_diagram_paths(record)
+    del GENERATED_NOTES[note_id]
+    try:
+        _save_generated_notes()
+    except Exception:
+        GENERATED_NOTES[note_id] = record
+        raise
+
+    # Keep any diagram file still referenced by another generated note.
+    shared_paths: set[Path] = set()
+    for other_record in GENERATED_NOTES.values():
+        shared_paths.update(_collect_diagram_paths(other_record))
+    for path in diagram_paths - shared_paths:
+        try:
+            if path.is_file():
+                path.unlink()
+        except OSError:
+            # Note deletion should succeed even if an orphan image is locked.
+            pass
+    return True
