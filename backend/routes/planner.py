@@ -7,6 +7,7 @@ import threading
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,8 +22,9 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 TASKS_PATH = DATA_DIR / "revision_tasks.json"
 PREFERENCES_PATH = DATA_DIR / "planner_preferences.json"
 _LOCK = threading.RLock()
-_PRIORITY_WEIGHTS = {"weakness": .35, "decline": .20, "urgency": .20, "importance": .15, "uncertainty": .10}
-_DURATION_MINUTES = {"quick_review": 15, "targeted_practice": 20, "deep_revision": 30, "assessment": 15}
+from scheduling_config import PRIORITY_WEIGHTS as _PRIORITY_WEIGHTS, DEFAULT_DURATIONS as _DURATION_MINUTES
+
+STUDY_TZ = ZoneInfo("Asia/Kolkata")
 
 
 def _utc_now() -> datetime:
@@ -180,7 +182,7 @@ def _candidate_topics() -> list[dict[str, Any]]:
             "reason": "; ".join(explanation_parts) or "Prioritized using the available learning evidence.",
             "due_at": due_at,
         })
-    return sorted(candidates, key=lambda item: (item["priority_score"], item["due_at"] or datetime.max.replace(tzinfo=timezone.utc)), reverse=True)
+    return sorted(candidates, key=lambda item: (-item["priority_score"], item["due_at"] or datetime.max.replace(tzinfo=timezone.utc)))
 
 
 def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[datetime]:
@@ -189,7 +191,7 @@ def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[
     if end_hour <= start_hour:
         end_hour = min(24, start_hour + 2)
     slots: list[datetime] = []
-    local_now = now.astimezone()
+    local_now = now.astimezone(STUDY_TZ)
     for offset in range(horizon):
         day = (local_now + timedelta(days=offset)).date()
         cursor = datetime.combine(day, time(hour=start_hour), tzinfo=local_now.tzinfo)
@@ -202,8 +204,20 @@ def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[
     return slots
 
 
+def _scheduled_timestamp(task: dict[str, Any]) -> datetime | None:
+    """Parse a scheduled slot only; deadlines are not calendar occupancy."""
+    raw = task.get("scheduled_at")
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
 def _overlap(start: datetime, duration: int, task: dict[str, Any]) -> bool:
-    other = _task_timestamp(task)
+    other = _scheduled_timestamp(task)
     if not other:
         return False
     other_duration = _duration(task)
@@ -285,6 +299,11 @@ def auto_schedule():
         current = [task for task in existing if not _task_done(task)]
         planned_today: dict[str, int] = {}
         updated_tasks = [dict(task) for task in existing]
+        for reserved_task in occupied:
+            reserved_at = _scheduled_timestamp(reserved_task)
+            if reserved_at:
+                day_key = reserved_at.astimezone(STUDY_TZ).date().isoformat()
+                planned_today[day_key] = planned_today.get(day_key, 0) + _duration(reserved_task)
         occupied = [task for task in current if task.get("origin") != "auto" or task.get("id") not in {v.get("id") for v in pending_generated.values()}]
         for candidate in topics:
             topic = candidate["topic"]
@@ -305,7 +324,7 @@ def auto_schedule():
             chosen = None
             duration = candidate["duration_minutes"]
             for slot in slots:
-                if (slot.date().isoformat(),) and planned_today.get(slot.date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
+                if (slot.date().isoformat(),) and planned_today.get(slot.astimezone(STUDY_TZ).date().isoformat(), 0) + duration > int(prefs["daily_minutes"]):
                     continue
                 if candidate["due_at"] and slot > candidate["due_at"]:
                     continue
@@ -338,11 +357,11 @@ def auto_schedule():
                 task["est"] = f"{duration} min"
                 task["scheduled_at"] = chosen.isoformat(timespec="seconds")
                 task["due_date"] = task.get("original_due_date") or (candidate["due_at"].isoformat(timespec="seconds") if candidate["due_at"] else None)
-                task["day"] = "today" if chosen.astimezone().date() == now.astimezone().date() else "upcoming"
-                task["date"] = chosen.astimezone().strftime("%a, %d %b · %H:%M")
+                task["day"] = "today" if chosen.astimezone(STUDY_TZ).date() == now.astimezone(STUDY_TZ).date() else "upcoming"
+                task["date"] = chosen.astimezone(STUDY_TZ).strftime("%a, %d %b · %H:%M")
                 task["updated_at"] = now.isoformat(timespec="seconds")
                 task["status"] = "planned"
-                planned_today[chosen.date().isoformat()] = planned_today.get(chosen.date().isoformat(), 0) + duration
+                planned_today[chosen.astimezone(STUDY_TZ).date().isoformat()] = planned_today.get(chosen.astimezone(STUDY_TZ).date().isoformat(), 0) + duration
                 occupied.append(task)
         TASKS[:] = updated_tasks
         _persist_tasks()
