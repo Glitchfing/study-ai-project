@@ -8,13 +8,15 @@ import NotesView from "./pages/NotesView";
 import QuizModule from "./pages/QuizModule";
 import ChatInterface from "./pages/ChatInterface";
 import RevisionPlanner from "./pages/RevisionPlanner";
+import LearningJourney from "./pages/LearningJourney";
 import { useToast } from "./hooks/useToast";
 import { getDashboard, logActivity } from "./services/api";
 
 const FALLBACK_USER = { name: "RUTU", initials: "RU", role: "Individual Learning", streak: 0 };
+const initialView = () => window.location.pathname === "/learning-journey" ? "journey" : "dashboard";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState("dashboard");
+  const [currentView, setCurrentView] = useState(initialView);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
   const [selectedQuizNoteId, setSelectedQuizNoteId] = useState(null);
@@ -33,6 +35,12 @@ export default function App() {
 
   useEffect(() => { refreshDashboard(); }, [refreshDashboard]);
 
+  useEffect(() => {
+    const onPopState = () => setCurrentView(window.location.pathname === "/learning-journey" ? "journey" : "dashboard");
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const trackActivity = useCallback(async (event, shouldRefresh = true) => {
     try { await logActivity(event); }
     catch { /* Keep the UI responsive if activity telemetry is unavailable. */ }
@@ -47,6 +55,11 @@ export default function App() {
     else if (view === "quiz") setSelectedQuizTopic("");
     if (Object.prototype.hasOwnProperty.call(options, "recommendationId")) setSelectedRecommendationId(options.recommendationId || null);
     else if (view === "quiz") setSelectedRecommendationId(null);
+    if (view === "journey") {
+      if (window.location.pathname !== "/learning-journey") window.history.pushState({ view }, "", "/learning-journey");
+    } else if (window.location.pathname === "/learning-journey") {
+      window.history.pushState({ view }, "", "/");
+    }
     setCurrentView(view);
     setSidebarOpen(false);
     window.scrollTo(0, 0);
@@ -68,6 +81,7 @@ export default function App() {
         {currentView === "quiz" && <QuizModule {...sharedProps} selectedNoteId={selectedQuizNoteId} selectedQuizTopic={selectedQuizTopic} selectedRecommendationId={selectedRecommendationId} />}
         {currentView === "chat" && <ChatInterface {...sharedProps} />}
         {currentView === "planner" && <RevisionPlanner {...sharedProps} />}
+        {currentView === "journey" && <LearningJourney {...sharedProps} />}
       </div>
     </div>
   </>;
