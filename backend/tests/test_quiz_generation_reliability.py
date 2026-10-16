@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import unittest
-from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
-import intelligent_quiz_generator as quiz
+from services import intelligent_quiz_generator as quiz
 
 
 class QuizGenerationReliabilityTests(unittest.TestCase):
