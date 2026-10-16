@@ -428,7 +428,22 @@ def generate_exam_style_questions(
     # The caller may already request extra questions for filtering. Avoid
     # multiplying that pool again and overwhelming providers' token-per-minute limits.
     candidate_limit = min(40, max(limit + 6, int(limit * 1.5)))
-    source_text = str(package.get("retrieved_source_text") or "")
+    source_text = str(package.get("retrieved_source_text") or "").strip()
+    if not source_text:
+        # Existing saved notes may have no Qdrant document IDs. Their synthesized
+        # sections are still valid grounding evidence for quiz validation.
+        section_text = []
+        for section in package.get("sections") or []:
+            text = _clean(
+                section.get("content")
+                or section.get("educational_explanation")
+                or section.get("explanation")
+                or ""
+            )
+            if text:
+                section_text.append(text)
+        source_text = "\\n\\n".join(section_text)
+    source_text = source_text[:100000]
     requested_topic = str(package.get("quiz_topic") or "")
 
     candidates: list[dict[str, Any]] = []
