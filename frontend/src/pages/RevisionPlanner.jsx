@@ -3,6 +3,12 @@ import { getPlanner, toggleTask, autoSchedule, getDashboard, updatePlannerTask }
 
 const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const formatMinutes = (minutes) => `${Math.floor((Number(minutes)||0)/60)}h ${String((Number(minutes)||0)%60).padStart(2,"0")}m`;
+const formatDeadlineDate = (value) => {
+  const parsed = value ? new Date(value) : null;
+  return parsed && !Number.isNaN(parsed.getTime())
+    ? parsed.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : value || "";
+};
 
 export default function RevisionPlanner({ toast, refreshDashboard }) {
   const [tasks, setTasks] = useState([]);
@@ -82,12 +88,14 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
   }
 
   async function handleAutoSchedule() {
-    toast("✨ AI generating optimal schedule…", "teal");
+    toast("Generating a revision schedule from saved quiz history…", "teal");
     try {
       const res = await autoSchedule();
-      toast(`📅 ${res.message}`, "teal");
-    } catch {
-      toast("⚠️ Auto-schedule failed", "coral");
+      await loadPlannerData();
+      if (typeof refreshDashboard === "function") refreshDashboard();
+      toast(`Schedule saved · ${res.created_count || 0} created · ${res.rescheduled_count || 0} rescheduled · ${res.retained_count || 0} retained.`, "teal");
+    } catch (error) {
+      toast(error?.message || "Auto-schedule failed. Please retry.", "coral");
     }
   }
 
@@ -190,7 +198,7 @@ export default function RevisionPlanner({ toast, refreshDashboard }) {
                 <div key={i} className="upcoming-item">
                   <div className="upcoming-dot" style={{ background: d.color }} />
                   <div className="upcoming-text">{d.text}</div>
-                  <div className="upcoming-date">{d.date}</div>
+                  <div className="upcoming-date">{formatDeadlineDate(d.date)}</div>
                 </div>
               ))}
             </div>
