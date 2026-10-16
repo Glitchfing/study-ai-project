@@ -220,9 +220,13 @@ def _topic_summary(topic_mastery: dict[str, dict[str, Any]]) -> list[dict[str, A
 
 
 def _format_minutes(minutes: int) -> dict[str, Any]:
-    hours = minutes // 60
-    mins = minutes % 60
-    return {"value": str(hours), "suffix": f"h {mins:02d}m"}
+    minutes = max(0, int(minutes))
+    hours, mins = divmod(minutes, 60)
+    if hours == 0:
+        return {"value": str(mins), "suffix": "m"}
+    if mins == 0:
+        return {"value": str(hours), "suffix": "h"}
+    return {"value": str(hours), "suffix": f"h {mins}m"}
 
 
 def _study_seconds_from_activity(start_day: date | None = None, end_day: date | None = None) -> int:
