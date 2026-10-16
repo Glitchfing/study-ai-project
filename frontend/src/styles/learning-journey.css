@@ -117,3 +117,38 @@
   .lj-timeline-node{width:205px;min-width:205px}
   .lj-timeline-track{min-height:320px;padding-left:10px;padding-right:10px}
 }
+
+/* Connected month-lane timeline inspired by the supplied reference. */
+.lj-journey-board{min-width:0;overflow-x:auto;overflow-y:hidden;border:1px solid #1b4b4d;border-radius:14px;background:radial-gradient(ellipse at 10% 0%,#11a0a51b,transparent 35%),linear-gradient(135deg,#08191a,#0b2021 58%,#071718);scrollbar-width:thin;scrollbar-color:#2b7373 #08191a}
+.lj-journey-board-track{position:relative;display:flex;align-items:stretch;gap:0;width:max-content;min-width:100%;padding:25px 25px 30px}
+.lj-journey-board-track:before{content:"";position:absolute;top:55px;left:62px;right:62px;height:2px;background:linear-gradient(90deg,#e29578,#64b6ac 38%,#b7d6b9 68%,#64b6ac);opacity:.68}
+.lj-month-lane{position:relative;flex:0 0 300px;width:300px;min-height:370px;padding:0 19px 8px;border-right:1px solid #1b4142}
+.lj-month-lane:last-child{border-right:0}
+.lj-month-heading{position:relative;z-index:2;display:flex;align-items:center;gap:12px;min-height:61px;margin-bottom:17px}
+.lj-month-marker{flex:0 0 30px;width:30px;height:30px;display:grid;place-items:center;position:relative;border:1px solid #a4c76e;border-radius:9px;color:#17221a;background:#d7e95c;box-shadow:0 0 0 6px #d7e95c12,0 4px 15px #0004;font-size:9px;font-weight:800}
+.lj-month-marker i{position:absolute;left:50%;bottom:-10px;height:10px;width:1px;background:#6d9890}
+.lj-month-heading>div{display:grid;gap:4px}.lj-month-heading b{font-size:14px;letter-spacing:-.3px;color:#e8f5f2}.lj-month-heading small{font-size:9px;color:#7fa9a6}
+.lj-month-events{position:relative;display:flex;flex-direction:column;gap:13px;padding:0 0 0 15px}
+.lj-month-events:before{content:"";position:absolute;left:0;top:-2px;bottom:14px;width:1px;background:linear-gradient(#7daaa0,#316c6b 70%,transparent)}
+.lj-journey-event-card{position:relative;display:grid;grid-template-columns:32px minmax(0,1fr) 15px;align-items:start;gap:9px;width:100%;min-height:100px;padding:11px 10px;text-align:left;color:#e5f4f1;border:1px solid #2a5656;border-radius:12px;background:linear-gradient(145deg,#153233,#0d2425 75%);box-shadow:0 7px 18px #0002;transition:transform .18s,border-color .18s,box-shadow .18s}
+.lj-journey-event-card:nth-child(even){margin-left:8px;width:calc(100% - 8px)}
+.lj-journey-event-card:hover,.lj-journey-event-card.selected{transform:translateY(-2px);border-color:#62b9b1;box-shadow:0 0 0 2px #64b6ac16,0 9px 22px #0003}
+.lj-card-connector{position:absolute;left:-16px;top:24px;width:16px;height:1px;background:#64b6ac}
+.lj-card-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;border:1px solid #347b79;background:#103d3d;color:#c0fdfb;font-size:11px;font-weight:800}
+.lj-journey-event-card.quiz .lj-card-icon{border-color:#b58b73;background:#38291f;color:#ffc9a6}
+.lj-journey-event-card.note .lj-card-icon{border-color:#a3bd59;background:#30371c;color:#e1ed8c}
+.lj-journey-event-card.deadline .lj-card-icon,.lj-journey-event-card.overdue .lj-card-icon{border-color:#a96049;background:#3a211e;color:#ffb49a}
+.lj-journey-event-card.completed .lj-card-icon{background:#b5eee0;color:#073a37;border-color:#b5eee0}
+.lj-card-content{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.lj-card-date{font-size:8px;letter-spacing:.25px;color:#80b9b3}
+.lj-card-content>b{font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+.lj-card-content>span:not(.lj-card-status){font-size:9px;line-height:1.5;color:#a6c5c1;overflow-wrap:anywhere}
+.lj-card-status{display:inline-flex;border:1px solid #315b5c;border-radius:5px;padding:3px 6px;font-size:8px;color:#a9d6cf}
+.lj-card-status.done{border-color:#397d6a;color:#b4efd9;background:#123a32}.lj-card-status.late{border-color:#8f5742;color:#ffb79b;background:#3a241e}.lj-card-status.planned{border-color:#286d6e;color:#c0fdfb;background:#103233}
+.lj-card-open{align-self:center;color:#70bdb6;font-size:13px;opacity:.75}
+.lj-lane-bridge{position:absolute;top:55px;right:-1px;z-index:1;width:1px;height:28px;background:#64b6ac}
+.lj-lane-bridge:after{content:"";position:absolute;left:-3px;bottom:-1px;width:6px;height:6px;border-right:1px solid #64b6ac;border-bottom:1px solid #64b6ac;transform:rotate(45deg)}
+.lj-timeline-layout{grid-template-columns:minmax(0,1.7fr) minmax(270px,.8fr);align-items:stretch}
+.lj-detail-panel{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto}
+@media(max-width:1000px){.lj-timeline-layout{grid-template-columns:minmax(0,1fr)}.lj-detail-panel{position:relative;top:auto;max-height:none}.lj-month-lane{flex-basis:280px;width:280px}}
+@media(max-width:600px){.lj-journey-board-track{padding:20px 12px 22px}.lj-journey-board-track:before{left:45px;right:45px}.lj-month-lane{flex-basis:265px;width:265px;padding:0 13px 8px}.lj-month-heading b{font-size:13px}}

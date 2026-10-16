@@ -161,6 +161,21 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     return da - db;
   }), [events, range, bounds, topicFilter, eventFilter, statusFilter, tasks, topics]);
 
+  const timelineGroups = useMemo(() => {
+    const groups = new Map();
+    visibleEvents.forEach((event) => {
+      const stamp = parseDate(event.timestamp);
+      const key = stamp ? `${stamp.getFullYear()}-${String(stamp.getMonth() + 1).padStart(2, "0")}` : "unscheduled";
+      if (!groups.has(key)) groups.set(key, { key, date: stamp, events: [] });
+      groups.get(key).events.push(event);
+    });
+    return [...groups.values()].sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return a.date - b.date;
+    });
+  }, [visibleEvents]);
+
   const selected = visibleEvents.find((event) => String(event.id) === String(selectedId)) || visibleEvents[0] || null;
   const selectedTask = selected?.task_id != null ? tasks.find((task) => String(task.id) === String(selected.task_id)) : null;
 
@@ -408,20 +423,29 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
       </form>}
 
       <div className="lj-timeline-layout">
-        <div className="lj-timeline-scroll">
-          {visibleEvents.length ? <div className="lj-timeline-track">
-            {visibleEvents.map((event, index) => {
-              const selectedNode = String(selected?.id) === String(event.id);
-              const overdue = eventIsOverdue(event, tasks);
-              const completed = String(event.status || "").includes("completed");
-              const inProgress = event.status === "in_progress";
-              return <button key={event.id} className={"lj-timeline-node " + ((event.source === "planner" || event.source === "deadline") ? "planned" : "historical") + (selectedNode ? " active" : "") + (overdue ? " overdue" : "") + (completed ? " completed" : "") + (inProgress ? " in-progress" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
-                <span className="lj-node-line" aria-hidden="true"/><span className="lj-node-dot">{completed ? "✓" : event.type === "quiz_completed" ? "Q" : event.type === "note_view" ? "N" : event.source === "planner" ? "↻" : event.source === "deadline" ? "D" : "•"}</span>
-                <span className="lj-node-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}</span><b>{event.title || eventLabel(event)}</b><small>{event.topic || eventLabel(event)}</small><span className={"lj-event-status " + (overdue ? "overdue" : completed ? "completed" : (event.source === "planner" || event.source === "deadline") ? "planned" : inProgress ? "in-progress" : "history")}>{overdue ? "Overdue" : completed ? "Completed" : inProgress ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</span>
-                <span className="lj-timeline-card"><b>{event.title || eventLabel(event)}</b><small>{event.reason || eventLabel(event)}</small><span>{formatDateTime(event.timestamp)}</span></span>
-                {index === 0 && <span className="lj-first-marker">EARLIER</span>}
-              </button>;
-            })}
+        <div className="lj-journey-board" aria-label="Connected learning timeline">
+          {timelineGroups.length ? <div className="lj-journey-board-track">
+            {timelineGroups.map((group, groupIndex) => <section className="lj-month-lane" key={group.key}>
+              <div className="lj-month-heading">
+                <span className="lj-month-marker">{group.date ? String(group.date.getMonth() + 1).padStart(2, "0") : "…"}<i/></span>
+                <div><b>{group.date ? group.date.toLocaleDateString(undefined, { month: "long" }) : "Unscheduled"}</b><small>{group.date ? group.date.getFullYear() : "Date to be set"} · {group.events.length} {group.events.length === 1 ? "activity" : "activities"}</small></div>
+              </div>
+              <div className="lj-month-events">
+                {group.events.map((event) => {
+                  const overdue = eventIsOverdue(event, tasks);
+                  const completed = String(event.status || "").includes("completed");
+                  const selectedNode = String(selected?.id) === String(event.id);
+                  const eventKind = event.type === "quiz_completed" ? "quiz" : event.type === "note_view" ? "note" : event.source === "deadline" ? "deadline" : event.source === "planner" ? "revision" : "study";
+                  const task = tasks.find((item) => String(item.id) === String(event.task_id || "").replace(/^task-/, ""));
+                  return <button key={event.id} type="button" className={"lj-journey-event-card " + eventKind + (selectedNode ? " selected" : "") + (completed ? " completed" : "") + (overdue ? " overdue" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
+                    <span className="lj-card-connector" aria-hidden="true"/><span className="lj-card-icon">{completed ? "✓" : eventKind === "quiz" ? "Q" : eventKind === "note" ? "N" : eventKind === "revision" ? "↻" : eventKind === "deadline" ? "!" : "◷"}</span>
+                    <span className="lj-card-content"><small className="lj-card-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}{event.timestamp ? " · " + formatDateTime(event.timestamp).split(",").slice(-1)[0].trim() : ""}</small><b>{event.title || eventLabel(event)}</b><span>{event.topic || event.reason || eventLabel(event)}</span><small className={"lj-card-status " + (overdue ? "late" : completed ? "done" : "planned")}>{overdue ? "Overdue" : completed ? "Completed" : task?.status === "in_progress" ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</small></span>
+                    <span className="lj-card-open" aria-hidden="true">↗</span>
+                  </button>;
+                })}
+              </div>
+              {groupIndex < timelineGroups.length - 1 && <span className="lj-lane-bridge" aria-hidden="true"/>}
+            </section>)}
           </div> : <div className="lj-empty-timeline"><span className="lj-empty-symbol"><Icon name="calendar"/></span><h3>No activity in this view</h3><p>There are no persisted learning events or scheduled tasks matching these filters. Try another date range or complete a learning activity.</p><button className="lj-btn" onClick={() => { setRange("all"); setEventFilter("all"); setStatusFilter("all"); setTopicFilter("all"); }}>Show all activity</button></div>}
         </div>
 
