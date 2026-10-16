@@ -149,8 +149,8 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     if (eventFilter === "notes" && event.type !== "note_view") return false;
     if (eventFilter === "completed" && !String(event.status).includes("completed")) return false;
     if (eventFilter === "overdue" && !eventIsOverdue(event, tasks)) return false;
-    if (eventFilter === "weak" && !topics.some((topic) => topic.topic === event.topic && (topic.mastery_pct ?? 100) < 70)) return false;
-    if (statusFilter === "planned" && (event.source !== "planner" || String(event.status).includes("completed"))) return false;
+    if (eventFilter === "weak" && !topics.some((topic) => String(topic.topic || "").toLowerCase() === String(event.topic || "").toLowerCase() && ((topic.mastery_pct ?? 100) < 70 || topic.trend_label === "declining"))) return false;
+    if (statusFilter === "planned" && (!["planner", "deadline"].includes(event.source) || String(event.status).includes("completed"))) return false;
     if (statusFilter === "completed" && !String(event.status).includes("completed")) return false;
     if (statusFilter === "overdue" && !eventIsOverdue(event, tasks)) return false;
     return true;
@@ -390,8 +390,8 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
               const completed = String(event.status || "").includes("completed");
               const inProgress = event.status === "in_progress";
               return <button key={event.id} className={"lj-timeline-node " + ((event.source === "planner" || event.source === "deadline") ? "planned" : "historical") + (selectedNode ? " active" : "") + (overdue ? " overdue" : "") + (completed ? " completed" : "") + (inProgress ? " in-progress" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
-                <span className="lj-node-line" aria-hidden="true"/><span className="lj-node-dot">{completed ? "✓" : event.type === "quiz_completed" ? "Q" : event.type === "note_view" ? "N" : event.source === "planner" ? "↻" : "•"}</span>
-                <span className="lj-node-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}</span><b>{event.title || eventLabel(event)}</b><small>{event.topic || eventLabel(event)}</small><span className={"lj-event-status " + (overdue ? "overdue" : completed ? "completed" : event.source === "planner" ? "planned" : "history")}>{overdue ? "Overdue" : completed ? "Completed" : inProgress ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</span>
+                <span className="lj-node-line" aria-hidden="true"/><span className="lj-node-dot">{completed ? "✓" : event.type === "quiz_completed" ? "Q" : event.type === "note_view" ? "N" : event.source === "planner" ? "↻" : event.source === "deadline" ? "D" : "•"}</span>
+                <span className="lj-node-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}</span><b>{event.title || eventLabel(event)}</b><small>{event.topic || eventLabel(event)}</small><span className={"lj-event-status " + (overdue ? "overdue" : completed ? "completed" : (event.source === "planner" || event.source === "deadline") ? "planned" : inProgress ? "in-progress" : "history")}>{overdue ? "Overdue" : completed ? "Completed" : inProgress ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</span>
                 <span className="lj-timeline-card"><b>{event.title || eventLabel(event)}</b><small>{event.reason || eventLabel(event)}</small><span>{formatDateTime(event.timestamp)}</span></span>
                 {index === 0 && <span className="lj-first-marker">EARLIER</span>}
               </button>;
