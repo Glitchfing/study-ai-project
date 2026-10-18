@@ -44,6 +44,22 @@ class NoteQualityUpgradeTests(unittest.TestCase):
         sections = [{"generation_status": "llm", "generation_metadata": {"status": "llm"}}]
         self.assertEqual(_generation_summary(sections)["mode"], "llm")
 
+    def test_semantic_chunks_keep_source_page_and_heading_metadata(self):
+        from services.chunking_service import chunk_document
+
+        source = (
+            "[[PAGE_1]]\\nCloud Computing\\n"
+            + ("Cloud computing provides on-demand network access to shared configurable resources. " * 12)
+            + "\\n\\n[[PAGE_2]]\\nDeployment Models\\n"
+            + ("Deployment models define where cloud resources are hosted and managed. " * 12)
+        )
+        chunks = chunk_document(source, "quality-test.pdf", chunk_size=500, overlap=80)
+        self.assertTrue(chunks)
+        self.assertTrue(all(chunk.get("document_id") for chunk in chunks))
+        self.assertTrue(all(chunk.get("source_pages") for chunk in chunks))
+        self.assertTrue(all(chunk.get("page") in {1, 2} for chunk in chunks))
+        self.assertTrue(any("Cloud Computing" in str(chunk.get("heading") or "") for chunk in chunks))
+
     def test_targeted_note_generation_exposes_real_fallback_status(self):
         from unittest.mock import patch
         from services.targeted_note_generation import generate_targeted_note_package
