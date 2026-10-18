@@ -138,6 +138,16 @@ def _is_provider_error_recoverable(error: Exception) -> bool:
         "503",
         "502",
         "500",
+        # Structured model output can be malformed even when the provider is online.
+        # Treat parser/schema failures as recoverable so the configured secondary
+        # provider (Gemini when Groq is primary) gets the same request.
+        "jsondecodeerror",
+        "json.decoder",
+        "expecting ',' delimiter",
+        "expecting value",
+        "invalid json",
+        "unterminated string",
+        "returned json",
     )
 
     return any(marker in message for marker in markers)
