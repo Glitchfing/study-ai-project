@@ -1,5 +1,9 @@
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
+import services.mind_map_service as mind_map_service
 from services.mind_map_service import _fallback_map, _validate_map
 
 
@@ -49,6 +53,52 @@ class MindMapValidationTests(unittest.TestCase):
                 ]},
                 "Root",
             )
+
+    def test_saved_map_is_reused_without_regeneration(self):
+        note = {
+            "id": "note-1",
+            "title": "Cloud Computing",
+            "topic": "Cloud Computing",
+            "source": "generated",
+            "package": {
+                "document_title": "Cloud Computing",
+                "sections": [
+                    {"title": "Service Models", "content": "IaaS provides infrastructure. PaaS provides a platform.", "page_numbers": [2]}
+                ],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(mind_map_service, "DATA_DIR", Path(temporary)), \
+                 patch.object(mind_map_service, "STORE_PATH", Path(temporary) / "mind_maps.json"), \
+                 patch.object(mind_map_service, "get_note_record", return_value=note), \
+                 patch.object(mind_map_service, "has_llm_support", return_value=False), \
+                 patch.object(mind_map_service, "_generate", wraps=mind_map_service._generate) as generate:
+                first = mind_map_service.generate_mind_map("note-1")
+                second = mind_map_service.generate_mind_map("note-1")
+                self.assertEqual(first, second)
+                self.assertEqual(generate.call_count, 1)
+
+    def test_failed_regeneration_preserves_saved_map(self):
+        note = {
+            "id": "note-1",
+            "title": "Cloud Computing",
+            "topic": "Cloud Computing",
+            "source": "generated",
+            "package": {
+                "document_title": "Cloud Computing",
+                "sections": [{"title": "Service Models", "content": "IaaS provides infrastructure.", "page_numbers": [2]}],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(mind_map_service, "DATA_DIR", Path(temporary)), \
+                 patch.object(mind_map_service, "STORE_PATH", Path(temporary) / "mind_maps.json"), \
+                 patch.object(mind_map_service, "get_note_record", return_value=note), \
+                 patch.object(mind_map_service, "has_llm_support", return_value=False):
+                saved = mind_map_service.generate_mind_map("note-1")
+                with patch.object(mind_map_service, "_generate", side_effect=RuntimeError("provider failed")):
+                    with self.assertRaisesRegex(RuntimeError, "provider failed"):
+                        mind_map_service.generate_mind_map("note-1", force=True)
+                self.assertEqual(mind_map_service.get_saved_mind_map("note-1"), saved)
 
     def test_fallback_map_is_interactive_graph_data(self):
         result = _fallback_map(
