@@ -71,7 +71,11 @@ class TaskEdit(BaseModel):
 @router.get("")
 def get_planner():
     """Return persisted revision tasks and the existing deadline list."""
-    return {"tasks": [dict(task) for task in TASKS], "deadlines": DEADLINES}
+    return {
+        "tasks": [dict(task) for task in TASKS],
+        "deadlines": DEADLINES,
+        "tasks_source": "persisted" if TASKS_PATH.exists() else "defaults",
+    }
 
 
 @router.post("/toggle")
