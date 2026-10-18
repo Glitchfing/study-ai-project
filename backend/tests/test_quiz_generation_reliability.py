@@ -112,6 +112,22 @@ class QuizGenerationReliabilityTests(unittest.TestCase):
                 )
         generate.assert_not_called()
 
+    def test_quiz_sets_are_persisted_per_note_and_topic(self):
+        from note_store import GENERATED_NOTES, get_saved_quiz_set, save_quiz_set
+
+        note_id = "quiz-cache-test-note"
+        questions = [{"id": "q1", "type": "mcq", "options": ["A", "B", "C", "D"]}]
+        with patch.dict(GENERATED_NOTES, {note_id: {"id": note_id, "package": {}}}), patch(
+            "note_store._save_generated_notes"
+        ) as save:
+            self.assertTrue(save_quiz_set(note_id, "Tokenization", questions))
+            stored = get_saved_quiz_set(note_id, "tokenization")
+            self.assertIsNotNone(stored)
+            self.assertEqual(stored["topic"], "Tokenization")
+            self.assertEqual(stored["questions"], questions)
+            self.assertIsNone(get_saved_quiz_set(note_id, "BERT"))
+            save.assert_called_once()
+
     def test_saved_note_quiz_is_reused_when_scope_matches(self):
         from quiz_engine import generate_quiz_for_package
 
