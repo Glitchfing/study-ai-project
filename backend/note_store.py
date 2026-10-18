@@ -694,6 +694,41 @@ def get_note_record(
     )
 
 
+def _quiz_scope_key(topic: str | None) -> str:
+    """Normalize the scope key used for note-linked persisted quiz sets."""
+    return " ".join(str(topic or "").lower().split()) or "entire note"
+
+
+def get_saved_quiz_set(note_id: str, topic: str | None = None) -> dict[str, Any] | None:
+    """Return a previously generated, note-linked quiz for an exact topic scope."""
+    record = get_note_record(note_id)
+    package = (record or {}).get("package") or {}
+    quiz_sets = package.get("quiz_sets") or {}
+    entry = quiz_sets.get(_quiz_scope_key(topic))
+    if not isinstance(entry, dict) or not isinstance(entry.get("questions"), list):
+        return None
+    if not entry["questions"]:
+        return None
+    return deepcopy(entry)
+
+
+def save_quiz_set(note_id: str, topic: str | None, questions: list[dict[str, Any]]) -> bool:
+    """Persist normalized quiz questions inside their generated note, keyed by topic."""
+    if note_id not in GENERATED_NOTES or not questions:
+        return False
+    record = GENERATED_NOTES[note_id]
+    package = record.setdefault("package", {})
+    quiz_sets = package.setdefault("quiz_sets", {})
+    display_topic = str(topic or "").strip() or "entire note"
+    quiz_sets[_quiz_scope_key(topic)] = {
+        "topic": display_topic,
+        "questions": deepcopy(questions),
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    _save_generated_notes()
+    return True
+
+
 # ============================================================
 # GET NOTE CONTENT FOR FRONTEND
 # ============================================================
