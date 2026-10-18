@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Any
 
 from note_generation import (
+    _generation_summary,
+    _deduplicate_section_aids,
     _aggregate_cornell,
     _aggregate_outline,
     _aggregate_mindmap,
