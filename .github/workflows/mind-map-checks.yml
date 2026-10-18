@@ -20,6 +20,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm install --no-audit --no-fund
+      - name: Emit resolved lockfile temporarily
+        run: |
+          python - <<'PY'
+          import base64
+          data = base64.b64encode(open("package-lock.json", "rb").read()).decode()
+          for index in range(0, len(data), 3000):
+              print(f"LOCK_CHUNK_{index // 3000:03d}:" + data[index:index + 3000])
+          PY
       - run: npm run build
 
   backend-mind-map-tests:
