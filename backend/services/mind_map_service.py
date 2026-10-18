@@ -75,6 +75,21 @@ def _save_store(store: dict[str, Any]) -> None:
         temporary.replace(STORE_PATH)
 
 
+def _save_map_record(key: str, value: dict[str, Any]) -> None:
+    """Merge and atomically persist one map without losing concurrent updates."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary = STORE_PATH.with_suffix(".tmp")
+    with _STORE_LOCK:
+        try:
+            current = json.loads(STORE_PATH.read_text(encoding="utf-8"))
+            store = current if isinstance(current, dict) else {}
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            store = {}
+        store[key] = value
+        temporary.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.replace(STORE_PATH)
+
+
 def _clean(value: Any, limit: int = 500) -> str:
     text = " ".join(str(value or "").split())
     return text[:limit]
@@ -380,7 +395,5 @@ def generate_mind_map(note_id: str, topic: str | None = None, *, force: bool = F
         if saved:
             return saved
     result = _generate(note, note_id, topic)
-    store = _load_store()
-    store[key] = result
-    _save_store(store)
+    _save_map_record(key, result)
     return deepcopy(result)
