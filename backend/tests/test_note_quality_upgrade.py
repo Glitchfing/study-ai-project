@@ -44,6 +44,13 @@ class NoteQualityUpgradeTests(unittest.TestCase):
         sections = [{"generation_status": "llm", "generation_metadata": {"status": "llm"}}]
         self.assertEqual(_generation_summary(sections)["mode"], "llm")
 
+    def test_validator_detects_suspicious_truncated_prose(self):
+        from services.note_quality_validator import _has_suspicious_truncated_ending
+
+        self.assertTrue(_has_suspicious_truncated_ending("The deployment depends on the availability of..."))
+        self.assertTrue(_has_suspicious_truncated_ending("The service provides access to"))
+        self.assertFalse(_has_suspicious_truncated_ending("Cloud services scale with demand."))
+
     def test_semantic_chunks_keep_source_page_and_heading_metadata(self):
         from services.chunking_service import chunk_document
 
