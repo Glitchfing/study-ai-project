@@ -483,7 +483,17 @@ def generate_exam_style_questions(
                 section_text.append(text)
         source_text = "\n\n".join(section_text)
     source_text = source_text[:100000]
-    requested_topic = str(package.get("quiz_topic") or "")
+    requested_topic = str(
+        package.get("quiz_topic")
+        or package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+        or ""
+    ).strip()
+
+    # A title is not source evidence. Never call the model or fabricate
+    # questions when the saved package contains no actual learning content.
+    if not source_text.strip():
+        return []
 
     candidates: list[dict[str, Any]] = []
     if has_llm_support():
