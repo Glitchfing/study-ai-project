@@ -1072,11 +1072,22 @@ SECTION RULES:
                 )
 
             except Exception as exc:
-                safe_reason = f"{type(exc).__name__}: {str(exc)[:240]}"
+                error_text = str(exc).lower()
+                if any(marker in error_text for marker in ("429", "quota", "rate limit", "resource exhausted", "tpm", "tpd")):
+                    safe_reason = "provider_rate_limit"
+                elif any(marker in error_text for marker in ("json", "schema", "section ids", "invalid response", "empty section")):
+                    safe_reason = "invalid_structured_output"
+                elif any(marker in error_text for marker in ("timeout", "timed out")):
+                    safe_reason = "provider_timeout"
+                elif "no llm provider" in error_text or "no usable llm" in error_text:
+                    safe_reason = "no_provider_configured"
+                else:
+                    safe_reason = "generation_failed"
                 # Avoid logging raw model responses, prompts, or credential-bearing errors.
                 print(
                     "\n[BATCH GENERATION ERROR]"
                     f"\nType: {type(exc).__name__}"
+                    f"\nReason: {safe_reason}"
                     "\nUsing bounded local fallback for this batch."
                 )
 
