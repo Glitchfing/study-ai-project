@@ -924,7 +924,7 @@ SECTION RULES:
                 repair_prompt = user_prompt
                 if attempt:
                     repair_prompt += (
-                        "\\n\\nREPAIR REQUEST (attempt 2): Your previous response was rejected. "
+                        "\n\nREPAIR REQUEST (attempt 2): Your previous response was rejected. "
                         "Return one complete JSON object matching the supplied schema, include every "
                         "section_id exactly once, and ensure each section has complete non-empty content. "
                         "Validation error: "
@@ -1072,15 +1072,16 @@ SECTION RULES:
                 )
 
             except Exception as exc:
+                safe_reason = f"{type(exc).__name__}: {str(exc)[:240]}"
+                # Avoid logging raw model responses, prompts, or credential-bearing errors.
                 print(
                     "\n[BATCH GENERATION ERROR]"
                     f"\nType: {type(exc).__name__}"
-                    f"\nMessage: {exc}"
-                    "\nUsing local fallback for this batch."
+                    "\nUsing bounded local fallback for this batch."
                 )
 
                 return [
-                    local_fallback(section)
+                    local_fallback(section, safe_reason)
                     for _, section in batch
                 ]
 
