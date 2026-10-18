@@ -137,6 +137,30 @@ def _has_meaningful_text(value: Any) -> bool:
     )
 
 
+def _has_suspicious_truncated_ending(value: Any) -> bool:
+    """Conservative warning for cut-off prose; ignores table/code/formula endings."""
+    text = str(value or "").strip()
+    if not text:
+        return False
+    prose_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip()
+        and not line.lstrip().startswith(("|", "```", "#", "$"))
+    ]
+    if not prose_lines:
+        return False
+    last = prose_lines[-1].rstrip()
+    if last.endswith(("...", "…")):
+        return True
+    return bool(re.search(
+        r"\b(?:and|or|because|which|that|with|to|of|for|including|such as|"
+        r"consisting of|resulting in|depending on|as well as)$",
+        last,
+        flags=re.IGNORECASE,
+    ))
+
+
 # ============================================================
 # SECTION VALIDATION
 # ============================================================
@@ -233,6 +257,9 @@ def validate_section(
         warnings.append(
             "very_short_content"
         )
+
+    if content and _has_suspicious_truncated_ending(content):
+        warnings.append("possibly_truncated_ending")
 
     # --------------------------------------------------------
     # PROMPT LEAKAGE
