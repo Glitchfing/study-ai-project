@@ -1372,6 +1372,12 @@ def run_targeted_note_pipeline(
         "document_title": f"{clean_topic} — Targeted Study",
         "source_filename": filename,
         "requested_topic": clean_topic,
+        "requested_quiz_topic": clean_topic,
+        "quiz_topic": clean_topic,
+        # Keep the exact retrieved source as the grounding evidence for quiz
+        # validation. The generated note sections are a summary and may omit
+        # terms that appeared in the original chunks.
+        "retrieved_source_text": context,
         "document_intelligence": intelligence,
         "topic_map": intelligence,
         "sections": sections,
