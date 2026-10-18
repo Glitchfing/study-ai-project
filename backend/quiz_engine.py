@@ -208,16 +208,20 @@ def generate_quiz_for_package(
         )
 
     stored_questions = package.get("questions") or []
+    raw_questions: list[dict[str, Any]] = []
     if same_scope and isinstance(stored_questions, list):
-        valid_stored = [question for question in stored_questions if valid_generated_mcq(question)]
-        if len(valid_stored) >= requested_limit:
-            raw_questions = valid_stored
+        raw_questions = [question for question in stored_questions if valid_generated_mcq(question)]
 
-    if "raw_questions" not in locals():
-        # A small candidate buffer is enough for validation/deduplication; multiplying by 3
-        # here and again inside the generator caused unnecessary provider token usage.
+    # If the stored quiz already contains enough valid questions, no provider
+    # call is needed. Otherwise generate additional source-grounded candidates
+    # and combine them with the saved quiz before duplicate filtering.
+    if len(raw_questions) < requested_limit:
         candidate_limit = max(requested_limit + 6, int(requested_limit * 1.5))
-        raw_questions = generate_exam_style_questions(package, limit=candidate_limit, memory=memory)
+        generated_questions = generate_exam_style_questions(package, limit=candidate_limit, memory=memory)
+        raw_questions.extend(
+            question for question in generated_questions
+            if valid_generated_mcq(question)
+        )
 
     raw_questions = [question for question in raw_questions if valid_generated_mcq(question)]
     normalized = [
