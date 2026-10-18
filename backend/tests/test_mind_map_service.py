@@ -124,9 +124,9 @@ class MindMapValidationTests(unittest.TestCase):
             },
         }
         with tempfile.TemporaryDirectory() as temporary:
-            with patch.object(mind_map_service, "DATA_DIR", Path(temporary)), \\
-                 patch.object(mind_map_service, "STORE_PATH", Path(temporary) / "mind_maps.json"), \\
-                 patch.object(mind_map_service, "get_note_record", return_value=note), \\
+            with patch.object(mind_map_service, "DATA_DIR", Path(temporary)), \
+                 patch.object(mind_map_service, "STORE_PATH", Path(temporary) / "mind_maps.json"), \
+                 patch.object(mind_map_service, "get_note_record", return_value=note), \
                  patch.object(mind_map_service, "has_llm_support", return_value=False):
                 services = mind_map_service.generate_mind_map("note-1", "Service Models")
                 deployment = mind_map_service.generate_mind_map("note-1", "Deployment Models")
@@ -145,8 +145,8 @@ class MindMapValidationTests(unittest.TestCase):
                 "sections": [{"title": "Service Models", "content": "IaaS provides infrastructure. PaaS provides a platform.", "page_numbers": [2]}],
             },
         }
-        with patch.object(mind_map_service, "get_note_record", return_value=note), \\
-             patch.object(mind_map_service, "has_llm_support", return_value=True), \\
+        with patch.object(mind_map_service, "get_note_record", return_value=note), \
+             patch.object(mind_map_service, "has_llm_support", return_value=True), \
              patch.object(mind_map_service, "generate_structured_json", return_value={"nodes": [{"id": "root", "parent_id": None}, {"id": "orphan", "parent_id": "missing"}], "edges": []}):
             result = mind_map_service._generate(note, "note-1", None)
         self.assertEqual(result["generation_method"], "deterministic_fallback")
