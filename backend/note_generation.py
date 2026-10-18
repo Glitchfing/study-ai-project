@@ -383,6 +383,7 @@ def _deduplicate_section_aids(sections: list[dict[str, Any]]) -> list[dict[str, 
         "memory_tricks", "concept_comparisons", "test_yourself",
     )
     for section in sections:
+        removed = 0
         for field in fields:
             values = section.get(field)
             if not isinstance(values, list):
@@ -396,6 +397,7 @@ def _deduplicate_section_aids(sections: list[dict[str, Any]]) -> list[dict[str, 
                     continue
                 text = " ".join(str(value).split()).strip()
                 if not text:
+                    removed += 1
                     continue
                 key = text.casefold()
                 if any(
@@ -405,10 +407,38 @@ def _deduplicate_section_aids(sections: list[dict[str, Any]]) -> list[dict[str, 
                     )
                     for prior in normalized_kept
                 ):
+                    removed += 1
                     continue
                 kept.append(text)
                 normalized_kept.append(key)
             section[field] = kept
+
+        # Remove only repeated/near-identical narrative paragraphs within this
+        # section; keep table blocks, equations, and distinct explanations intact.
+        narrative = str(section.get("content") or "").strip()
+        if narrative:
+            paragraphs = [part.strip() for part in re.split(r"\\n\\s*\\n", narrative) if part.strip()]
+            kept_paragraphs: list[str] = []
+            paragraph_keys: list[str] = []
+            for paragraph in paragraphs:
+                key = " ".join(paragraph.split()).casefold()
+                duplicate = any(
+                    key == prior or (
+                        min(len(key), len(prior)) >= 80
+                        and SequenceMatcher(None, key, prior).ratio() >= 0.94
+                    )
+                    for prior in paragraph_keys
+                )
+                if duplicate:
+                    removed += 1
+                    continue
+                kept_paragraphs.append(paragraph)
+                paragraph_keys.append(key)
+            section["content"] = "\\n\\n".join(kept_paragraphs)
+        section["deduplication_metadata"] = {
+            "duplicate_items_removed": removed,
+            "scope": "within_section_and_learning_aid_category",
+        }
     return sections
 
 
