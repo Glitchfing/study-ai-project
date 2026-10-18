@@ -76,6 +76,22 @@ class QuizGenerationReliabilityTests(unittest.TestCase):
         self.assertEqual(generate.call_count, 2)
         self.assertEqual(generate.call_args.args[1], "same source and topic")
 
+    def test_undersized_provider_batch_is_retried_and_best_batch_kept(self):
+        smaller = {"questions": [{"type": "mcq", "question": "Question one?"}]}
+        larger = {"questions": [{"type": "mcq", "question": f"Question {i}?"} for i in range(3)]}
+        with patch.object(
+            quiz,
+            "generate_structured_json",
+            side_effect=[smaller, larger],
+        ) as generate:
+            result = quiz._generate_quiz_payload_with_retry(
+                "system",
+                "same source and topic",
+                expected_count=4,
+            )
+        self.assertEqual(len(result["questions"]), 3)
+        self.assertEqual(generate.call_count, 2)
+
     def test_empty_source_does_not_call_llm(self):
         package = {"document_title": "Title only", "sections": []}
         with patch.object(quiz, "has_llm_support", return_value=True), patch.object(
