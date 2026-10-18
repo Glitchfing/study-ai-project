@@ -44,14 +44,14 @@ def _lexical_relevance(query: str, match: dict[str, Any]) -> float:
     combined = f"{heading} {text}"
     matched = sum(
         1 for term in terms
-        if re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", combined)
+        if re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", combined)
     )
     if not matched:
         return 0.0
 
     heading_hits = sum(
         1 for term in terms
-        if re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", heading)
+        if re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", heading)
     )
     return min(1.0, (matched / len(terms)) * 0.75 + (0.25 if heading_hits else 0.0))
 
@@ -60,13 +60,13 @@ def _deduplicate_by_text(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Remove identical or near-identical chunks, preserving the higher-ranked result."""
     best: list[dict[str, Any]] = []
     for match in matches:
-        text = re.sub(r"\\W+", " ", str(match.get("text") or "").casefold()).strip()
+        text = re.sub(r"\W+", " ", str(match.get("text") or "").casefold()).strip()
         if not text:
             continue
         words = set(text.split())
         duplicate_index = None
         for index, previous in enumerate(best):
-            prior_text = re.sub(r"\\W+", " ", str(previous.get("text") or "").casefold()).strip()
+            prior_text = re.sub(r"\W+", " ", str(previous.get("text") or "").casefold()).strip()
             if text == prior_text:
                 duplicate_index = index
                 break
