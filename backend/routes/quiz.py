@@ -14,7 +14,7 @@ from fastapi import (
 from activity import record_activity
 from note_store import get_note_record, get_saved_quiz_set, save_quiz_set
 from note_generation import generate_note_package
-from quiz_engine import evaluate_answer, generate_quiz_for_package, performance_feedback
+from quiz_engine import _canonicalize_saved_mcq, evaluate_answer, generate_quiz_for_package, performance_feedback
 from services.targeted_retrieval_service import retrieve_targeted_chunks
 from quiz_attempt_store import (
     list_quiz_attempts,
@@ -411,7 +411,14 @@ def _generated_questions_for_note(
     ).strip()
     cached_quiz = get_saved_quiz_set(note_id, requested_scope)
     if cached_quiz:
-        cached_questions = cached_quiz.get("questions") or []
+        cached_questions = [
+            question
+            for question in (
+                _canonicalize_saved_mcq(item)
+                for item in (cached_quiz.get("questions") or [])
+            )
+            if question is not None
+        ]
         if len(cached_questions) >= max(1, limit):
             return {
                 "topic": record.get("topic") or "generated",
