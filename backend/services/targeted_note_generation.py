@@ -50,9 +50,10 @@ def generate_targeted_note_package(
     )
 
     intelligence = pipeline_result.get("document_intelligence") or {}
-    sections = pipeline_result.get("sections") or []
+    sections = _deduplicate_section_aids(pipeline_result.get("sections") or [])
     questions = pipeline_result.get("questions") or []
     _attach_section_questions(sections, questions)
+    generation_metadata = _generation_summary(sections)
 
     title = f"{clean_topic} — Targeted Study"
     summary = intelligence.get("document_summary") or f"Focused notes on {clean_topic}."
@@ -78,7 +79,14 @@ def generate_targeted_note_package(
         "topic_map": intelligence,
         "difficulty_level": "intermediate",
         "requested_topic": clean_topic,
+        # Keep targeted as the study workflow mode for backward compatibility;
+        # generation_metadata.mode reports the actual provider/fallback path.
         "generation_mode": "targeted",
+        "generation_metadata": generation_metadata,
+        "validation_metadata": {
+            "status": "pending_persistence_validation",
+            "validator": "note_store.validate_note_package",
+        },
         "retrieval": pipeline_result.get("retrieval", {}),
         "pipeline_diagnostics": {
             "pipeline": [
@@ -93,6 +101,7 @@ def generate_targeted_note_package(
             "requested_topic": clean_topic,
             "source_pages": pages,
             "section_count": len(sections),
+            "generation": generation_metadata,
         },
         "preferences": pref,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
