@@ -71,27 +71,30 @@ ACTIVITY_LOCK = threading.RLock()
 
 
 def _save_activity() -> None:
-    """Atomically persist events using a unique temp file (safe on Windows)."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    temp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=DATA_DIR,
-            prefix="activity_events_",
-            suffix=".tmp",
-            delete=False,
-        ) as temporary:
-            json.dump(ACTIVITY_LOG[-5000:], temporary, ensure_ascii=False, indent=2)
-            temp_path = Path(temporary.name)
-        os.replace(temp_path, ACTIVITY_PATH)
-    finally:
-        if temp_path and temp_path.exists():
-            try:
-                temp_path.unlink()
-            except OSError:
-                pass
+    """Atomically persist events with a unique temp file under the shared write lock."""
+    # record_activity already holds this RLock; acquiring it again is safe and
+    # also protects any future direct caller from replacing a newer snapshot.
+    with ACTIVITY_LOCK:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=DATA_DIR,
+                prefix="activity_events_",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                json.dump(ACTIVITY_LOG[-5000:], temporary, ensure_ascii=False, indent=2)
+                temp_path = Path(temporary.name)
+            os.replace(temp_path, ACTIVITY_PATH)
+        finally:
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
 
 # Only completed recommendation work contributes to activity totals/heatmap.
 # Start and dismiss events remain visible in recent activity without inflating study activity.
