@@ -540,6 +540,50 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
                   </button>
                 </div>
               ) : null}
+              {content.generation_metadata?.mode && content.generation_metadata.mode !== "unknown" ? (
+                <div role="status" style={{
+                  marginBottom: 12,
+                  padding: "8px 12px",
+                  borderRadius: "var(--r)",
+                  border: "1px solid var(--border)",
+                  background: content.generation_metadata.mode === "fallback" || content.generation_metadata.mode === "mixed"
+                    ? "rgba(255,190,80,0.08)" : "rgba(17,157,164,0.08)",
+                  color: "var(--text2)",
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                }}>
+                  <strong>Generation status: {content.generation_metadata.mode}</strong>
+                  {typeof content.generation_metadata.sections_fallback === "number"
+                    ? <span> · {content.generation_metadata.sections_fallback} fallback section(s), {content.generation_metadata.sections_repaired || 0} repaired</span>
+                    : null}
+                  {content.generation_metadata.fallback_reasons?.length
+                    ? <div>Fallback reason: {content.generation_metadata.fallback_reasons.join("; ")}</div>
+                    : null}
+                </div>
+              ) : null}
+              {content.validation_metadata?.status === "warning" ? (
+                <div role="alert" style={{
+                  marginBottom: 14,
+                  padding: "10px 12px",
+                  borderRadius: "var(--r)",
+                  border: "1px solid rgba(255,190,80,0.35)",
+                  background: "rgba(255,190,80,0.08)",
+                  color: "var(--text2)",
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                }}>
+                  <strong>Note quality needs review.</strong>
+                  {content.validation_metadata.quality_score != null
+                    ? <span> Quality score: {Math.round(content.validation_metadata.quality_score * 100)}%.</span>
+                    : null}
+                  {content.validation_metadata.issues?.length
+                    ? <div>Issues: {content.validation_metadata.issues.join(", ")}</div>
+                    : null}
+                  {content.validation_metadata.warnings?.length
+                    ? <div>Warnings: {content.validation_metadata.warnings.join(", ")}</div>
+                    : null}
+                </div>
+              ) : null}
               {format === "full" && <FullNoteView content={content} />}
               {format === "cornell" && <CornellView content={content} />}
               {format === "outline" && <OutlineView content={content} />}

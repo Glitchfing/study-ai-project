@@ -338,6 +338,110 @@ def _attach_section_questions(sections: list[dict[str, Any]], questions: list[di
         section["questions"] = by_topic.get(str(section.get("title") or "").lower(), [])[:6]
 
 
+def _generation_summary(sections: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize the real per-section provider path without guessing from document analysis."""
+    statuses = [
+        str(section.get("generation_status") or (section.get("generation_metadata") or {}).get("status") or "unknown")
+        for section in sections
+    ]
+    llm_count = sum(status in {"llm", "repaired"} for status in statuses)
+    fallback_count = sum(status == "fallback" for status in statuses)
+    repaired_count = sum(status == "repaired" for status in statuses)
+    if fallback_count and llm_count:
+        mode = "mixed"
+    elif fallback_count:
+        mode = "fallback"
+    elif repaired_count:
+        mode = "repaired"
+    elif llm_count:
+        mode = "llm"
+    else:
+        mode = "unknown"
+    reasons = []
+    for section in sections:
+        meta = section.get("generation_metadata") or {}
+        reason = meta.get("reason")
+        if reason and reason not in reasons:
+            reasons.append(str(reason)[:240])
+    return {
+        "mode": mode,
+        "sections_total": len(sections),
+        "sections_llm": llm_count,
+        "sections_fallback": fallback_count,
+        "sections_repaired": repaired_count,
+        "fallback_reasons": reasons,
+    }
+
+
+def _deduplicate_section_aids(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove exact/near duplicate items within the same learning-aid category."""
+    from difflib import SequenceMatcher
+
+    fields = (
+        "key_points", "definitions", "examples", "use_cases",
+        "important_notes", "common_mistakes", "revision_notes",
+        "memory_tricks", "concept_comparisons", "test_yourself",
+    )
+    for section in sections:
+        removed = 0
+        for field in fields:
+            values = section.get(field)
+            if not isinstance(values, list):
+                continue
+            kept: list[Any] = []
+            normalized_kept: list[str] = []
+            for value in values:
+                if not isinstance(value, (str, int, float)):
+                    kept.append(value)
+                    normalized_kept.append(" ".join(str(value).lower().split()))
+                    continue
+                text = " ".join(str(value).split()).strip()
+                if not text:
+                    removed += 1
+                    continue
+                key = text.casefold()
+                if any(
+                    key == prior or (
+                        min(len(key), len(prior)) >= 45
+                        and SequenceMatcher(None, key, prior).ratio() >= 0.90
+                    )
+                    for prior in normalized_kept
+                ):
+                    removed += 1
+                    continue
+                kept.append(text)
+                normalized_kept.append(key)
+            section[field] = kept
+
+        # Remove only repeated/near-identical narrative paragraphs within this
+        # section; keep table blocks, equations, and distinct explanations intact.
+        narrative = str(section.get("content") or "").strip()
+        if narrative:
+            paragraphs = [part.strip() for part in re.split(r"\n\s*\n", narrative) if part.strip()]
+            kept_paragraphs: list[str] = []
+            paragraph_keys: list[str] = []
+            for paragraph in paragraphs:
+                key = " ".join(paragraph.split()).casefold()
+                duplicate = any(
+                    key == prior or (
+                        min(len(key), len(prior)) >= 80
+                        and SequenceMatcher(None, key, prior).ratio() >= 0.94
+                    )
+                    for prior in paragraph_keys
+                )
+                if duplicate:
+                    removed += 1
+                    continue
+                kept_paragraphs.append(paragraph)
+                paragraph_keys.append(key)
+            section["content"] = "\n\n".join(kept_paragraphs)
+        section["deduplication_metadata"] = {
+            "duplicate_items_removed": removed,
+            "scope": "within_section_and_learning_aid_category",
+        }
+    return sections
+
+
 def _build_package(
     text: str,
     filename: str,
@@ -396,9 +500,10 @@ def _build_package(
         quiz_limit=max(12, min(40, (source_page_count or 1) * 2)),
     )
     intelligence = pipeline.get("document_intelligence") or {}
-    sections = pipeline.get("sections") or []
+    sections = _deduplicate_section_aids(pipeline.get("sections") or [])
     questions = pipeline.get("questions") or []
     _attach_section_questions(sections, questions)
+    generation_metadata = _generation_summary(sections)
     summary = intelligence.get("document_summary") or f"{title} converted into teacher-style study notes."
     package = {
         "document_title": title,
@@ -441,10 +546,16 @@ def _build_package(
             "content_policy": "source-grounded; preserve educationally important detail",
             "section_count": len(sections),
             "source_quality": intelligence.get("source_quality", {}),
-            "analysis_mode": intelligence.get("analysis_mode", "fallback"),
+            "analysis_mode": intelligence.get("analysis_mode", "deterministic"),
+            "generation": generation_metadata,
+        },
+        "generation_metadata": generation_metadata,
+        "validation_metadata": {
+            "status": "pending_persistence_validation",
+            "validator": "note_store.validate_note_package",
         },
         "preferences": pref,
-        "generation_mode": "llm" if intelligence.get("analysis_mode") == "llm" else "fallback",
+        "generation_mode": generation_metadata["mode"],
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
     return package

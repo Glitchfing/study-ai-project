@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -377,19 +379,29 @@ def _load_generated_notes() -> dict[str, dict[str, Any]]:
 
 
 def _save_generated_notes() -> None:
-    DATA_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    NOTES_DB_PATH.write_text(
-        json.dumps(
-            GENERATED_NOTES,
-            indent=2,
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
+    """Atomically persist generated notes so a crash cannot truncate the JSON store."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=DATA_DIR,
+            prefix="generated_notes_",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            json.dump(GENERATED_NOTES, temporary, indent=2, ensure_ascii=False)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_path = Path(temporary.name)
+        os.replace(temporary_path, NOTES_DB_PATH)
+    finally:
+        if temporary_path and temporary_path.exists():
+            try:
+                temporary_path.unlink()
+            except OSError:
+                pass
 
 
 # ============================================================
@@ -555,6 +567,18 @@ def register_generated_note(
         normalized,
         expected_source_pages=expected_pages,
     )
+
+    # Persist the real validation outcome alongside the original package.
+    # A failed report remains visible as a warning; it is never relabelled as a pass.
+    package["validation_metadata"] = {
+        "status": "passed" if quality_report.get("valid") else "warning",
+        "validator": "validate_note_package",
+        "quality_score": quality_report.get("quality_score"),
+        "rating": quality_report.get("rating"),
+        "issues": list(quality_report.get("document_issues") or []),
+        "warnings": list(quality_report.get("document_warnings") or []),
+        "summary": dict(quality_report.get("summary") or {}),
+    }
 
     # --------------------------------------------------------
     # TITLE
@@ -750,13 +774,18 @@ def get_note_content(
         "source"
     ) == "generated":
 
-        return format_package_for_view(
-            record.get(
-                "package",
-                {},
-            ),
-            note_format,
-        )
+        package = record.get("package", {}) or {}
+        view = format_package_for_view(package, note_format)
+        if isinstance(view, dict):
+            # Metadata is additive and available in every reader format.
+            view = deepcopy(view)
+            view.setdefault("generation_mode", package.get("generation_mode"))
+            view.setdefault("generation_metadata", package.get("generation_metadata") or {})
+            view.setdefault("validation_metadata", package.get("validation_metadata") or {})
+            view.setdefault("quality_report", record.get("quality_report") or {})
+            view.setdefault("requested_topic", package.get("requested_topic"))
+            view.setdefault("retrieval", package.get("retrieval") or {})
+        return view
 
     return deepcopy(
         record.get(
