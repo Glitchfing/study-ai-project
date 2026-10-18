@@ -285,6 +285,28 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
     return candidates
 
 
+def _generate_quiz_payload_with_retry(system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    """Retry malformed or empty structured responses while preserving the same topic/source prompt."""
+    errors: list[str] = []
+    for attempt in range(2):
+        try:
+            payload = generate_structured_json(
+                system_prompt,
+                user_prompt,
+                "intelligent_quiz",
+                QUIZ_SCHEMA,
+                temperature=0.2 if attempt else 0.32,
+                cache=False,
+                max_output_tokens=6000,
+            )
+            if isinstance(payload, dict) and isinstance(payload.get("questions"), list) and payload["questions"]:
+                return payload
+            errors.append("provider returned an empty questions array")
+        except Exception as exc:
+            errors.append(f"attempt {attempt + 1}: {type(exc).__name__}: {exc}")
+    raise RuntimeError("Quiz generation produced no usable structured questions: " + "; ".join(errors))
+
+
 def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]:
     system_prompt = (
         "You are a university exam setter. Generate ONLY four-option multiple-choice questions (MCQs) directly grounded in the supplied study notes. "
@@ -312,8 +334,8 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)[:2500]}\n\n"
         f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package, max_chars=10000), ensure_ascii=True)}"
     )
-    payload = generate_structured_json(system_prompt, user_prompt, "intelligent_quiz", QUIZ_SCHEMA, temperature=0.32)
-    return payload.get("questions") or []
+    payload = _generate_quiz_payload_with_retry(system_prompt, user_prompt)
+    return [question for question in (payload.get("questions") or []) if isinstance(question, dict)]
 
 
 def detect_concept_overlap(question: dict[str, Any], accepted: list[dict[str, Any]]) -> bool:
@@ -467,7 +489,8 @@ def generate_exam_style_questions(
     if has_llm_support():
         try:
             candidates = _llm_candidates(package, candidate_limit)
-        except Exception:
+        except Exception as exc:
+            print(f"[QUIZ DEBUG] Structured quiz generation failed after retry: {type(exc).__name__}: {exc}")
             candidates = []
     candidates = [
         question for question in candidates
