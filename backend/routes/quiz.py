@@ -275,9 +275,15 @@ def _normalize_question(
 # GENERATED QUESTIONS
 # =====================================================
 
-def _retrieve_quiz_evidence(record: dict[str, Any], topic: str | None = None) -> dict[str, Any]:
+def _retrieve_quiz_evidence(
+    record: dict[str, Any],
+    topic: str | None = None,
+    package_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build quiz context from Qdrant chunks restricted to this note's source documents."""
-    package = dict(record.get("package") or {})
+    # Callers may hydrate legacy/static notes from their rendered content. Preserve
+    # that recovery instead of re-reading the empty original package here.
+    package = dict(package_override or record.get("package") or {})
     document_ids = package.get("source_document_ids") or record.get("source_document_ids") or []
     document_ids = [str(value).strip() for value in document_ids if str(value).strip()]
     if not document_ids:
@@ -420,7 +426,7 @@ def _generated_questions_for_note(
                 "key_points": [line.strip() for line in source_text.splitlines() if len(line.split()) >= 5],
             }]
 
-    rag = _retrieve_quiz_evidence(record, topic=topic)
+    rag = _retrieve_quiz_evidence(record, topic=topic, package_override=package)
     package = rag["package"]
 
     # Saved synthesized notes may not have indexed source-document IDs, so
