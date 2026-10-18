@@ -350,13 +350,44 @@ async def run_note_generation_async(
       - Do NOT explode a failed batch into many extra LLM calls.
     """
 
-    sections = build_semantic_sections(
-        text,
-        intelligence,
-        filename,
-    )
-
-    sections = _normalize_semantic_sections(sections)
+    # Targeted study must remain a single topic-focused generation unit.
+    # Running the full-document semantic section builder on retrieved snippets
+    # can promote incidental headings (for example "Cloud APIs") into separate
+    # note sections even when the user requested a narrower topic.
+    target_topic = str((preferences or {}).get("target_topic") or "").strip()
+    if target_topic:
+        page_numbers = sorted({
+            int(page)
+            for page in re.findall(r"\[\[PAGE_(\d+)\]\]", text or "")
+        })
+        source_text = re.sub(r"\[\[PAGE_\d+\]\]\s*", "", text or "").strip()
+        if not source_text:
+            return []
+        keyword_candidates = re.findall(r"[A-Za-z][A-Za-z0-9+#-]{2,}", target_topic)
+        sections = [{
+            "section_id": "targeted-topic",
+            "title": target_topic,
+            "raw_text": source_text,
+            "page_numbers": page_numbers or [1],
+            "pages": page_numbers or [1],
+            "source_filename": filename,
+            "concept_group": target_topic,
+            "section_type": "targeted_topic",
+            "learning_objectives": [
+                f"Explain {target_topic} using the supplied source material.",
+                f"Recall the key details and distinctions related to {target_topic}.",
+            ],
+            "related_topics": [],
+            "concept_keywords": list(dict.fromkeys(keyword_candidates))[:12],
+            "targeted_topic": target_topic,
+        }]
+    else:
+        sections = build_semantic_sections(
+            text,
+            intelligence,
+            filename,
+        )
+        sections = _normalize_semantic_sections(sections)
 
     if not sections:
         return []
@@ -911,6 +942,18 @@ SECTION RULES:
             "when that field exists in the supplied schema."
         )
 
+        target_topic = str((preferences or {}).get("target_topic") or "").strip()
+        if target_topic:
+            system_prompt += (
+                "\\n\\nTARGETED-STUDY CONTRACT:\\n"
+                f"The learner requested exactly this topic: {target_topic!r}. "
+                "Create one focused note from the supplied source evidence. "
+                "Do not turn incidental source headings into additional topics. "
+                "Exclude source material unrelated to the requested topic. "
+                "Do not add knowledge absent from the source. The final section title "
+                "must remain the requested topic."
+            )
+
         print(
             f"[BATCH LLM START] "
             f"{len(batch)} sections"
@@ -993,11 +1036,15 @@ SECTION RULES:
                     f"Batch LLM omitted {section_id}."
                 )
 
-            title = str(
-                generated_item.get("title")
-                or section.get("title")
-                or "Study Topic"
-            ).strip()
+            title = (
+                target_topic
+                if target_topic
+                else str(
+                    generated_item.get("title")
+                    or section.get("title")
+                    or "Study Topic"
+                ).strip()
+            )
 
             content = str(
                 generated_item.get("content")
