@@ -285,9 +285,18 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
     return candidates
 
 
-def _generate_quiz_payload_with_retry(system_prompt: str, user_prompt: str) -> dict[str, Any]:
-    """Retry malformed or empty structured responses while preserving the same topic/source prompt."""
+def _generate_quiz_payload_with_retry(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    expected_count: int = 1,
+) -> dict[str, Any]:
+    """Retry malformed, empty, or undersized quiz output while retaining the best valid batch."""
     errors: list[str] = []
+    best_payload: dict[str, Any] | None = None
+    best_count = 0
+    required_count = max(1, int(expected_count))
+
     for attempt in range(2):
         try:
             payload = generate_structured_json(
@@ -299,11 +308,27 @@ def _generate_quiz_payload_with_retry(system_prompt: str, user_prompt: str) -> d
                 cache=False,
                 max_output_tokens=6000,
             )
-            if isinstance(payload, dict) and isinstance(payload.get("questions"), list) and payload["questions"]:
-                return payload
-            errors.append("provider returned an empty questions array")
+            questions = payload.get("questions") if isinstance(payload, dict) else None
+            if isinstance(questions, list) and questions:
+                if len(questions) > best_count:
+                    best_payload = payload
+                    best_count = len(questions)
+                if len(questions) >= required_count:
+                    return payload
+                errors.append(
+                    f"attempt {attempt + 1}: provider returned {len(questions)} questions; "
+                    f"{required_count} candidate questions were requested"
+                )
+            else:
+                errors.append(f"attempt {attempt + 1}: provider returned an empty questions array")
         except Exception as exc:
             errors.append(f"attempt {attempt + 1}: {type(exc).__name__}: {exc}")
+
+    # A short but non-empty response may still contain useful valid candidates.
+    # Preserve it so source-grounded fallback candidates can top up the quiz.
+    if best_payload is not None:
+        print(f"[QUIZ DEBUG] Keeping best partial provider batch ({best_count} questions) after retry.")
+        return best_payload
     raise RuntimeError("Quiz generation produced no usable structured questions: " + "; ".join(errors))
 
 
@@ -334,7 +359,11 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)[:2500]}\n\n"
         f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package, max_chars=10000), ensure_ascii=True)}"
     )
-    payload = _generate_quiz_payload_with_retry(system_prompt, user_prompt)
+    payload = _generate_quiz_payload_with_retry(
+        system_prompt,
+        user_prompt,
+        expected_count=limit,
+    )
     return [question for question in (payload.get("questions") or []) if isinstance(question, dict)]
 
 
