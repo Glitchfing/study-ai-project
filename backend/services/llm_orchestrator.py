@@ -945,7 +945,7 @@ SECTION RULES:
         target_topic = str((preferences or {}).get("target_topic") or "").strip()
         if target_topic:
             system_prompt += (
-                "\\n\\nTARGETED-STUDY CONTRACT:\\n"
+                "\n\nTARGETED-STUDY CONTRACT:\n"
                 f"The learner requested exactly this topic: {target_topic!r}. "
                 "Create one focused note from the supplied source evidence. "
                 "Do not turn incidental source headings into additional topics. "
