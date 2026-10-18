@@ -417,7 +417,7 @@ def _deduplicate_section_aids(sections: list[dict[str, Any]]) -> list[dict[str, 
         # section; keep table blocks, equations, and distinct explanations intact.
         narrative = str(section.get("content") or "").strip()
         if narrative:
-            paragraphs = [part.strip() for part in re.split(r"\\n\\s*\\n", narrative) if part.strip()]
+            paragraphs = [part.strip() for part in re.split(r"\n\s*\n", narrative) if part.strip()]
             kept_paragraphs: list[str] = []
             paragraph_keys: list[str] = []
             for paragraph in paragraphs:
@@ -434,7 +434,7 @@ def _deduplicate_section_aids(sections: list[dict[str, Any]]) -> list[dict[str, 
                     continue
                 kept_paragraphs.append(paragraph)
                 paragraph_keys.append(key)
-            section["content"] = "\\n\\n".join(kept_paragraphs)
+            section["content"] = "\n\n".join(kept_paragraphs)
         section["deduplication_metadata"] = {
             "duplicate_items_removed": removed,
             "scope": "within_section_and_learning_aid_category",
