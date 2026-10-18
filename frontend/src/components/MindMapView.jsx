@@ -184,7 +184,7 @@ function GraphCanvas({ map, selectedNode, onSelect }) {
   );
 }
 
-function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, toast }) {
+function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, onOpenSource, toast }) {
   const [map, setMap] = useState(null);
   const [topic, setTopic] = useState("");
   const [selectedId, setSelectedId] = useState(null);
@@ -298,7 +298,10 @@ function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, toast }) {
             <div className="mind-map-detail-section"><h4>Examples</h4><ul>{selectedNode.examples.map((item, index) => <li key={index}>{item}</li>)}</ul></div>
           ) : null}
           {selectedNode?.source_pages?.length ? (
-            <div className="mind-map-source"><strong>Source pages</strong><div>{selectedNode.source_pages.join(", ")}</div></div>
+            <div className="mind-map-source">
+              <strong>Source pages</strong><div>{selectedNode.source_pages.join(", ")}</div>
+              {onOpenSource ? <button type="button" className="mind-source-link" onClick={() => onOpenSource(selectedNode)}>Open related notes ↗</button> : null}
+            </div>
           ) : <div className="mind-map-source">No page-level source reference was saved for this concept.</div>}
           <button type="button" className="btn btn-primary btn-sm mind-map-quiz-button" disabled={!selectedNode} onClick={requestQuiz}>Practice this concept</button>
         </aside>
