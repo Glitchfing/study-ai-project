@@ -1434,18 +1434,20 @@ def run_targeted_note_pipeline(
         f"of {filename}."
     )
 
-    clean_headings = [h for h in headings if h and h.lower() != clean_topic.lower() and len(h) >= 3]
-    if clean_headings:
-        major_topics = [clean_topic] + clean_headings[:5]
-    else:
-        major_topics = [clean_topic]
+    # Retrieved headings are evidence metadata, not additional requested topics.
+    # Passing every heading into major_topics was causing incidental headings from
+    # broad vector matches to become separate generated sections.
+    clean_headings = [
+        h for h in headings
+        if h and len(h) >= 3
+    ]
 
     intelligence = {
         "document_title": f"{clean_topic} — Targeted Study",
-        "major_topics": major_topics,
-        "subtopics": clean_headings,
-        "concept_relationships": [f"{clean_topic} -> {h}" for h in clean_headings[:5]],
-        "revision_priority_order": [clean_topic] + clean_headings[:4],
+        "major_topics": [clean_topic],
+        "subtopics": [],
+        "concept_relationships": [],
+        "revision_priority_order": [clean_topic],
         "document_summary": summary_text,
         "source_quality": {"usable_sections": True, "targeted": True},
         "analysis_mode": "llm" if has_llm_support() else "fallback",
