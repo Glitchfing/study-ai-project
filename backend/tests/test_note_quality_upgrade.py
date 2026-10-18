@@ -48,9 +48,9 @@ class NoteQualityUpgradeTests(unittest.TestCase):
         from services.chunking_service import chunk_document
 
         source = (
-            "[[PAGE_1]]\\nCloud Computing\\n"
+            "[[PAGE_1]]\nCloud Computing\n"
             + ("Cloud computing provides on-demand network access to shared configurable resources. " * 12)
-            + "\\n\\n[[PAGE_2]]\\nDeployment Models\\n"
+            + "\n\n[[PAGE_2]]\nDeployment Models\n"
             + ("Deployment models define where cloud resources are hosted and managed. " * 12)
         )
         chunks = chunk_document(source, "quality-test.pdf", chunk_size=500, overlap=80)
