@@ -109,6 +109,50 @@ class MindMapValidationTests(unittest.TestCase):
         self.assertTrue(result["edges"])
         self.assertTrue(any(node["source_pages"] == [2] for node in result["nodes"]))
 
+    def test_topic_maps_are_cached_separately(self):
+        note = {
+            "id": "note-1",
+            "title": "Cloud Computing",
+            "topic": "Cloud Computing",
+            "source": "generated",
+            "package": {
+                "document_title": "Cloud Computing",
+                "sections": [
+                    {"title": "Service Models", "content": "IaaS provides infrastructure. PaaS provides a platform.", "page_numbers": [2]},
+                    {"title": "Deployment Models", "content": "Public cloud serves many users. Private cloud serves one organization.", "page_numbers": [4]},
+                ],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(mind_map_service, "DATA_DIR", Path(temporary)), \\
+                 patch.object(mind_map_service, "STORE_PATH", Path(temporary) / "mind_maps.json"), \\
+                 patch.object(mind_map_service, "get_note_record", return_value=note), \\
+                 patch.object(mind_map_service, "has_llm_support", return_value=False):
+                services = mind_map_service.generate_mind_map("note-1", "Service Models")
+                deployment = mind_map_service.generate_mind_map("note-1", "Deployment Models")
+                self.assertNotEqual(services["source_version"], deployment["source_version"])
+                self.assertEqual(mind_map_service.get_saved_mind_map("note-1", "Service Models"), services)
+                self.assertEqual(mind_map_service.get_saved_mind_map("note-1", "Deployment Models"), deployment)
+
+    def test_invalid_llm_graph_uses_deterministic_fallback(self):
+        note = {
+            "id": "note-1",
+            "title": "Cloud Computing",
+            "topic": "Cloud Computing",
+            "source": "generated",
+            "package": {
+                "document_title": "Cloud Computing",
+                "sections": [{"title": "Service Models", "content": "IaaS provides infrastructure. PaaS provides a platform.", "page_numbers": [2]}],
+            },
+        }
+        with patch.object(mind_map_service, "get_note_record", return_value=note), \\
+             patch.object(mind_map_service, "has_llm_support", return_value=True), \\
+             patch.object(mind_map_service, "generate_structured_json", return_value={"nodes": [{"id": "root", "parent_id": None}, {"id": "orphan", "parent_id": "missing"}], "edges": []}):
+            result = mind_map_service._generate(note, "note-1", None)
+        self.assertEqual(result["generation_method"], "deterministic_fallback")
+        self.assertEqual(result["nodes"][0]["label"], "Cloud Computing")
+        self.assertTrue(result["edges"])
+
 
 if __name__ == "__main__":
     unittest.main()
