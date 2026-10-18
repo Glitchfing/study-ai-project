@@ -321,9 +321,32 @@ def _retrieve_quiz_evidence(record: dict[str, Any], topic: str | None = None) ->
         key=lambda item: (str(item.get("document_id") or ""), int(item.get("page") or 0), int(item.get("chunk_index") or 0)),
     )
     if not matches:
+        # If this note already contains a quiz generated with the exact same
+        # topic, prefer that persisted quiz instead of failing because Qdrant
+        # is temporarily unavailable or its chunks cannot be retrieved.
+        saved_topic = str(
+            package.get("requested_quiz_topic")
+            or package.get("requested_topic")
+            or ""
+        ).strip()
+        same_saved_scope = (
+            not topic
+            or (
+                bool(saved_topic)
+                and " ".join(topic.lower().split()) == " ".join(saved_topic.lower().split())
+            )
+        )
+        saved_questions = package.get("questions") or []
+        if same_saved_scope and isinstance(saved_questions, list) and saved_questions:
+            package["quiz_topic"] = saved_topic or "entire note"
+            return {
+                "package": package,
+                "retrieved_chunks": 0,
+                "source_document_ids": document_ids,
+            }
         raise HTTPException(
             status_code=404,
-            detail="No indexed source chunks were retrieved for this note/topic. Re-upload the source or verify Qdrant indexing; no unsupported quiz will be generated.",
+            detail="No indexed source chunks were retrieved for this topic, and no saved quiz matches it. Verify Qdrant indexing or choose the note's original topic.",
         )
 
     grouped: dict[str, list[str]] = {}
