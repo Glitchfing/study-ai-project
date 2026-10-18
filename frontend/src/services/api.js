@@ -68,7 +68,18 @@ export const uploadFiles = (files) => {
 // ── Notes ────────────────────────────────────────────────────────────────────
 export const getNotesList = () => request("GET", "/notes");
 export const getNote = (id, format = "cornell") =>
-  request("GET", `/notes/${id}?format=${format}`);
+  request("GET", `/notes/${encodeURIComponent(id)}?format=${encodeURIComponent(format)}`);
+
+export const getMindMap = (noteId, topic = null) => {
+  const params = new URLSearchParams();
+  if (topic) params.set("topic", topic);
+  const query = params.toString();
+  return request("GET", `/notes/${encodeURIComponent(noteId)}/mind-map${query ? `?${query}` : ""}`);
+};
+export const generateMindMap = (noteId, topic = null) =>
+  request("POST", `/notes/${encodeURIComponent(noteId)}/mind-map/generate`, { topic });
+export const regenerateMindMap = (noteId, topic = null) =>
+  request("POST", `/notes/${encodeURIComponent(noteId)}/mind-map/regenerate`, { topic });
 
 // ── Quiz ─────────────────────────────────────────────────────────────────────
 export const getQuiz = (topic = "all", limit = 5, noteId = null, quizTopic = null) => {
