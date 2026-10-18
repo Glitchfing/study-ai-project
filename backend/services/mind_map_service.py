@@ -295,7 +295,7 @@ def _validate_map(payload: dict[str, Any], root_label: str) -> dict[str, Any]:
     for raw in raw_edges:
         if not isinstance(raw, dict):
             continue
-        source, target = str(raw.get("source") or ""), str(raw.get("target") or "")
+        source, target = _safe_id(raw.get("source"), ""), _safe_id(raw.get("target"), "")
         if source not in ids or target not in ids or source == target or (source, target) in edge_keys:
             continue
         edge_keys.add((source, target))
