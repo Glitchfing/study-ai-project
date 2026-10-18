@@ -107,5 +107,88 @@ class NoteQualityUpgradeTests(unittest.TestCase):
         self.assertEqual(package["generation_metadata"]["sections_fallback"], 1)
 
 
+    def test_targeted_retrieval_excludes_chunks_without_topic_evidence(self):
+        from unittest.mock import patch
+        from services.targeted_retrieval_service import retrieve_targeted_chunks
+
+        matches = [
+            {
+                "chunk_id": "components-page-2",
+                "document_id": "doc-1",
+                "filename": "cloud.pdf",
+                "page": 2,
+                "chunk_index": 2,
+                "page_chunk_index": 0,
+                "heading": "Components of Cloud Computing",
+                "text": "Components of cloud computing include client devices, datacentres, distributed servers, front-end and back-end platforms, and the delivery network.",
+                "score": 0.64,
+            },
+            {
+                "chunk_id": "api-page-6",
+                "document_id": "doc-1",
+                "filename": "cloud.pdf",
+                "page": 6,
+                "chunk_index": 12,
+                "page_chunk_index": 0,
+                "heading": "Cloud APIs",
+                "text": "Cloud APIs let applications provision virtual machines and integrate services programmatically.",
+                "score": 0.91,
+            },
+            {
+                "chunk_id": "deployment-page-6",
+                "document_id": "doc-1",
+                "filename": "cloud.pdf",
+                "page": 6,
+                "chunk_index": 13,
+                "page_chunk_index": 1,
+                "heading": "Cloud Deployment Models",
+                "text": "Public, private, hybrid, and community cloud models vary in ownership and control.",
+                "score": 0.83,
+            },
+        ]
+
+        with patch("services.targeted_retrieval_service.embed_query", return_value=[0.1] * 384), patch(
+            "services.targeted_retrieval_service.search_chunks", return_value=matches
+        ):
+            result = retrieve_targeted_chunks(
+                document_id="doc-1",
+                query="Components of Cloud Computing",
+                top_k=5,
+                max_chunks=10,
+            )
+
+        self.assertEqual(result["document_id"], "doc-1")
+        self.assertEqual(result["pages"], [2])
+        self.assertEqual(len(result["matches"]), 1)
+        self.assertEqual(result["matches"][0]["heading"], "Components of Cloud Computing")
+        self.assertIn("client devices", result["source_text"])
+        self.assertNotIn("Cloud APIs let applications", result["source_text"])
+
+    def test_targeted_retrieval_removes_identical_chunk_text(self):
+        from services.targeted_retrieval_service import _deduplicate_by_text
+
+        matches = [
+            {"chunk_id": "a", "score": 0.6, "text": "Components include clients, datacentres, and distributed servers."},
+            {"chunk_id": "b", "score": 0.8, "text": "Components include clients, datacentres, and distributed servers."},
+        ]
+        result = _deduplicate_by_text(matches)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["chunk_id"], "b")
+
+    def test_targeted_retrieval_lexical_match_uses_word_boundaries(self):
+        from services.targeted_retrieval_service import _lexical_relevance
+
+        exact = {
+            "heading": "Components of Cloud Computing",
+            "text": "Components include client devices and datacentres.",
+        }
+        partial = {
+            "heading": "Cloud APIs",
+            "text": "This API exposes cloud service components through a console.",
+        }
+        self.assertGreater(_lexical_relevance("Components of Cloud Computing", exact), 0)
+        self.assertEqual(_lexical_relevance("Components of Cloud Computing", {"heading": "Cloud APIs", "text": "API calls provision services."}), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
