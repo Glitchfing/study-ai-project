@@ -160,6 +160,53 @@ def _dedupe_after_normalization(questions: list[dict[str, Any]], limit: int, mem
     return accepted
 
 
+def _canonicalize_saved_mcq(question: Any) -> dict[str, Any] | None:
+    """Adapt persisted note-generation MCQs to the quiz API without regenerating them."""
+    if not isinstance(question, dict):
+        return None
+    q_type = str(question.get("type") or question.get("question_type") or "mcq").lower().replace("-", "_").replace(" ", "_")
+    if q_type not in {"mcq", "multiple_choice", "multiple_choice_question"}:
+        return None
+
+    options = _distinct_mcq_options(question.get("options") or question.get("choices"))
+    if len(options) != 4:
+        return None
+
+    answer_value = question.get("correct_answer") or question.get("answer")
+    if isinstance(answer_value, (int, float)):
+        answer_index = int(answer_value)
+        answer_value = options[answer_index] if 0 <= answer_index < len(options) else ""
+    if not _clean(answer_value):
+        # Older generated-note schemas store the correct option as an index.
+        raw_index = question.get("answer_index", question.get("correct_index", question.get("correct")))
+        if isinstance(raw_index, int) or (isinstance(raw_index, str) and raw_index.strip().isdigit()):
+            answer_index = int(raw_index)
+            answer_value = options[answer_index] if 0 <= answer_index < len(options) else ""
+
+    normalized_answer = _normalize_answer(answer_value)
+    matching_answer = next(
+        (option for option in options if _normalize_answer(option) == normalized_answer),
+        None,
+    )
+    stem = _clean(question.get("question") or question.get("stem") or question.get("question_text"))
+    explanation = _clean(question.get("explanation") or question.get("answer_hint") or question.get("rationale"))
+    if not matching_answer or len(stem.split()) < 6 or not stem.endswith("?") or not explanation:
+        return None
+
+    # Keep the original generated question and its evidence; only harmonize field names.
+    return {
+        **question,
+        "type": "mcq",
+        "question": stem,
+        "options": options,
+        "correct_answer": matching_answer,
+        "answer": matching_answer,
+        "correct": options.index(matching_answer),
+        "answer_index": options.index(matching_answer),
+        "explanation": explanation,
+    }
+
+
 def generate_quiz_for_package(
     package: dict[str, Any],
     *,
@@ -210,7 +257,12 @@ def generate_quiz_for_package(
     stored_questions = package.get("questions") or []
     raw_questions: list[dict[str, Any]] = []
     if same_scope and isinstance(stored_questions, list):
-        raw_questions = [question for question in stored_questions if valid_generated_mcq(question)]
+        canonical_saved = [
+            question
+            for question in (_canonicalize_saved_mcq(item) for item in stored_questions)
+            if question is not None
+        ]
+        raw_questions = [question for question in canonical_saved if valid_generated_mcq(question)]
 
     # If the stored quiz already contains enough valid questions, no provider
     # call is needed. Otherwise generate additional source-grounded candidates
