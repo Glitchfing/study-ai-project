@@ -384,7 +384,7 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
   }
 
   useEffect(() => {
-    if (!pendingSourcePages?.length || !content || format !== "full") return;
+    if (loading || !pendingSourcePages?.length || !content || format !== "full") return;
     const sections = Array.from(document.querySelectorAll(".teaching-section[data-pages]"));
     const target = sections.find((section) => {
       const pages = (section.getAttribute("data-pages") || "").split(",").map((value) => Number(value.trim()));
@@ -392,7 +392,7 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
     });
     if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     setPendingSourcePages(null);
-  }, [pendingSourcePages, content, format]);
+  }, [pendingSourcePages, content, format, loading]);
 
   const activeNoteMeta = notesList.find((note) => note.id === activeNote);
   const canAttemptQuiz = activeNoteMeta?.source === "generated";
