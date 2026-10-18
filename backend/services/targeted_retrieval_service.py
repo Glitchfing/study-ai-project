@@ -8,14 +8,79 @@ from services.vector_store import search_chunks
 
 
 def _normalize_text(value: Any) -> str:
-    """
-    Clean and normalize user queries, headings, and metadata strings.
-    """
+    """Clean and normalize user queries, headings, and metadata strings."""
     if not value:
         return ""
     text = str(value).strip()
     text = re.sub(r"\s+", " ", text)
     return text
+
+
+_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+    "how", "in", "into", "is", "it", "of", "on", "or", "the", "their",
+    "this", "to", "using", "what", "when", "where", "which", "with",
+    "cloud", "computing", "impact", "study", "targeted", "topic",
+}
+
+
+def _topic_terms(query: str) -> set[str]:
+    """Return meaningful terms for a lightweight lexical relevance check."""
+    return {
+        token
+        for token in re.findall(r"[a-z0-9+#-]{3,}", query.casefold())
+        if token not in _STOPWORDS
+    }
+
+
+def _lexical_relevance(query: str, match: dict[str, Any]) -> float:
+    """Supplement embedding similarity with evidence in chunk headings and text."""
+    terms = _topic_terms(query)
+    if not terms:
+        return 1.0
+
+    heading = _normalize_text(match.get("heading")).casefold()
+    text = _normalize_text(match.get("text")).casefold()
+    combined = f"{heading} {text}"
+    matched = sum(
+        1 for term in terms
+        if re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", combined)
+    )
+    if not matched:
+        return 0.0
+
+    heading_hits = sum(
+        1 for term in terms
+        if re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", heading)
+    )
+    return min(1.0, (matched / len(terms)) * 0.75 + (0.25 if heading_hits else 0.0))
+
+
+def _deduplicate_by_text(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove identical or near-identical chunks, preserving the higher-ranked result."""
+    best: list[dict[str, Any]] = []
+    for match in matches:
+        text = re.sub(r"\\W+", " ", str(match.get("text") or "").casefold()).strip()
+        if not text:
+            continue
+        words = set(text.split())
+        duplicate_index = None
+        for index, previous in enumerate(best):
+            prior_text = re.sub(r"\\W+", " ", str(previous.get("text") or "").casefold()).strip()
+            if text == prior_text:
+                duplicate_index = index
+                break
+            prior_words = set(prior_text.split())
+            if len(words) >= 8 and len(prior_words) >= 8:
+                overlap = len(words & prior_words) / max(1, min(len(words), len(prior_words)))
+                if overlap >= 0.92:
+                    duplicate_index = index
+                    break
+        if duplicate_index is None:
+            best.append(match)
+        elif float(match.get("score") or 0.0) > float(best[duplicate_index].get("score") or 0.0):
+            best[duplicate_index] = match
+    return best
 
 
 def _is_table_of_contents_chunk(match: dict[str, Any]) -> bool:
@@ -209,15 +274,34 @@ def retrieve_targeted_chunks(
         document_id=clean_doc_id,
     )
 
-    # Step 3 — Deduplicate and sort by relevance score
+    # Step 3 — Deduplicate by stable chunk ID, then remove overlapping source text.
     deduped_matches = _deduplicate_matches(raw_matches)
+    deduped_matches = _deduplicate_by_text(deduped_matches)
 
-    # Step 4 — Filter out Table of Contents / Index chunks if substantive content exists
+    # Step 4 — Remove navigation/index chunks when substantive content exists.
     content_matches = [m for m in deduped_matches if not _is_table_of_contents_chunk(m)]
-    final_candidates = content_matches if content_matches else deduped_matches
+    candidates = content_matches if content_matches else deduped_matches
 
-    # Step 5 — Slice top matches up to max_chunks
-    selected_matches = final_candidates[:max_chunks]
+    # Step 5 — Re-rank with topic-term evidence plus vector similarity.
+    # Keep semantic recall, but reduce unrelated generic sections.
+    for match in candidates:
+        vector_score = float(match.get("score") or 0.0)
+        lexical_score = _lexical_relevance(clean_query, match)
+        match["lexical_relevance"] = round(lexical_score, 4)
+        match["vector_score"] = round(vector_score, 4)
+        match["score"] = round((0.72 * vector_score) + (0.28 * lexical_score), 6)
+
+    candidates.sort(key=lambda item: item.get("score", 0.0), reverse=True)
+
+    # If topic evidence exists, exclude candidates with no topical term matches.
+    # Otherwise preserve semantic candidates for paraphrased or broad queries.
+    if _topic_terms(clean_query):
+        with_topic_evidence = [m for m in candidates if m.get("lexical_relevance", 0.0) > 0]
+        if with_topic_evidence:
+            candidates = with_topic_evidence
+
+    # Step 6 — Select relevant chunks, then restore source order.
+    selected_matches = candidates[:max_chunks]
 
     if not selected_matches:
         return {
@@ -232,10 +316,10 @@ def retrieve_targeted_chunks(
             "context_word_count": 0,
         }
 
-    # Step 6 — Restore document reading order
+    # Step 7 — Restore document reading order after relevance ranking.
     ordered_matches = _sort_for_reading(selected_matches)
 
-    # Step 7 — Extract metadata
+    # Step 8 — Extract metadata from selected source evidence only.
     pages = sorted(list({
         int(match["page"])
         for match in ordered_matches
@@ -250,7 +334,7 @@ def retrieve_targeted_chunks(
             seen_headings.add(h.lower())
             headings.append(h)
 
-    # Step 8 — Build clean page-preserved source text & inspection context
+    # Step 9 — Build clean page-preserved source text & inspection context.
     source_text = build_targeted_source_text(ordered_matches)
     context = _build_targeted_context(ordered_matches)
     context_word_count = len(re.findall(r"\b\w+\b", source_text))
