@@ -173,17 +173,22 @@ def generate_quiz_for_package(
     # Reuse the quiz generated and stored with this note when the requested topic
     # matches the note's original scope. This makes the upload -> note -> quiz
     # flow deterministic and avoids regenerating a just-created quiz on first open.
+    # Distinguish the topic the note was originally generated for from the
+    # topic currently requested in the quiz UI. Never treat a new quiz_topic
+    # value as proof that the stored questions were generated for that topic.
     stored_topic = _clean(
         package.get("requested_quiz_topic")
         or package.get("requested_topic")
-        or package.get("quiz_topic")
     )
     requested_topic = _clean(package.get("quiz_topic"))
     if requested_topic.lower() in {"entire note", "all", "none"}:
         requested_topic = ""
     same_scope = (
-        (not requested_topic and not stored_topic)
-        or (bool(stored_topic) and (not requested_topic or _normalize_answer(requested_topic) == _normalize_answer(stored_topic)))
+        not requested_topic
+        or (
+            bool(stored_topic)
+            and _normalize_answer(requested_topic) == _normalize_answer(stored_topic)
+        )
     )
 
     # Only admit real MCQs with four distinct options and a correct answer present in those options.
