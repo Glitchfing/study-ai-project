@@ -23,6 +23,7 @@ from routes import (
     planner,
     targeted_study,
     recommendations,
+    mind_map,
 )
 
 # =====================================================
@@ -139,6 +140,12 @@ app.include_router(
     recommendations.router,
     prefix="/recommendations",
     tags=["Recommendations"],
+)
+
+app.include_router(
+    mind_map.router,
+    prefix="/notes",
+    tags=["Mind Map"],
 )
 
 # =====================================================

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getAssetUrl, getNotesList, getNote } from "../services/api";
+import MindMapView from "../components/MindMapView";
 
 let mermaidModulePromise = null;
 
@@ -61,24 +62,6 @@ function CornellView({ content }) {
   );
 }
 
-function renderMindMapNode(node, depth = 0) {
-  const name = typeof node === "string" ? node : node?.name;
-  const children = typeof node === "string" ? [] : node?.sub_branches || [];
-  if (!name) return null;
-  return (
-    <div key={`${name}-${depth}`} style={{ marginLeft: depth * 18, marginTop: 8 }}>
-      <div style={{
-        fontFamily: "'Syne', sans-serif",
-        fontWeight: 700,
-        color: depth === 0 ? "var(--c-bright)" : "var(--text)",
-      }}>
-        {depth === 0 ? name : `- ${name}`}
-      </div>
-      {children.map((child) => renderMindMapNode(child, depth + 1))}
-    </div>
-  );
-}
-
 function MermaidDiagram({ code, title = "Rendered diagram" }) {
   const [svg, setSvg] = useState("");
   const [error, setError] = useState("");
@@ -117,22 +100,6 @@ function MermaidDiagram({ code, title = "Rendered diagram" }) {
           <pre>{code}</pre>
         </div>
       )}
-    </div>
-  );
-}
-
-function MindMapView({ content }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ color: "var(--muted)", fontSize: 12 }}>
-        Root concept: {content.root}
-      </div>
-      <div>
-        {content.branches?.map((branch) => renderMindMapNode(branch, 0))}
-      </div>
-      {content.mermaid ? (
-        <MermaidDiagram code={content.mermaid} title="Mind map" />
-      ) : null}
     </div>
   );
 }
@@ -348,7 +315,7 @@ function FullNoteView({ content }) {
       </div>
 
       {content.sections.map((section, index) => (
-        <section key={section.section_id || index} className="teaching-section">
+        <section key={section.section_id || index} className="teaching-section" data-pages={(section.page_numbers || section.source_pages || []).join(",")}>
           <h2>{section.title}</h2>
           {section.page_numbers?.length ? (
             <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 10 }}>
@@ -372,6 +339,7 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
   const [format, setFormat] = useState("full");
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [pendingSourcePages, setPendingSourcePages] = useState(null);
 
   useEffect(() => {
     getNotesList()
@@ -407,6 +375,24 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
       loadNote(activeNote, fmt);
     }
   }
+
+  function openSourceForNode(node) {
+    const pages = node?.source_pages || [];
+    if (!pages.length || !activeNote) return;
+    setPendingSourcePages(pages);
+    loadNote(activeNote, "full");
+  }
+
+  useEffect(() => {
+    if (loading || !pendingSourcePages?.length || !content || format !== "full") return;
+    const sections = Array.from(document.querySelectorAll(".teaching-section[data-pages]"));
+    const target = sections.find((section) => {
+      const pages = (section.getAttribute("data-pages") || "").split(",").map((value) => Number(value.trim()));
+      return pendingSourcePages.some((page) => pages.includes(Number(page)));
+    });
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    setPendingSourcePages(null);
+  }, [pendingSourcePages, content, format, loading]);
 
   const activeNoteMeta = notesList.find((note) => note.id === activeNote);
   const canAttemptQuiz = activeNoteMeta?.source === "generated";
@@ -507,7 +493,7 @@ export default function NotesView({ toast, refreshDashboard, selectedNoteId, onN
               {format === "full" && <FullNoteView content={content} />}
               {format === "cornell" && <CornellView content={content} />}
               {format === "outline" && <OutlineView content={content} />}
-              {format === "mindmap" && <MindMapView content={content} />}
+              {format === "mindmap" && <MindMapView noteId={activeNote} noteTitle={activeNoteMeta?.title || content.title} defaultTopic={content.requested_topic || activeNoteMeta?.topic} onNavigate={onNavigate} onOpenSource={openSourceForNode} toast={toast} />}
               {format === "chart" && <ChartView content={content} />}
               {format === "sentence" && <SentenceView content={content} />}
             </>
