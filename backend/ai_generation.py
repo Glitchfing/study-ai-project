@@ -148,6 +148,7 @@ def _is_provider_error_recoverable(error: Exception) -> bool:
         "invalid json",
         "unterminated string",
         "returned json",
+        "empty questions array",
     )
 
     return any(marker in message for marker in markers)
@@ -425,6 +426,16 @@ def generate_structured_json(
                 raise ValueError(
                     f"{provider} returned JSON, but it was not an object."
                 )
+
+            # A valid JSON object with zero quiz questions is still a failed quiz
+            # response. Treat it as recoverable so the secondary provider can
+            # receive the identical source/topic prompt.
+            if (
+                schema_name == "intelligent_quiz"
+                and isinstance(parsed.get("questions"), list)
+                and not parsed["questions"]
+            ):
+                raise ValueError("Provider returned an empty questions array.")
 
             print(
                 f"[LLM PROVIDER SUCCESS] {provider.upper()}"
