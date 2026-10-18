@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   Controls,
   Handle,
@@ -16,6 +17,8 @@ import {
   getMindMap,
   generateMindMap,
   regenerateMindMap,
+  getQuizAttempts,
+  getPlanner,
 } from "../services/api";
 
 const BRANCH_COLORS = ["#119da4", "#e29578", "#7c83fd", "#65b891", "#d77ba8", "#d7b45d"];
@@ -191,6 +194,7 @@ function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, onOpenSourc
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [learningEvidence, setLearningEvidence] = useState({ attempts: [], tasks: [], tasksSource: "unknown" });
   const selectedNode = map?.nodes?.find((node) => node.id === selectedId) || map?.nodes?.find((node) => !node.parent_id) || null;
 
   const loadMap = useCallback(async (force = false, selectedTopic = topic) => {
@@ -222,12 +226,22 @@ function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, onOpenSourc
     setTopic("");
     setSelectedId(null);
     loadMap(false, "");
-  }, [noteId]); // Load a saved map first; only generate when missing.
+    let cancelled = false;
+    Promise.allSettled([getQuizAttempts(noteId, 100), getPlanner()]).then(([attemptResult, plannerResult]) => {
+      if (cancelled) return;
+      const attemptsValue = attemptResult.status === "fulfilled" ? attemptResult.value : [];
+      const attempts = Array.isArray(attemptsValue) ? attemptsValue : Array.isArray(attemptsValue?.attempts) ? attemptsValue.attempts : [];
+      const planner = plannerResult.status === "fulfilled" ? plannerResult.value : {};
+      const tasks = Array.isArray(planner?.tasks) ? planner.tasks : [];
+      setLearningEvidence({ attempts, tasks, tasksSource: planner?.tasks_source || "unknown" });
+    });
+    return () => { cancelled = true; };
+  }, [noteId]); // Load saved map first; only generate when missing.
 
   const runTopic = async (event) => {
     event.preventDefault();
     setLoading(false);
-    await loadMap(true, topic.trim());
+    await loadMap(false, topic.trim());
   };
 
   const requestQuiz = () => {
@@ -238,6 +252,36 @@ function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, onOpenSourc
       toast("Quiz navigation is not available here.", "coral");
     }
   };
+
+  const normalizeLabel = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const selectedLabel = normalizeLabel(selectedNode?.label);
+  const matchedResponses = (learningEvidence.attempts || []).flatMap((attempt) => {
+    const responses = Array.isArray(attempt?.responses) ? attempt.responses : [];
+    return responses.filter((response) => {
+      const candidates = [response?.topic, response?.section_title, response?.concept_id, response?.concept, response?.concept_tag]
+        .map(normalizeLabel).filter(Boolean);
+      return selectedLabel && candidates.some((candidate) => candidate === selectedLabel || (Math.min(candidate.length, selectedLabel.length) >= 5 && (candidate.includes(selectedLabel) || selectedLabel.includes(candidate))));
+    });
+  });
+  const matchedAttempts = (learningEvidence.attempts || []).filter((attempt) => {
+    const labels = [attempt?.topic_label, attempt?.topic, attempt?.note_title].map(normalizeLabel).filter(Boolean);
+    return selectedLabel && labels.some((label) => label === selectedLabel);
+  });
+  const evidenceScores = matchedResponses.length
+    ? { count: matchedResponses.length, correct: matchedResponses.filter((response) => response.is_correct === true).length }
+    : matchedAttempts.reduce((acc, attempt) => {
+        const total = Number(attempt?.total) || 0;
+        const correct = Number(attempt?.correct) || 0;
+        if (total > 0) { acc.count += total; acc.correct += correct; }
+        return acc;
+      }, { count: 0, correct: 0 });
+  const hasLearningEvidence = evidenceScores.count > 0;
+  const matchingTasks = learningEvidence.tasksSource === "persisted"
+    ? learningEvidence.tasks.filter((task) => {
+        const taskLabels = [task?.title, task?.topic].map(normalizeLabel).filter(Boolean);
+        return selectedLabel && taskLabels.some((label) => label === selectedLabel || (Math.min(label.length, selectedLabel.length) >= 5 && (label.includes(selectedLabel) || selectedLabel.includes(label))));
+      })
+    : [];
 
   if (loading && !map) return <div className="mind-map-state"><span className="mind-map-spinner" />Loading mind map…</div>;
   if (error && !map) return (
@@ -272,7 +316,7 @@ function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, onOpenSourc
         <button type="submit" className="btn btn-primary btn-sm" disabled={generating || !topic.trim()}>
           {generating ? "Generating…" : "Generate topic map"}
         </button>
-        {topic ? <button type="button" className="mind-tool-button" disabled={generating} onClick={() => { setTopic(""); loadMap(true, ""); }}>Full note</button> : null}
+        {topic ? <button type="button" className="mind-tool-button" disabled={generating} onClick={() => { setTopic(""); loadMap(false, ""); }}>Full note</button> : null}
       </form>
       {error ? <div className="mind-map-inline-error">{error}</div> : null}
       {generating ? <div className="mind-map-progress">Preparing a source-grounded concept map…</div> : null}
@@ -303,6 +347,21 @@ function MindMapInner({ noteId, noteTitle, defaultTopic, onNavigate, onOpenSourc
               {onOpenSource ? <button type="button" className="mind-source-link" onClick={() => onOpenSource(selectedNode)}>Open related notes ↗</button> : null}
             </div>
           ) : <div className="mind-map-source">No page-level source reference was saved for this concept.</div>}
+          <div className="mind-map-learning-evidence">
+            <div className="mind-map-detail-section">
+              <h4>Learning evidence</h4>
+              {hasLearningEvidence ? (
+                <p>{Math.round((evidenceScores.correct / evidenceScores.count) * 100)}% accuracy across {evidenceScores.count} matched answer{evidenceScores.count === 1 ? "" : "s"} from saved quiz attempts.</p>
+              ) : <p>No saved quiz results are linked to this concept yet.</p>}
+            </div>
+            {matchingTasks.length ? (
+              <div className="mind-map-detail-section">
+                <h4>Existing revision tasks</h4>
+                <ul>{matchingTasks.slice(0, 4).map((task) => <li key={task.id}>{task.title} · {task.done ? "Completed" : "Pending"}</li>)}</ul>
+                {onNavigate ? <button type="button" className="mind-source-link" onClick={() => onNavigate("planner")}>Open Revision Planner ↗</button> : null}
+              </div>
+            ) : null}
+          </div>
           <button type="button" className="btn btn-primary btn-sm mind-map-quiz-button" disabled={!selectedNode} onClick={requestQuiz}>Practice this concept</button>
         </aside>
       </div>
