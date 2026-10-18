@@ -12,7 +12,7 @@ from fastapi import (
 )
 
 from activity import record_activity
-from note_store import get_note_record
+from note_store import get_note_record, get_saved_quiz_set, save_quiz_set
 from note_generation import generate_note_package
 from quiz_engine import evaluate_answer, generate_quiz_for_package, performance_feedback
 from services.targeted_retrieval_service import retrieve_targeted_chunks
@@ -401,6 +401,38 @@ def _generated_questions_for_note(
         or "Generated Note"
     )
 
+    # Persisted quiz sets are note- and topic-specific. Reuse them across
+    # refreshes; if they are short, merge them with new candidates below.
+    requested_scope = str(
+        topic
+        or package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+        or ""
+    ).strip()
+    cached_quiz = get_saved_quiz_set(note_id, requested_scope)
+    if cached_quiz:
+        cached_questions = cached_quiz.get("questions") or []
+        if len(cached_questions) >= max(1, limit):
+            return {
+                "topic": record.get("topic") or "generated",
+                "topic_label": note_title,
+                "note_id": note_id,
+                "note_title": note_title,
+                "total": min(len(cached_questions), max(1, limit)),
+                "retrieval": {
+                    "mode": "saved_quiz_cache",
+                    "retrieved_chunks": 0,
+                    "source_document_ids": package.get("source_document_ids") or record.get("source_document_ids") or [],
+                },
+                "questions": cached_questions[:max(1, limit)],
+            }
+        # Seed top-up generation with the valid saved questions, while still
+        # allowing the source-backed generator to find additional candidates.
+        package["questions"] = [
+            *(package.get("questions") or []),
+            *cached_questions,
+        ]
+
     # Static notes may store their real learning content in the rendered formats
     # rather than package.sections. Promote that source text into a section so the
     # question generator never sees only a title and an empty package.
@@ -439,6 +471,14 @@ def _generated_questions_for_note(
         note_title=note_title,
         limit=limit,
     )
+    final_scope = str(
+        topic
+        or package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+        or ""
+    ).strip()
+    if questions:
+        save_quiz_set(note_id, final_scope, questions)
 
     return {
         "topic": (
