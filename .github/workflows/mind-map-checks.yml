@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [fix/quiz-dashboard-reliability, main, master]
   push:
-    branches: [feature/interactive-mind-map]
+    branches: [feature/interactive-mind-map, fix/mind-map-integration-checks]
 
 jobs:
   frontend-build:
