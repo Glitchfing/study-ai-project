@@ -581,6 +581,7 @@ async def run_note_generation_async(
     # --------------------------------------------------------
     def local_fallback(
         section: dict[str, Any],
+        fallback_reason: str = "provider_unavailable",
     ) -> dict[str, Any]:
         """
         Deterministic fallback used when all LLM providers fail.
@@ -759,6 +760,12 @@ async def run_note_generation_async(
             **notes,
             "diagrams": enriched_diagrams,
             "questions": [],
+            "generation_status": "fallback",
+            "generation_metadata": {
+                "mode": "fallback",
+                "reason": str(fallback_reason or "provider_unavailable")[:240],
+                "repair_attempts": 0,
+            },
         }
 
     # --------------------------------------------------------
@@ -769,7 +776,7 @@ async def run_note_generation_async(
     ) -> list[dict[str, Any]]:
         if not has_llm_support():
             return [
-                local_fallback(section)
+                local_fallback(section, "no_provider_configured")
                 for _, section in batch
             ]
 
@@ -909,19 +916,56 @@ SECTION RULES:
             f"{len(batch)} sections"
         )
 
-        generated = generate_structured_json(
-            system_prompt,
-            user_prompt,
-            "teaching_narrative_batch",
-            batch_schema,
-            temperature=0.28,
-            cache=False,
-            max_output_tokens=max_output_tokens,
-        )
+        generated = None
+        last_error: Exception | None = None
+        repair_attempts = 0
+        for attempt in range(2):
+            try:
+                repair_prompt = user_prompt
+                if attempt:
+                    repair_prompt += (
+                        "\\n\\nREPAIR REQUEST (attempt 2): Your previous response was rejected. "
+                        "Return one complete JSON object matching the supplied schema, include every "
+                        "section_id exactly once, and ensure each section has complete non-empty content. "
+                        "Validation error: "
+                        + f"{type(last_error).__name__}: {str(last_error)[:500]}"
+                    )
+                generated = generate_structured_json(
+                    system_prompt,
+                    repair_prompt,
+                    "teaching_narrative_batch",
+                    batch_schema,
+                    temperature=0.22 if attempt else 0.28,
+                    cache=False,
+                    max_output_tokens=max_output_tokens,
+                )
+                result = generated.get("sections") if isinstance(generated, dict) else None
+                if not isinstance(result, list) or len(result) != len(batch):
+                    raise ValueError(
+                        f"Expected {len(batch)} sections; got "
+                        f"{len(result) if isinstance(result, list) else 'invalid response'}"
+                    )
+                response_ids = [
+                    str(item.get("section_id") or "")
+                    for item in result
+                    if isinstance(item, dict)
+                ]
+                expected_ids = [section_id for section_id, _ in batch]
+                if len(response_ids) != len(batch) or set(response_ids) != set(expected_ids):
+                    raise ValueError("Response section IDs were missing, duplicated, or unexpected.")
+                if any(not str(item.get("content") or "").strip() for item in result if isinstance(item, dict)):
+                    raise ValueError("Response contained an empty section explanation.")
+                repair_attempts = attempt
+                break
+            except Exception as exc:
+                last_error = exc
+                repair_attempts = attempt + 1
+                if attempt == 1:
+                    raise
+        if generated is None:
+            raise RuntimeError("Structured generation failed after bounded repair attempts.") from last_error
 
-        result = generated.get(
-            "sections"
-        ) or []
+        result = generated.get("sections") or []
 
         if len(result) != len(batch):
             raise ValueError(
@@ -993,6 +1037,13 @@ SECTION RULES:
                     **notes,
                     "diagrams": enriched_diagrams,
                     "questions": [],
+                    "generation_status": "repaired" if repair_attempts else "llm",
+                    "generation_metadata": {
+                        "mode": "llm",
+                        "status": "repaired" if repair_attempts else "llm",
+                        "repair_attempts": repair_attempts,
+                        "reason": None,
+                    },
                 }
             )
 
