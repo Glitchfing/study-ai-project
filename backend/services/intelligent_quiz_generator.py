@@ -285,6 +285,53 @@ def _fallback_candidates(package: dict[str, Any], limit: int) -> list[dict[str, 
     return candidates
 
 
+def _generate_quiz_payload_with_retry(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    expected_count: int = 1,
+) -> dict[str, Any]:
+    """Retry malformed, empty, or undersized quiz output while retaining the best valid batch."""
+    errors: list[str] = []
+    best_payload: dict[str, Any] | None = None
+    best_count = 0
+    required_count = max(1, int(expected_count))
+
+    for attempt in range(2):
+        try:
+            payload = generate_structured_json(
+                system_prompt,
+                user_prompt,
+                "intelligent_quiz",
+                QUIZ_SCHEMA,
+                temperature=0.2 if attempt else 0.32,
+                cache=False,
+                max_output_tokens=6000,
+            )
+            questions = payload.get("questions") if isinstance(payload, dict) else None
+            if isinstance(questions, list) and questions:
+                if len(questions) > best_count:
+                    best_payload = payload
+                    best_count = len(questions)
+                if len(questions) >= required_count:
+                    return payload
+                errors.append(
+                    f"attempt {attempt + 1}: provider returned {len(questions)} questions; "
+                    f"{required_count} candidate questions were requested"
+                )
+            else:
+                errors.append(f"attempt {attempt + 1}: provider returned an empty questions array")
+        except Exception as exc:
+            errors.append(f"attempt {attempt + 1}: {type(exc).__name__}: {exc}")
+
+    # A short but non-empty response may still contain useful valid candidates.
+    # Preserve it so source-grounded fallback candidates can top up the quiz.
+    if best_payload is not None:
+        print(f"[QUIZ DEBUG] Keeping best partial provider batch ({best_count} questions) after retry.")
+        return best_payload
+    raise RuntimeError("Quiz generation produced no usable structured questions: " + "; ".join(errors))
+
+
 def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]:
     system_prompt = (
         "You are a university exam setter. Generate ONLY four-option multiple-choice questions (MCQs) directly grounded in the supplied study notes. "
@@ -312,8 +359,12 @@ def _llm_candidates(package: dict[str, Any], limit: int) -> list[dict[str, Any]]
         f"Document intelligence:\n{json.dumps(package.get('document_intelligence') or package.get('topic_map') or {}, ensure_ascii=True)[:2500]}\n\n"
         f"Synthesized note sections:\n{json.dumps(_compact_section_payload(package, max_chars=10000), ensure_ascii=True)}"
     )
-    payload = generate_structured_json(system_prompt, user_prompt, "intelligent_quiz", QUIZ_SCHEMA, temperature=0.32)
-    return payload.get("questions") or []
+    payload = _generate_quiz_payload_with_retry(
+        system_prompt,
+        user_prompt,
+        expected_count=limit,
+    )
+    return [question for question in (payload.get("questions") or []) if isinstance(question, dict)]
 
 
 def detect_concept_overlap(question: dict[str, Any], accepted: list[dict[str, Any]]) -> bool:
@@ -461,13 +512,24 @@ def generate_exam_style_questions(
                 section_text.append(text)
         source_text = "\n\n".join(section_text)
     source_text = source_text[:100000]
-    requested_topic = str(package.get("quiz_topic") or "")
+    requested_topic = str(
+        package.get("quiz_topic")
+        or package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+        or ""
+    ).strip()
+
+    # A title is not source evidence. Never call the model or fabricate
+    # questions when the saved package contains no actual learning content.
+    if not source_text.strip():
+        return []
 
     candidates: list[dict[str, Any]] = []
     if has_llm_support():
         try:
             candidates = _llm_candidates(package, candidate_limit)
-        except Exception:
+        except Exception as exc:
+            print(f"[QUIZ DEBUG] Structured quiz generation failed after retry: {type(exc).__name__}: {exc}")
             candidates = []
     candidates = [
         question for question in candidates

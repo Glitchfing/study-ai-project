@@ -36,13 +36,17 @@ def generate_targeted_note_package(
     filename = source_metadata.get("filename") or "Document"
     pages = source_metadata.get("pages") or []
 
+    if not context or not context.strip():
+        raise ValueError("Cannot generate topic-wise notes or quiz without retrieved source text.")
+
+    quiz_limit = max(6, min(15, len(pages) * 3 if pages else 8))
     pipeline_result = run_targeted_note_pipeline(
         context=context,
         topic=clean_topic,
         source_metadata=source_metadata,
         diagrams=extracted_diagrams or [],
         preferences=pref,
-        quiz_limit=max(6, min(15, len(pages) * 3 if pages else 8)),
+        quiz_limit=quiz_limit,
     )
 
     intelligence = pipeline_result.get("document_intelligence") or {}

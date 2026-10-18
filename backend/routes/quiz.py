@@ -12,7 +12,7 @@ from fastapi import (
 )
 
 from activity import record_activity
-from note_store import get_note_record
+from note_store import get_note_record, get_saved_quiz_set, save_quiz_set
 from note_generation import generate_note_package
 from quiz_engine import evaluate_answer, generate_quiz_for_package, performance_feedback
 from services.targeted_retrieval_service import retrieve_targeted_chunks
@@ -275,9 +275,15 @@ def _normalize_question(
 # GENERATED QUESTIONS
 # =====================================================
 
-def _retrieve_quiz_evidence(record: dict[str, Any], topic: str | None = None) -> dict[str, Any]:
+def _retrieve_quiz_evidence(
+    record: dict[str, Any],
+    topic: str | None = None,
+    package_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build quiz context from Qdrant chunks restricted to this note's source documents."""
-    package = dict(record.get("package") or {})
+    # Callers may hydrate legacy/static notes from their rendered content. Preserve
+    # that recovery instead of re-reading the empty original package here.
+    package = dict(package_override or record.get("package") or {})
     document_ids = package.get("source_document_ids") or record.get("source_document_ids") or []
     document_ids = [str(value).strip() for value in document_ids if str(value).strip()]
     if not document_ids:
@@ -321,9 +327,32 @@ def _retrieve_quiz_evidence(record: dict[str, Any], topic: str | None = None) ->
         key=lambda item: (str(item.get("document_id") or ""), int(item.get("page") or 0), int(item.get("chunk_index") or 0)),
     )
     if not matches:
+        # If this note already contains a quiz generated with the exact same
+        # topic, prefer that persisted quiz instead of failing because Qdrant
+        # is temporarily unavailable or its chunks cannot be retrieved.
+        saved_topic = str(
+            package.get("requested_quiz_topic")
+            or package.get("requested_topic")
+            or ""
+        ).strip()
+        same_saved_scope = (
+            not topic
+            or (
+                bool(saved_topic)
+                and " ".join(topic.lower().split()) == " ".join(saved_topic.lower().split())
+            )
+        )
+        saved_questions = package.get("questions") or []
+        if same_saved_scope and isinstance(saved_questions, list) and saved_questions:
+            package["quiz_topic"] = saved_topic or "entire note"
+            return {
+                "package": package,
+                "retrieved_chunks": 0,
+                "source_document_ids": document_ids,
+            }
         raise HTTPException(
             status_code=404,
-            detail="No indexed source chunks were retrieved for this note/topic. Re-upload the source or verify Qdrant indexing; no unsupported quiz will be generated.",
+            detail="No indexed source chunks were retrieved for this topic, and no saved quiz matches it. Verify Qdrant indexing or choose the note's original topic.",
         )
 
     grouped: dict[str, list[str]] = {}
@@ -372,6 +401,48 @@ def _generated_questions_for_note(
         or "Generated Note"
     )
 
+    # Persisted quiz sets are note- and topic-specific. Reuse them across
+    # refreshes; if they are short, merge them with new candidates below.
+    requested_scope = str(
+        topic
+        or package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+        or ""
+    ).strip()
+    cached_quiz = get_saved_quiz_set(note_id, requested_scope)
+    if cached_quiz:
+        cached_questions = cached_quiz.get("questions") or []
+        if len(cached_questions) >= max(1, limit):
+            return {
+                "topic": record.get("topic") or "generated",
+                "topic_label": note_title,
+                "note_id": note_id,
+                "note_title": note_title,
+                "total": min(len(cached_questions), max(1, limit)),
+                "retrieval": {
+                    "mode": "saved_quiz_cache",
+                    "retrieved_chunks": 0,
+                    "source_document_ids": package.get("source_document_ids") or record.get("source_document_ids") or [],
+                },
+                "questions": cached_questions[:max(1, limit)],
+            }
+
+        original_scope = str(
+            package.get("requested_quiz_topic")
+            or package.get("requested_topic")
+            or ""
+        ).strip()
+        same_original_scope = (
+            " ".join(requested_scope.lower().split())
+            == " ".join(original_scope.lower().split())
+        )
+        # A short saved set can be topped up, but never mix questions from a
+        # different topic's original auto-generated quiz into this topic.
+        package["quiz_topic"] = requested_scope or "entire note"
+        package["requested_quiz_topic"] = requested_scope
+        existing_questions = (package.get("questions") or []) if same_original_scope else []
+        package["questions"] = [*existing_questions, *cached_questions]
+
     # Static notes may store their real learning content in the rendered formats
     # rather than package.sections. Promote that source text into a section so the
     # question generator never sees only a title and an empty package.
@@ -397,7 +468,7 @@ def _generated_questions_for_note(
                 "key_points": [line.strip() for line in source_text.splitlines() if len(line.split()) >= 5],
             }]
 
-    rag = _retrieve_quiz_evidence(record, topic=topic)
+    rag = _retrieve_quiz_evidence(record, topic=topic, package_override=package)
     package = rag["package"]
 
     # Saved synthesized notes may not have indexed source-document IDs, so
@@ -410,6 +481,14 @@ def _generated_questions_for_note(
         note_title=note_title,
         limit=limit,
     )
+    final_scope = str(
+        topic
+        or package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+        or ""
+    ).strip()
+    if questions:
+        save_quiz_set(note_id, final_scope, questions)
 
     return {
         "topic": (

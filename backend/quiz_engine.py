@@ -169,10 +169,28 @@ def generate_quiz_for_package(
 ) -> list[dict[str, Any]]:
     requested_limit = max(1, limit)
     memory = _question_memory(note_id)
-    # A small candidate buffer is enough for validation/deduplication; multiplying by 3
-    # here and again inside the generator caused unnecessary provider token usage.
-    candidate_limit = max(requested_limit + 6, int(requested_limit * 1.5))
-    raw_questions = generate_exam_style_questions(package, limit=candidate_limit, memory=memory)
+
+    # Reuse the quiz generated and stored with this note when the requested topic
+    # matches the note's original scope. This makes the upload -> note -> quiz
+    # flow deterministic and avoids regenerating a just-created quiz on first open.
+    # Distinguish the topic the note was originally generated for from the
+    # topic currently requested in the quiz UI. Never treat a new quiz_topic
+    # value as proof that the stored questions were generated for that topic.
+    stored_topic = _clean(
+        package.get("requested_quiz_topic")
+        or package.get("requested_topic")
+    )
+    requested_topic = _clean(package.get("quiz_topic"))
+    if requested_topic.lower() in {"entire note", "all", "none"}:
+        requested_topic = ""
+    same_scope = (
+        not requested_topic
+        or (
+            bool(stored_topic)
+            and _normalize_answer(requested_topic) == _normalize_answer(stored_topic)
+        )
+    )
+
     # Only admit real MCQs with four distinct options and a correct answer present in those options.
     def valid_generated_mcq(question: Any) -> bool:
         if not isinstance(question, dict) or str(question.get("type") or "").lower().replace("-", "_") != "mcq":
@@ -187,6 +205,22 @@ def generate_quiz_for_package(
             and len(stem.split()) >= 6
             and stem.endswith("?")
             and bool(_clean(question.get("explanation")))
+        )
+
+    stored_questions = package.get("questions") or []
+    raw_questions: list[dict[str, Any]] = []
+    if same_scope and isinstance(stored_questions, list):
+        raw_questions = [question for question in stored_questions if valid_generated_mcq(question)]
+
+    # If the stored quiz already contains enough valid questions, no provider
+    # call is needed. Otherwise generate additional source-grounded candidates
+    # and combine them with the saved quiz before duplicate filtering.
+    if len(raw_questions) < requested_limit:
+        candidate_limit = max(requested_limit + 6, int(requested_limit * 1.5))
+        generated_questions = generate_exam_style_questions(package, limit=candidate_limit, memory=memory)
+        raw_questions.extend(
+            question for question in generated_questions
+            if valid_generated_mcq(question)
         )
 
     raw_questions = [question for question in raw_questions if valid_generated_mcq(question)]
