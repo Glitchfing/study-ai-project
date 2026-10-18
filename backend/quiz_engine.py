@@ -254,7 +254,21 @@ def generate_quiz_for_package(
             and bool(_clean(question.get("explanation")))
         )
 
+    # Questions may be persisted at package level, inside individual sections,
+    # or in the normalized note schema. Merge these sources in priority order so
+    # note-generation questions are reused even for older saved notes.
     stored_questions = package.get("questions") or []
+    if not isinstance(stored_questions, list):
+        stored_questions = []
+    for section in package.get("sections") or []:
+        if isinstance(section, dict) and isinstance(section.get("questions"), list):
+            stored_questions.extend(section["questions"])
+
+    normalized_note = package.get("normalized") or {}
+    normalized_quiz = normalized_note.get("quiz") or {}
+    if isinstance(normalized_quiz, dict):
+        stored_questions.extend(normalized_quiz.get("mcq") or [])
+
     raw_questions: list[dict[str, Any]] = []
     if same_scope and isinstance(stored_questions, list):
         canonical_saved = [
@@ -262,7 +276,16 @@ def generate_quiz_for_package(
             for question in (_canonicalize_saved_mcq(item) for item in stored_questions)
             if question is not None
         ]
-        raw_questions = [question for question in canonical_saved if valid_generated_mcq(question)]
+        # Preserve first occurrence and remove identical question stems before
+        # filling any remaining slots with newly generated candidates.
+        seen_stems: set[str] = set()
+        unique_saved = []
+        for question in canonical_saved:
+            stem_key = _normalize_answer(question.get("question"))
+            if stem_key and stem_key not in seen_stems:
+                seen_stems.add(stem_key)
+                unique_saved.append(question)
+        raw_questions = [question for question in unique_saved if valid_generated_mcq(question)]
 
     # If the stored quiz already contains enough valid questions, no provider
     # call is needed. Otherwise generate additional source-grounded candidates
