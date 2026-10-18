@@ -29,7 +29,7 @@ class QuizGenerationReliabilityTests(unittest.TestCase):
             "document_title": "Large note",
             "sections": [{"title": "Section", "content": "Important learning fact. " * 12000}],
         }
-        with patch.object(quiz, "generate_structured_json", return_value={"questions": []}) as generate:
+        with patch.object(quiz, "generate_structured_json", return_value={"questions": [{"type": "mcq"}]}) as generate:
             quiz._llm_candidates(package, 12)
         prompt = generate.call_args.args[1]
         self.assertIn("Need 12 candidate questions before filtering.", prompt)
