@@ -51,3 +51,7 @@
 @keyframes mind-map-spin { to { transform: rotate(360deg); } }
 @media (max-width: 1050px) { .mind-map-content { grid-template-columns: minmax(0, 1fr); } .mind-map-details { min-height: 180px; } }
 @media (max-width: 640px) { .mind-map-heading { align-items: flex-start; } .mind-map-heading > button { flex-shrink: 0; } .mind-map-content { gap: 10px; } .mind-graph-shell { height: 470px; min-height: 380px; } .mind-map-topic-form { align-items: stretch; } .mind-map-topic-form label { flex-basis: 100%; } .mind-map-topic-form input { flex-basis: 100%; } .mind-graph-toolbar { align-items: flex-start; flex-direction: column; } .mind-graph-canvas { height: calc(100% - 65px); } }
+
+.mind-source-link { display: inline-block; margin-top: 7px; border: 0; background: transparent; color: var(--c-mint); font-size: 10px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.mind-source-link:hover { color: var(--text); }
+.teaching-section[data-pages] { scroll-margin-top: 24px; }
