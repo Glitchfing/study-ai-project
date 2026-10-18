@@ -426,12 +426,22 @@ def _generated_questions_for_note(
                 },
                 "questions": cached_questions[:max(1, limit)],
             }
-        # Seed top-up generation with the valid saved questions, while still
-        # allowing the source-backed generator to find additional candidates.
-        package["questions"] = [
-            *(package.get("questions") or []),
-            *cached_questions,
-        ]
+
+        original_scope = str(
+            package.get("requested_quiz_topic")
+            or package.get("requested_topic")
+            or ""
+        ).strip()
+        same_original_scope = (
+            " ".join(requested_scope.lower().split())
+            == " ".join(original_scope.lower().split())
+        )
+        # A short saved set can be topped up, but never mix questions from a
+        # different topic's original auto-generated quiz into this topic.
+        package["quiz_topic"] = requested_scope or "entire note"
+        package["requested_quiz_topic"] = requested_scope
+        existing_questions = (package.get("questions") or []) if same_original_scope else []
+        package["questions"] = [*existing_questions, *cached_questions]
 
     # Static notes may store their real learning content in the rendered formats
     # rather than package.sections. Promote that source text into a section so the
