@@ -347,7 +347,7 @@ def _validate_schedule_slot(
         raise HTTPException(status_code=409, detail="That time is outside your configured study window or the session does not fit.")
 
     for other in TASKS:
-        if str(other.get("id")) == str(exclude_task_id) or _task_done(other) or other.get("status") in {"cancelled", "skipped"}:
+        if (exclude_task_id is not None and str(other.get("id")) == str(exclude_task_id)) or _task_done(other) or other.get("status") in {"cancelled", "skipped"}:
             continue
         if _overlap(new_time, duration_minutes, other):
             raise HTTPException(status_code=409, detail="That time overlaps another pending revision task. Choose another slot.")
@@ -355,7 +355,7 @@ def _validate_schedule_slot(
     day_key = local_new.date().isoformat()
     booked_minutes = sum(
         _duration(other) for other in TASKS
-        if str(other.get("id")) != str(exclude_task_id)
+        if (exclude_task_id is None or str(other.get("id")) != str(exclude_task_id))
         and not _task_done(other)
         and other.get("status") not in {"cancelled", "skipped"}
         and (other_time := _scheduled_timestamp(other)) is not None
