@@ -266,30 +266,93 @@ def _aggregate_outline(sections: list[dict[str, Any]], title: str) -> dict[str, 
 
 
 def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
+    """Create a radial mind map from section concepts, not isolated high-frequency words."""
     branches = []
     lines = ["mindmap", f"  root(({_mindmap_label(title, 'Study Document')}))"]
-    seen = set()
+    seen_sections: set[str] = set()
+    weak_labels = {
+        "object", "instance", "used", "use", "page", "request", "response",
+        "elements", "element", "method", "methods", "name", "source", "file",
+        "data", "key", "then", "common", "incorrectly", "major", "various",
+        "following", "important", "different", "related", "based", "using",
+        "therefore", "thus", "also", "first", "second", "example", "examples",
+    }
+
+    def concept_label(value: Any) -> str:
+        if isinstance(value, dict):
+            value = value.get("name") or value.get("heading") or value.get("title") or value.get("content") or ""
+        text = re.sub(r"^[\s•*\-\d.)]+", "", str(value or ""))
+        text = re.sub(r"\s+", " ", text).strip(" .:;,-")
+        return _mindmap_label(_shorten(text, sentences=1, chars=62), "")
+
+    def is_meaningful(value: Any) -> bool:
+        label = concept_label(value)
+        if not label:
+            return False
+        words = re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", label)
+        lowered = label.casefold()
+        if lowered in weak_labels or len(label) < 6:
+            return False
+        # Multi-word concepts and actual acronyms are useful; one-word keyword noise isn't.
+        is_acronym = len(words) == 1 and words[0].isupper() and len(words[0]) >= 2
+        if len(words) < 2 and not is_acronym:
+            return False
+        if len(words) >= 2 and all(word.casefold() in weak_labels for word in words):
+            return False
+        return True
+
+    def add_candidate(output: list[str], seen: set[str], value: Any) -> None:
+        label = concept_label(value)
+        key = label.casefold()
+        if not is_meaningful(label) or key in seen:
+            return
+        seen.add(key)
+        output.append(label)
+
     for section in sections:
         section_name = _mindmap_label(section.get("title"), "Section")
-        section_key = section_name.lower()
-        if section_key in seen:
+        section_key = section_name.casefold()
+        if section_key in seen_sections:
             continue
-        seen.add(section_key)
-        child_values = (
-            section.get("topics")
-            or section.get("concept_keywords")
-            or section.get("notes", {}).get("mindmap", {}).get("branches", [])
-            or []
-        )
-        children = []
-        for child in child_values:
-            child_name = child.get("name") if isinstance(child, dict) else child
-            child_label = _mindmap_label(child_name, "")
-            if child_label and _useful_mindmap_label(child_label):
-                children.append({"name": child_label, "sub_branches": []})
-            if len(children) >= 3:
+        seen_sections.add(section_key)
+
+        section_seen: set[str] = set()
+        child_names: list[str] = []
+
+        # Use explanatory facts first. topics/concept_keywords often contain isolated TF-IDF words.
+        for field in ("key_points", "definitions", "examples", "use_cases", "important_notes", "revision_notes"):
+            for value in section.get(field) or []:
+                add_candidate(child_names, section_seen, value)
+                if len(child_names) >= 3:
+                    break
+            if len(child_names) >= 3:
                 break
-        child_names = _dedupe([child["name"] for child in children], 3)
+
+        # Structured note content is another source of meaningful concepts.
+        note_data = section.get("notes") or {}
+        structure = section.get("note_structure") or {}
+        for block in structure.get("blocks") or []:
+            candidates = [block.get("heading"), block.get("content")]
+            candidates.extend(block.get("items") or [])
+            for value in candidates:
+                add_candidate(child_names, section_seen, value)
+                if len(child_names) >= 3:
+                    break
+            if len(child_names) >= 3:
+                break
+
+        # Keep only meaningful phrases from older keyword-oriented records.
+        if len(child_names) < 3:
+            old_branches = note_data.get("mindmap", {}).get("branches", []) if isinstance(note_data, dict) else []
+            fallback_values = []
+            fallback_values.extend(old_branches if isinstance(old_branches, list) else [])
+            fallback_values.extend(section.get("topics") or [])
+            fallback_values.extend(section.get("concept_keywords") or [])
+            for value in fallback_values:
+                add_candidate(child_names, section_seen, value)
+                if len(child_names) >= 3:
+                    break
+
         section_branch = {
             "name": section_name,
             "sub_branches": [{"name": child_name, "sub_branches": []} for child_name in child_names],
@@ -300,6 +363,7 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
             lines.append(f"      {_mindmap_label(child)}")
         if len(branches) >= 8:
             break
+
     return {
         "title": f"{title} - Mind Map",
         "format": "mindmap",
@@ -307,8 +371,6 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
         "mermaid": "\n".join(lines),
         "branches": branches,
     }
-
-
 def _aggregate_chart(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
     return {
         "title": f"{title} - Concept Chart",
