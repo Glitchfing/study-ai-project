@@ -162,7 +162,7 @@ input, textarea, select { font-family: 'DM Sans', sans-serif; }
 .tb-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: var(--c-coral); border-radius: 50%; border: 2px solid var(--bg); }
 
 /* ════ VIEW CONTAINER ════ */
-#view-container { flex: 1; overflow: hidden; position: relative; }
+#view-container { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; position: relative; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: var(--c-ocean) transparent; }
 .view { display: none; height: 100%; overflow-y: auto; overflow-x: hidden; padding: 22px 24px 30px; }
 .view.active { display: block; animation: fadeView 0.3s ease; }
 @keyframes fadeView { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
