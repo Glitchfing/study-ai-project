@@ -631,7 +631,7 @@ def _mindmap(
         r"transforms?|links?|contains?|includes?|brings?|stores?|creates?|helps?|"
         r"allows?|reduces?|prevents?|ensures?|uses?|delivers?|offers?|presents?|"
         r"collects?|organizes?|represents?|means?|refers to|consists of|is|are|"
-        r"serves as|acts as|displays?|shows?|generates?|measures?)\b",
+        r"serves as|acts as|displays?|shows?|generates?|measures?|requires?)\b",
         re.IGNORECASE,
     )
 
@@ -664,6 +664,11 @@ def _mindmap(
                     word for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", complement)
                     if word.casefold() not in filler_words
                 )
+        if not match:
+            text = " ".join(
+                word for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", text)
+                if word.casefold() not in filler_words
+            )
         words = text.split()
         text = " ".join(words[:max_words]).strip(" .:;,-")
         if len(text) > 38:
