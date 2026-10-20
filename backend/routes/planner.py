@@ -579,6 +579,8 @@ def toggle_task(body: TaskToggle):
         task = next((item for item in TASKS if str(item.get("id")) == str(body.task_id)), None)
         if task is None:
             raise HTTPException(status_code=404, detail="Revision task not found.")
+        if task.get("status") == "cancelled":
+            raise HTTPException(status_code=409, detail="Cancelled tasks cannot be completed or reopened. Create a new task to restart this revision.")
         previous = _task_done(task)
         if previous != body.done:
             task["done"] = body.done
@@ -600,6 +602,8 @@ def update_task(task_id: str, changes: TaskEdit):
         task = next((item for item in TASKS if str(item.get("id")) == str(task_id)), None)
         if task is None:
             raise HTTPException(status_code=404, detail="Revision task not found.")
+        if task.get("status") == "cancelled":
+            raise HTTPException(status_code=409, detail="Cancelled tasks are archived. Create a new task to restart this revision.")
         updates = changes.model_dump(exclude_unset=True, exclude_none=True)
         now = _utc_now()
         now_text = now.isoformat(timespec="seconds")
