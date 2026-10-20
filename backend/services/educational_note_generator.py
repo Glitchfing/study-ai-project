@@ -650,7 +650,8 @@ def _mindmap(
                 word for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", subject)
                 if word.casefold() not in filler_words
             ]
-            if len(subject_words) >= 2:
+            is_acronym_subject = len(subject_words) == 1 and subject_words[0].isupper() and len(subject_words[0]) >= 2
+            if len(subject_words) >= 2 or is_acronym_subject:
                 text = " ".join(subject_words)
             else:
                 complement = text[match.end():].strip(" .:;,-")
@@ -672,7 +673,8 @@ def _mindmap(
     def meaningful(value: Any) -> bool:
         text = clean_concept(value)
         words = re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", text)
-        if len(words) < 2 or len(text) < 7:
+        is_acronym = len(words) == 1 and words[0].isupper() and len(words[0]) >= 2
+        if (len(words) < 2 and not is_acronym) or len(text) < 3:
             return False
         if text.casefold() in stop_labels:
             return False
