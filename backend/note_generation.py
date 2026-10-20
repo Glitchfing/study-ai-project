@@ -296,7 +296,7 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
         r"transforms?|links?|contains?|includes?|brings?|stores?|creates?|helps?|"
         r"allows?|reduces?|prevents?|ensures?|uses?|delivers?|offers?|presents?|"
         r"collects?|organizes?|represents?|means?|refers to|consists of|is|are|"
-        r"serves as|acts as|displays?|shows?|generates?|measures?)\b",
+        r"serves as|acts as|displays?|shows?|generates?|measures?|requires?)\b",
         re.IGNORECASE,
     )
 
@@ -358,9 +358,9 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
             return False
         words = words_in(label)
         lowered = label.casefold()
-        if lowered in weak_labels or len(label) < 6:
-            return False
         is_acronym = len(words) == 1 and words[0].isupper() and len(words[0]) >= 2
+        if lowered in weak_labels or (len(label) < 6 and not is_acronym):
+            return False
         if len(words) < 2 and not is_acronym:
             return False
         if len(words) >= 2 and all(word.casefold() in weak_labels for word in words):
