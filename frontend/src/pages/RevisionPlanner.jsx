@@ -44,6 +44,15 @@ const toInputDateTime = (value) => {
   if (!d) return "";
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
+const getDefaultScheduleInput = (prefs = DEFAULT_PREFS) => {
+  const now = new Date();
+  const date = new Date(now);
+  date.setHours(Number(prefs.preferred_start_hour ?? 18), 0, 0, 0);
+  if (date <= now) date.setDate(date.getDate() + 1);
+  const days = prefs.available_days || [0, 1, 2, 3, 4, 5, 6];
+  for (let i = 0; i < 14 && !days.includes((date.getDay() + 6) % 7); i += 1) date.setDate(date.getDate() + 1);
+  return toInputDateTime(date);
+};
 
 export default function RevisionPlanner({ toast, refreshDashboard, onNavigate }) {
   const [planner, setPlanner] = useState({ tasks: [], deadlines: [], topics: [], summary: {} });
@@ -63,7 +72,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
   const [draftTitle, setDraftTitle] = useState("");
   const [draftTopic, setDraftTopic] = useState("");
   const [draftMinutes, setDraftMinutes] = useState(25);
-  const [draftDate, setDraftDate] = useState(toInputDateTime(new Date(Date.now() + 3600000)));
+  const [draftDate, setDraftDate] = useState(getDefaultScheduleInput(DEFAULT_PREFS));
   const [editDate, setEditDate] = useState("");
 
   const load = useCallback(async () => {
@@ -338,7 +347,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
     <main className="rp-page">
       <header className="rp-header">
         <div><div className="rp-eyebrow">STUDY WITH INTENTION</div><h1>Revision <em>Planner</em></h1><p>Your personalized study schedule, built from your saved learning activity.</p></div>
-        <div className="rp-header-actions"><span className="rp-date-chip">{new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span><button className="rp-btn secondary" onClick={() => { setShowCreate((v) => !v); setDraftDate(toInputDateTime(new Date(Date.now() + 3600000))); }}>＋ Add task</button><button className="rp-btn primary" disabled={busy === "generate"} onClick={generatePlan}>{busy === "generate" ? "Building plan…" : "✦ Generate / Update Plan"}</button></div>
+        <div className="rp-header-actions"><span className="rp-date-chip">{new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span><button className="rp-btn secondary" onClick={() => { setShowCreate((v) => !v); setDraftDate(getDefaultScheduleInput(preferences)); setDraftMinutes((current) => Math.min(current, Number(preferences.daily_minutes) || current)); }}>＋ Add task</button><button className="rp-btn primary" disabled={busy === "generate"} onClick={generatePlan}>{busy === "generate" ? "Building plan…" : "✦ Generate / Update Plan"}</button></div>
       </header>
 
       {activeSession && <section className="rp-session-banner"><span className="rp-live-dot"/><div><b>Study session active{activeSession.topic ? ` · ${activeSession.topic}` : ""}</b><small>{activeSession.status === "paused" ? "Paused" : "Timer running"} · {formatMinutes(Math.floor(displayedSessionSeconds / 60))} measured so far · paused time is excluded.</small></div>{activeSession.status === "paused" ? <button className="rp-btn secondary" disabled={busy === "resume"} onClick={resumeSession}>{busy === "resume" ? "Resuming…" : "Resume"}</button> : <button className="rp-btn secondary" disabled={busy === "pause"} onClick={pauseSession}>{busy === "pause" ? "Pausing…" : "Pause"}</button>}<button className="rp-btn primary" disabled={busy === "stop"} onClick={stopSession}>{busy === "stop" ? "Saving…" : "Finish session"}</button></section>}
