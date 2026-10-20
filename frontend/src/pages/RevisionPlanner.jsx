@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  autoSchedule, completeStudySession, createPlannerTask, getActiveStudySession,
-  getDashboard, getPlanner, getPlannerPreferences, savePlannerPreferences, startStudySession,
+  autoSchedule, cancelPlannerTask, completeStudySession, createPlannerTask, getActiveStudySession,
+  getDashboard, getPlanner, getPlannerPreferences, pauseStudySession, resumeStudySession, savePlannerPreferences, startStudySession,
   toggleTask, updatePlannerTask,
 } from "../services/api";
 import "../styles/revision-planner.css";
@@ -27,6 +27,7 @@ const formatMinutes = (minutes) => {
   return n >= 60 ? `${Math.floor(n / 60)}h ${n % 60}m` : `${n} min`;
 };
 const isDone = (task) => Boolean(task?.done) || task?.status === "completed";
+const isCancelled = (task) => task?.status === "cancelled" || task?.status === "skipped";
 const getScheduled = (task) => task?.scheduled_at || task?.due_date || null;
 const isOverdue = (task, now = new Date()) => {
   if (isDone(task)) return false;
@@ -44,6 +45,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
   const [preferences, setPreferences] = useState(DEFAULT_PREFS);
   const [dashboard, setDashboard] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
+  const [clockNow, setClockNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -81,10 +83,16 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!activeSession) return undefined;
+    const interval = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [activeSession?.session_id, activeSession?.status, activeSession?.active_interval_started_at]);
 
   const tasks = planner.tasks || [];
   const deadlines = planner.deadlines || preferences.deadlines || [];
   const selectedTask = tasks.find((task) => String(task.id) === String(selectedTaskId)) || null;
+  const displayedSessionSeconds = activeSession ? Math.max(0, Number(activeSession.duration_seconds) || 0) + (activeSession.status === "active" && activeSession.active_interval_started_at ? Math.max(0, Math.floor((clockNow - (parseDate(activeSession.active_interval_started_at)?.getTime() || clockNow)) / 1000)) : 0) : 0;
   const today = dayStart(new Date());
   const period = useMemo(() => {
     if (view === "today") return { start: dayStart(anchor), end: plusDays(dayStart(anchor), 1) };
@@ -163,7 +171,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
     if (!task?.topic) return notify("This task does not have a linked topic.", "coral");
     setBusy(`start-${task.id}`);
     try {
-      const result = await startStudySession(task.topic);
+      const result = await startStudySession(task.topic, task.id);
       const session = result?.session || result?.active;
       setActiveSession(session || null);
       if (result?.already_active && session?.topic && session.topic.toLowerCase() !== task.topic.toLowerCase()) {
@@ -288,7 +296,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
 
   const daysWithTasks = weekDays.map((day) => ({ date: day, key: localDay(day), tasks: (taskByDay.get(localDay(day)) || []).slice().sort((a, b) => (a.priority === "high" ? -1 : 0) - (b.priority === "high" ? -1 : 0)) }));
   const topics = planner.topics || [];
-  const recommended = tasks.filter((task) => !isDone(task)).sort((a, b) => {
+  const recommended = tasks.filter((task) => !isDone(task) && !isCancelled(task)).sort((a, b) => {
     if (isOverdue(a) !== isOverdue(b)) return isOverdue(a) ? -1 : 1;
     const p = { high: 0, med: 1, low: 2 };
     return (p[a.priority] ?? 3) - (p[b.priority] ?? 3) || (parseDate(getScheduled(a))?.getTime() ?? Infinity) - (parseDate(getScheduled(b))?.getTime() ?? Infinity);
@@ -308,6 +316,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
         <Metric label="Planned study time" value={formatMinutes(remainingMinutes)} helper="Remaining estimates, not actual time" glyph="◷"/>
         <Metric label="Completed sessions" value={completedCount} helper={`In ${view === "today" ? "this day" : view === "month" ? "this month" : "this week"}`} glyph="✓"/>
         <Metric label="Overdue tasks" value={overdueTasks.length} helper="Incomplete and past due" glyph="!"/>
+        <Metric label="Actual study time today" value={formatMinutes(studyMinutesToday)} helper="Measured from saved study sessions" glyph="◴"/>
       </section>
 
       {error && <div className="rp-error" role="alert">{error} <button className="rp-btn secondary" onClick={load}>Retry</button></div>}
@@ -383,7 +392,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
 function TaskCard({ task, selected, onSelect }) {
   const overdue = isOverdue(task);
   const done = isDone(task);
-  const status = done ? "Completed" : overdue ? "Overdue" : task.status === "in_progress" ? "In progress" : task.priority === "high" ? "High priority" : "Scheduled";
+  const status = done ? "Completed" : isCancelled(task) ? "Cancelled" : overdue ? "Overdue" : task.status === "in_progress" ? "In progress" : task.priority === "high" ? "High priority" : "Scheduled";
   return <button type="button" className={`rp-task-card ${selected ? "selected" : ""} ${done ? "completed" : ""} ${overdue ? "overdue" : ""}`} onClick={onSelect}>
     <span className="rp-task-leading">{done ? "✓" : overdue ? "!" : task.priority === "high" ? "↑" : "↻"}</span>
     <span className="rp-task-content"><b>{task.title || task.topic}</b><span>{task.topic || "Topic not linked"} · {formatMinutes(Number(task.duration_minutes) || parseEstimate(task.est))}</span><small>{task.priority_reason || "No additional performance evidence is available yet."}</small></span>
