@@ -18,8 +18,8 @@ try:
     )
 except ImportError:
     DEFAULT_WEIGHTS = {
-        "weakness": 0.35, "decline": 0.20, "review_need": 0.20,
-        "learning_importance": 0.15, "uncertainty": 0.10,
+        "weakness": 0.35, "decline": 0.20, "revision_priority": 0.25,
+        "action_utility": 0.20,
     }
     DEFAULT_RECOMMENDATION_LIMIT = 3
     LOW_MASTERY_THRESHOLD = 0.45
@@ -114,6 +114,7 @@ def build_recommendations(
     weights: dict[str, float] | None = None,
     concept_mastery: dict[str, dict[str, Any]] | None = None,
     revision_tasks: list[dict[str, Any]] | None = None,
+    note_topics: list[dict[str, Any]] | None = None,
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """Rank evidence-backed learning actions; one active candidate per topic."""
@@ -185,20 +186,28 @@ def build_recommendations(
         if elapsed is None:
             elapsed = topic_elapsed
 
-        # A missing signal is excluded and the available weights are
-        # renormalized. Unknown trend/review dates must not be scored as
-        # observed stability or urgency.
-        review_need = min(1.0, elapsed / 7.0) if elapsed is not None else None
+        # Paper formulation: S(r) = alpha*W + beta*G + gamma*R + delta*U.
+        # W = weakness, G = recent decline, R = saved revision urgency,
+        # U = utility of the action selected for this learner state.
+        pending_for_topic = [
+            task for task in (revision_tasks or [])
+            if _normalize(task.get("topic")) == _normalize(topic)
+            and not task.get("done")
+            and task.get("status") not in {"completed", "cancelled", "skipped"}
+        ]
+        elapsed_for_task = [
+            _days_since(task.get("scheduled_at") or task.get("due_date"), current_time)
+            for task in pending_for_topic
+        ]
+        overdue = any(value is not None and value > 0 for value in elapsed_for_task)
+        revision_priority = 1.0 if overdue else (0.75 if pending_for_topic else min(1.0, elapsed / 7.0) if elapsed is not None else None)
+        action = _action_for(focus_mastery, trend, diagnostic=diagnostic)
+        utilities = _action_utilities(focus_mastery, trend)
         components: dict[str, float | None] = {
             "weakness": 1.0 - focus_mastery,
             "decline": min(1.0, max(0.0, -trend / 0.25)) if trend is not None else None,
-            "review_need": review_need,
-            "learning_importance": (
-                min(1.0, max(0.0, float(importance_value)))
-                if isinstance((importance_value := focus_stats.get("learning_importance", stats.get("learning_importance"))), (int, float))
-                else None
-            ),
-            "uncertainty": 1.0 - confidence if confidence is not None else None,
+            "revision_priority": revision_priority,
+            "action_utility": utilities.get(action, 0.0),
         }
         available_weight = sum(chosen_weights[key] for key, value in components.items() if value is not None)
         priority = (
@@ -215,8 +224,6 @@ def build_recommendations(
             for key, value in components.items() if value is not None
         }
 
-        action = _action_for(focus_mastery, trend, diagnostic=diagnostic)
-        utilities = _action_utilities(focus_mastery, trend)
         display_action = "Diagnostic Practice Quiz" if diagnostic else action
         reason, reason_parts = _reason(topic, concept, focus_pct, trend, attempt_count,
                                        question_count, elapsed, diagnostic)
@@ -261,8 +268,34 @@ def build_recommendations(
             },
             "status": "pending",
             "created_at": current_time.isoformat(timespec="seconds"),
-            "model_version": "1.0",
+            "model_version": "2.0-paper-adaptive",
             "action_utility": round(utilities.get(action, 0.0), 3),
+        })
+
+    # Saved notes without quiz history become diagnostic candidates; mastery remains unknown.
+    measured_keys = {_normalize(topic) for topic in topic_mastery}
+    for note in note_topics or []:
+        if not isinstance(note, dict) or not note.get("id"):
+            continue
+        topic = str(note.get("topic") or note.get("title") or "").strip()
+        if not topic or _normalize(topic) in measured_keys:
+            continue
+        candidates.append({
+            "id": _stable_id(topic, None, "diagnostic"),
+            "topic": topic, "concept": None, "type": "diagnostic",
+            "action": "Practice Quiz", "title": f"Diagnostic Practice Quiz: {topic}",
+            "mastery_pct": None, "topic_mastery_pct": None, "trend": None,
+            "trend_label": "insufficient_data", "attempts": 0, "question_count": 0,
+            "evidence_confidence": 0.0, "evidence_level": "saved_note",
+            "evidence": {"source": "saved_note", "note_id": note.get("id"), "attempt_count": 0},
+            "priority_components": {"revision_priority": {"value": 0.5, "configured_weight": chosen_weights["revision_priority"], "effective_weight": 1.0}},
+            "priority_score": 0.5, "priority": 0.5,
+            "reason": f"{topic}: a saved study note exists, but quiz history is insufficient to estimate mastery. Take a diagnostic quiz first.",
+            "reason_factors": ["saved note exists", "no quiz evidence; mastery not inferred"],
+            "next_review_days": 1,
+            "action_payload": {"type": "practice_quiz", "topic": topic, "note_id": note.get("id"), "note_title": note.get("title"), "question_count": 5},
+            "status": "pending", "created_at": current_time.isoformat(timespec="seconds"),
+            "model_version": "2.0-paper-adaptive", "action_utility": 0.7,
         })
 
     for task in revision_tasks or []:
