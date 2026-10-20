@@ -201,20 +201,48 @@ def build_recommendations(
         ]
         overdue = any(value is not None and value > 0 for value in elapsed_for_task)
         revision_priority = 1.0 if overdue else (0.75 if pending_for_topic else min(1.0, elapsed / 7.0) if elapsed is not None else None)
-        action = _action_for(focus_mastery, trend, diagnostic=diagnostic)
+        # Evaluate each feasible action as its own recommendation r. The paper's
+        # utility term U_r must belong to that candidate action, not be attached
+        # after a separate rule has already fixed the action.
         utilities = _action_utilities(focus_mastery, trend)
-        components: dict[str, float | None] = {
+        feasible_actions = ["Practice Quiz"] if diagnostic else list(utilities)
+        base_components: dict[str, float | None] = {
             "weakness": 1.0 - focus_mastery,
             "decline": min(1.0, max(0.0, -trend / 0.25)) if trend is not None else None,
             "revision_priority": revision_priority,
-            "action_utility": utilities.get(action, 0.0),
         }
-        available_weight = sum(chosen_weights[key] for key, value in components.items() if value is not None)
-        priority = (
-            sum(chosen_weights[key] * float(value) for key, value in components.items() if value is not None)
-            / available_weight
-            if available_weight > 0 else 0.0
+
+        def score_action(candidate_action: str) -> tuple[float, dict[str, float | None]]:
+            components_for_action = {
+                **base_components,
+                "action_utility": utilities.get(candidate_action, 0.0),
+            }
+            available = sum(
+                chosen_weights[key] for key, value in components_for_action.items()
+                if value is not None
+            )
+            score = (
+                sum(chosen_weights[key] * float(value)
+                    for key, value in components_for_action.items() if value is not None) / available
+                if available > 0 else 0.0
+            )
+            return score, components_for_action
+
+        action_scores = {
+            candidate_action: score_action(candidate_action)[0]
+            for candidate_action in feasible_actions
+        }
+        rule_preferred_action = _action_for(focus_mastery, trend, diagnostic=diagnostic)
+        action = max(
+            feasible_actions,
+            key=lambda candidate_action: (
+                action_scores[candidate_action],
+                utilities.get(candidate_action, 0.0),
+                candidate_action == rule_preferred_action,
+            ),
         )
+        priority, components = score_action(action)
+        available_weight = sum(chosen_weights[key] for key, value in components.items() if value is not None)
         priority_components = {
             key: {
                 "value": round(float(value), 4),
@@ -268,8 +296,9 @@ def build_recommendations(
             },
             "status": "pending",
             "created_at": current_time.isoformat(timespec="seconds"),
-            "model_version": "2.0-paper-adaptive",
+            "model_version": "2.1-paper-candidate-scoring",
             "action_utility": round(utilities.get(action, 0.0), 3),
+            "action_scores": {key: round(value, 4) for key, value in action_scores.items()},
         })
 
     # Saved notes without quiz history become diagnostic candidates; mastery remains unknown.

@@ -164,7 +164,10 @@ def _load_pending_revision_tasks() -> list[dict[str, Any]]:
         return []
     return [
         dict(task) for task in loaded
-        if isinstance(task, dict) and task.get("id") is not None and not task.get("done")
+        if isinstance(task, dict)
+        and task.get("id") is not None
+        and not task.get("done")
+        and task.get("status") not in {"completed", "cancelled", "skipped"}
     ]
 
 

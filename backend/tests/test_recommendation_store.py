@@ -74,6 +74,18 @@ class RecommendationStoreTests(unittest.TestCase):
         rows = recommendation_store.list_recommendations(include_history=True)
         self.assertEqual(rows[0]["id"], "rec-test")
 
+    def test_pending_revision_task_loader_excludes_cancelled_and_skipped(self):
+        recommendation_store.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        (recommendation_store.DATA_DIR / "revision_tasks.json").write_text(
+            '[{"id":1,"topic":"A","status":"planned","done":false},'
+            '{"id":2,"topic":"B","status":"cancelled","done":false},'
+            '{"id":3,"topic":"C","status":"skipped","done":false},'
+            '{"id":4,"topic":"D","status":"completed","done":true}]',
+            encoding="utf-8",
+        )
+        tasks = recommendation_store._load_pending_revision_tasks()
+        self.assertEqual([task["id"] for task in tasks], [1])
+
     def test_follow_up_quiz_records_matched_outcome_and_completes_recommendation(self):
         recommendation_store.upsert_recommendations([self.row(mastery=40.0)])
         outcome = recommendation_store.record_recommendation_outcome("rec-test", {
