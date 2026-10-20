@@ -31,13 +31,13 @@ const isCancelled = (task) => task?.status === "cancelled" || task?.status === "
 const getScheduled = (task) => task?.scheduled_at || task?.due_date || null;
 const isOverdue = (task, now = new Date()) => {
   if (isDone(task) || isCancelled(task)) return false;
-  const raw = task?.original_due_date || task?.due_date || task?.scheduled_at;
-  const date = parseDate(raw);
-  if (!date) return false;
-  // Date-only deadlines are due by end-of-day; scheduled datetimes become overdue
-  // as soon as their planned time has passed.
-  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return localDay(date) < localDay(now);
-  return date.getTime() < now.getTime();
+  const scheduled = parseDate(task?.scheduled_at);
+  const deadlineRaw = task?.original_due_date || task?.due_date;
+  const deadline = parseDate(deadlineRaw);
+  const deadlinePassed = deadline && (typeof deadlineRaw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(deadlineRaw)
+    ? localDay(deadline) < localDay(now)
+    : deadline.getTime() < now.getTime());
+  return Boolean((scheduled && scheduled.getTime() < now.getTime()) || deadlinePassed);
 };
 const toInputDateTime = (value) => {
   const d = parseDate(value);
