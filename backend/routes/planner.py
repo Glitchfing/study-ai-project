@@ -137,6 +137,7 @@ class PlannerPreferences(BaseModel):
     planning_days: int = Field(default=DEFAULT_PLANNING_DAYS, ge=1, le=60)
     preferred_start_hour: int = Field(default=DEFAULT_START_HOUR, ge=0, le=23)
     preferred_end_hour: int = Field(default=DEFAULT_END_HOUR, ge=1, le=24)
+    available_days: list[int] = Field(default_factory=lambda: list(range(7)))
     topic_importance: dict[str, float] = Field(default_factory=dict)
     deadlines: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -271,8 +272,11 @@ def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[
         end_hour = min(24, start_hour + 2)
     slots: list[datetime] = []
     local_now = now.astimezone(STUDY_TZ)
+    available_days = {int(value) for value in prefs.get("available_days", range(7)) if str(value).lstrip("-").isdigit() and 0 <= int(value) <= 6}
     for offset in range(horizon):
         day = (local_now + timedelta(days=offset)).date()
+        if day.weekday() not in available_days:
+            continue
         cursor = datetime.combine(day, time(hour=start_hour), tzinfo=local_now.tzinfo)
         end_day = day + timedelta(days=1) if end_hour == 24 else day
         end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=local_now.tzinfo)
@@ -385,7 +389,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
     events.sort(key=lambda item: str(item.get("timestamp") or ""))
     return {
         "tasks": tasks, "deadlines": deadlines, "topics": topics, "events": events,
-        "preferences": {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "topic_importance": {}}, **preferences},
+        "preferences": {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "available_days": list(range(7)), "topic_importance": {}}, **preferences},
         "summary": {
             "topics_tracked": len(topics),
             "topics_needing_revision": sum(1 for topic in topics if (isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7) or topic.get("trend_label") == "declining"),
@@ -407,6 +411,8 @@ def update_preferences(body: PlannerPreferences):
     values = body.model_dump()
     if values["preferred_end_hour"] <= values["preferred_start_hour"]:
         raise HTTPException(status_code=400, detail="Preferred end hour must be after preferred start hour.")
+    if not values["available_days"] or any(day < 0 or day > 6 for day in values["available_days"]):
+        raise HTTPException(status_code=400, detail="Select at least one valid study day (Monday=0 through Sunday=6).")
     for deadline in values.get("deadlines") or []:
         if not isinstance(deadline, dict) or not str(deadline.get("topic") or "").strip():
             raise HTTPException(status_code=400, detail="Each deadline must include a related topic.")
