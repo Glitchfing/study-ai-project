@@ -319,6 +319,14 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
         task.setdefault("status", "completed" if _task_done(task) else "planned")
         task.setdefault("duration_minutes", _duration(task))
         task.setdefault("topic_id", re.sub(r"[^a-z0-9]+", "-", str(task.get("topic") or "").lower()).strip("-") or None)
+        linked_sessions = [
+            item for item in ACTIVITY_LOG
+            if item.get("kind") == "study_session_completed"
+            and str(item.get("revision_task_id") or "") == str(task.get("id"))
+        ]
+        actual_seconds = sum(max(0, int(item.get("duration_seconds") or 0)) for item in linked_sessions)
+        task["actual_duration_seconds"] = actual_seconds
+        task["actual_duration_minutes"] = round(actual_seconds / 60) if linked_sessions else None
     if start or end:
         def in_range(task: dict[str, Any]) -> bool:
             stamp = _task_timestamp(task)
