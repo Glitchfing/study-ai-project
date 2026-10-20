@@ -90,3 +90,11 @@
 .rf-recommendation-controls button:hover {
   border-color: var(--rf-teal, #119da4);
 }
+
+
+/* Live study timer controls */
+.rf-study-timer-actions{display:flex;align-items:center;gap:8px;margin-top:10px;position:relative;z-index:2}
+.rf-study-timer-actions button{appearance:none;border:1px solid #247779;border-radius:8px;padding:7px 12px;background:linear-gradient(135deg,#0e393b,#0b292b);color:#c0fdfb;font:600 12px/1.2 "DM Sans",sans-serif;cursor:pointer;transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.rf-study-timer-actions button:hover:not(:disabled){background:linear-gradient(135deg,#145356,#0d393b);border-color:#64b6ac;transform:translateY(-1px)}
+.rf-study-timer-actions button:disabled{opacity:.55;cursor:wait}
+.rf-metric-card.tone-mint{overflow:visible}
