@@ -228,7 +228,7 @@ def build_recommendations(
         reason, reason_parts = _reason(topic, concept, focus_pct, trend, attempt_count,
                                        question_count, elapsed, diagnostic)
         next_review_days = (1 if diagnostic or focus_pct < 50 or (trend is not None and trend < -0.15)
-                            else 3 if focus_pct < 80 or (review_need is not None and review_need >= 0.75) else 7)
+                            else 3 if focus_pct < 80 or (revision_priority is not None and revision_priority >= 0.75) else 7)
 
         candidates.append({
             "id": _stable_id(topic, concept, action),
