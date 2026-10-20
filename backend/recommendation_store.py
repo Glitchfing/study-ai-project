@@ -177,10 +177,16 @@ def refresh_recommendations(
     current_attempts = attempts if attempts is not None else list_quiz_attempts(limit=1000)
     topics = build_topic_mastery(current_attempts)
     concepts = build_concept_mastery(current_attempts)
+    try:
+        from note_store import list_notes
+        saved_notes = [note for note in list_notes() if isinstance(note, dict) and note.get("id") and note.get("source") == "generated"]
+    except Exception:
+        saved_notes = []
     candidates = build_recommendations(
         topics,
         concept_mastery=concepts,
         revision_tasks=_load_pending_revision_tasks(),
+        note_topics=saved_notes,
         limit=max(MAX_RECOMMENDATION_CANDIDATES, limit * 10, limit),
     )
     persisted = upsert_recommendations(candidates)
