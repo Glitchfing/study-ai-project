@@ -129,7 +129,7 @@ class TaskEdit(BaseModel):
     scheduled_at: str | None = None
     due_date: str | None = None
     duration_minutes: int | None = Field(default=None, ge=5, le=240)
-    status: Literal["planned", "in_progress", "completed", "skipped", "missed", "cancelled"] | None = None
+    status: Literal["planned", "in_progress", "completed", "skipped", "missed"] | None = None
 
 
 class PlannerPreferences(BaseModel):
@@ -310,6 +310,59 @@ def _overlap(start: datetime, duration: int, task: dict[str, Any]) -> bool:
         return False
     other_duration = _duration(task)
     return start < other + timedelta(minutes=other_duration) and other < start + timedelta(minutes=duration)
+
+
+def _validate_schedule_slot(
+    scheduled_value: Any,
+    duration_minutes: int,
+    exclude_task_id: Any = None,
+) -> None:
+    """Validate a manually selected slot against saved availability and commitments."""
+    new_time = _parse_datetime(scheduled_value)
+    if new_time is None:
+        raise HTTPException(status_code=400, detail="scheduled_at must be a valid ISO date or datetime.")
+    prefs = {
+        "daily_minutes": DEFAULT_DAILY_MINUTES,
+        "preferred_start_hour": DEFAULT_START_HOUR,
+        "preferred_end_hour": DEFAULT_END_HOUR,
+        "available_days": list(range(7)),
+        **_read_preferences(),
+    }
+    local_new = new_time.astimezone(STUDY_TZ)
+    available_days = {
+        int(value) for value in prefs.get("available_days", range(7))
+        if str(value).lstrip("-").isdigit() and 0 <= int(value) <= 6
+    }
+    if local_new.weekday() not in available_days:
+        raise HTTPException(status_code=409, detail="That date is outside your selected study days. Update availability or choose another date.")
+
+    start_hour = int(prefs.get("preferred_start_hour", DEFAULT_START_HOUR))
+    end_hour = int(prefs.get("preferred_end_hour", DEFAULT_END_HOUR))
+    if end_hour <= start_hour:
+        raise HTTPException(status_code=409, detail="Your configured study window is invalid. Update planner preferences first.")
+    end_day = local_new.date() + timedelta(days=1) if end_hour == 24 else local_new.date()
+    window_start = datetime.combine(local_new.date(), time(hour=start_hour), tzinfo=STUDY_TZ)
+    window_end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=STUDY_TZ)
+    if local_new < window_start or local_new + timedelta(minutes=duration_minutes) > window_end:
+        raise HTTPException(status_code=409, detail="That time is outside your configured study window or the session does not fit.")
+
+    for other in TASKS:
+        if str(other.get("id")) == str(exclude_task_id) or _task_done(other) or other.get("status") in {"cancelled", "skipped"}:
+            continue
+        if _overlap(new_time, duration_minutes, other):
+            raise HTTPException(status_code=409, detail="That time overlaps another pending revision task. Choose another slot.")
+
+    day_key = local_new.date().isoformat()
+    booked_minutes = sum(
+        _duration(other) for other in TASKS
+        if str(other.get("id")) != str(exclude_task_id)
+        and not _task_done(other)
+        and other.get("status") not in {"cancelled", "skipped"}
+        and (other_time := _scheduled_timestamp(other)) is not None
+        and other_time.astimezone(STUDY_TZ).date().isoformat() == day_key
+    )
+    if booked_minutes + duration_minutes > int(prefs.get("daily_minutes", DEFAULT_DAILY_MINUTES)):
+        raise HTTPException(status_code=409, detail="This would exceed your daily study budget. Increase the budget or choose another date.")
 
 
 @router.get("")
@@ -613,34 +666,8 @@ def update_task(task_id: str, changes: TaskEdit):
         if "scheduled_at" in updates:
             new_time = _parse_datetime(updates["scheduled_at"])
             old = _scheduled_timestamp(task)
-            if new_time and old != new_time:
-                prefs = {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "available_days": list(range(7))}, **_read_preferences()}
-                local_new = new_time.astimezone(STUDY_TZ)
-                if local_new.weekday() not in set(prefs.get("available_days", range(7))):
-                    raise HTTPException(status_code=409, detail="That date is outside your selected study days. Update availability or choose another date.")
-                end_hour = int(prefs.get("preferred_end_hour", DEFAULT_END_HOUR))
-                start_hour = int(prefs.get("preferred_start_hour", DEFAULT_START_HOUR))
-                end_day = local_new.date() + timedelta(days=1) if end_hour == 24 else local_new.date()
-                window_start = datetime.combine(local_new.date(), time(hour=start_hour), tzinfo=STUDY_TZ)
-                window_end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=STUDY_TZ)
-                if local_new < window_start or local_new + timedelta(minutes=_duration(task)) > window_end:
-                    raise HTTPException(status_code=409, detail="That time is outside your configured study window or the session does not fit.")
-                for other in TASKS:
-                    if str(other.get("id")) == str(task_id) or _task_done(other) or other.get("status") in {"cancelled", "skipped"}:
-                        continue
-                    if _overlap(new_time, _duration(task), other):
-                        raise HTTPException(status_code=409, detail="That time overlaps another pending revision task. Choose another slot.")
-                day_key = local_new.date().isoformat()
-                booked_minutes = sum(
-                    _duration(other) for other in TASKS
-                    if str(other.get("id")) != str(task_id)
-                    and not _task_done(other)
-                    and other.get("status") not in {"cancelled", "skipped"}
-                    and (other_time := _scheduled_timestamp(other)) is not None
-                    and other_time.astimezone(STUDY_TZ).date().isoformat() == day_key
-                )
-                if booked_minutes + _duration(task) > int(prefs.get("daily_minutes", DEFAULT_DAILY_MINUTES)):
-                    raise HTTPException(status_code=409, detail="This would exceed your daily study budget. Increase the budget or choose another date.")
+            if updates["scheduled_at"] and new_time and old != new_time:
+                _validate_schedule_slot(new_time, _duration(task), exclude_task_id=task_id)
             task["schedule_locked"] = True
             if old and new_time and old != new_time:
                 task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": new_time.isoformat(timespec="seconds"), "at": now_text, "reason": "User rescheduled task."})
@@ -694,10 +721,16 @@ def create_task(payload: TaskEdit):
     data = payload.model_dump(exclude_none=True)
     if not data.get("title") or not data.get("topic"):
         raise HTTPException(status_code=400, detail="A task title and topic are required.")
+    for date_key in ("scheduled_at", "due_date"):
+        if data.get(date_key) and _parse_datetime(data[date_key]) is None:
+            raise HTTPException(status_code=400, detail=f"{date_key} must be an ISO date or datetime.")
     with _LOCK:
+        duration = int(data.get("duration_minutes", _duration(data)))
+        if data.get("scheduled_at"):
+            _validate_schedule_slot(data["scheduled_at"], duration)
         max_id = max([int(t.get("id")) for t in TASKS if str(t.get("id", "")).isdigit()] or [0])
         now = _utc_now().isoformat(timespec="seconds")
-        task = {"id": max_id + 1, "title": data["title"], "topic": data["topic"], "priority": data.get("priority", "med"), "est": data.get("est", "20 min"), "duration_minutes": data.get("duration_minutes", 20), "done": False, "status": "planned", "origin": "manual", "created_at": now, "scheduled_at": data.get("scheduled_at"), "due_date": data.get("due_date"), "day": data.get("day", "upcoming"), "date": data.get("date")}
+        task = {"id": max_id + 1, "title": data["title"], "topic": data["topic"], "priority": data.get("priority", "med"), "est": data.get("est", f"{duration} min"), "duration_minutes": duration, "done": False, "status": "planned", "origin": "manual", "created_at": now, "scheduled_at": data.get("scheduled_at"), "due_date": data.get("due_date"), "day": data.get("day", "upcoming"), "date": data.get("date")}
         TASKS.append(task)
         _persist_tasks()
         return {"task": dict(task), "created": True}
