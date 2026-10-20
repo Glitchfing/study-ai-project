@@ -9,9 +9,8 @@ from __future__ import annotations
 DEFAULT_WEIGHTS = {
     "weakness": 0.35,
     "decline": 0.20,
-    "review_need": 0.20,
-    "learning_importance": 0.15,
-    "uncertainty": 0.10,
+    "revision_priority": 0.25,
+    "action_utility": 0.20,
 }
 
 DEFAULT_DECAY = 0.85

@@ -99,6 +99,7 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast,onTog
   const activity=(data?.activity_heatmap||[]).slice(-12).flatMap(c=>c).map(c=>({level:({"":0,l1:1,l2:2,l3:3,l4:4})[c.lvl]??0,label:(c.date||"")+" · "+(c.tip||"No activity")}));
   const studyMins=Number(a.study_minutes)||0,mastered=Number(a.topics_mastered)||0,topicCount=Math.max(topics.length,mastered);
   const recommendations=(data?.recommendations||[]).slice(0,3);
+  useEffect(()=>{const refreshVisible=()=>{if(document.visibilityState==="visible")onRefresh?.();};const timer=window.setInterval(refreshVisible,30000);window.addEventListener("focus",refreshVisible);document.addEventListener("visibilitychange",refreshVisible);return()=>{window.clearInterval(timer);window.removeEventListener("focus",refreshVisible);document.removeEventListener("visibilitychange",refreshVisible);};},[onRefresh]);
   async function startRecommendedAction(recommendation) {
     try {
       await startRecommendation(recommendation.id);
@@ -117,7 +118,7 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast,onTog
       onNavigate("notes", { noteId });
       return;
     }
-    onNavigate("quiz", { quizNoteId: noteId, quizTopic: topic });
+    onNavigate("quiz", { quizNoteId: noteId, quizTopic: topic, recommendationId: recommendation.id });
   }
   async function practiceRecommendation(recommendation) {
     try {
