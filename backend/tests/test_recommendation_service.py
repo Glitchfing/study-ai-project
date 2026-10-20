@@ -79,6 +79,50 @@ class RecommendationServiceTests(unittest.TestCase):
         second = build_recommendations(model, now=self.now)[0]
         self.assertEqual(first["id"], second["id"])
 
+    def test_selected_action_score_uses_its_own_candidate_utility(self):
+        rows = build_recommendations(
+            {"Bayes Theorem": {
+                "mastery_pct": 35.0,
+                "trend": -0.2,
+                "attempts": 4,
+                "question_count": 12,
+                "evidence_confidence": 0.8,
+                "last_reviewed_at": "2026-10-10T00:00:00+00:00",
+            }},
+            now=self.now,
+        )
+        row = rows[0]
+        self.assertEqual(row["action"], "Revise Topic")
+        self.assertIn("action_scores", row)
+        self.assertEqual(
+            row["priority_components"]["action_utility"]["value"],
+            row["action_utility"],
+        )
+        weights = {
+            key: component["configured_weight"]
+            for key, component in row["priority_components"].items()
+        }
+        components = {
+            key: component["value"]
+            for key, component in row["priority_components"].items()
+        }
+        expected = sum(weights[key] * components[key] for key in components) / sum(weights.values())
+        self.assertAlmostEqual(row["priority_score"], expected, places=4)
+        self.assertEqual(row["priority_score"], row["action_scores"][row["action"]])
+
+    def test_diagnostic_candidate_only_scores_diagnostic_quiz_action(self):
+        row = build_recommendations(
+            {"Bayes Theorem": {
+                "mastery_pct": 20.0,
+                "trend": None,
+                "attempts": 1,
+                "question_count": 5,
+                "evidence_confidence": 0.2,
+            }},
+            now=self.now,
+        )[0]
+        self.assertEqual(row["action_scores"], {"Practice Quiz": row["priority_score"]})
+
     def test_weights_are_validated(self):
         with self.assertRaises(ValueError):
             build_recommendations({}, weights={"weakness": 1.0})
