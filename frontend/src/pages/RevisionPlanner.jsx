@@ -385,6 +385,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
                 <div><small>Original deadline</small><b>{formatDateTimeSafe(selectedTask.original_due_date || selectedTask.due_date)}</b></div>
                 <div><small>Topic mastery</small><b>{selectedTask.evidence?.mastery == null ? "Not assessed" : Math.round(Number(selectedTask.evidence.mastery) * 100) + "%"}</b></div>
                 <div><small>Recent trend</small><b>{selectedTask.evidence?.trend || "Insufficient data"}</b></div>
+                <div><small>Actual study time</small><b>{selectedTask.actual_duration_minutes == null ? "Not recorded yet" : formatMinutes(selectedTask.actual_duration_minutes)}</b></div>
               </div>
               {selectedTask.note_id && <button className="rp-link" onClick={() => onNavigate?.("notes", { noteId: selectedTask.note_id })}>Open linked study notes ↗</button>}
               <div className="rp-actions">
