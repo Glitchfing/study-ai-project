@@ -187,6 +187,41 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
     finally { setBusy(""); }
   }
 
+  async function pauseSession() {
+    if (!activeSession?.session_id) return;
+    setBusy("pause");
+    try {
+      const result = await pauseStudySession(activeSession.session_id);
+      setActiveSession(result?.session || null);
+      notify("Study timer paused. Paused time will not be counted.");
+    } catch (err) { notify(err?.message || "Could not pause the session.", "coral"); }
+    finally { setBusy(""); }
+  }
+
+  async function resumeSession() {
+    if (!activeSession?.session_id) return;
+    setBusy("resume");
+    try {
+      const result = await resumeStudySession(activeSession.session_id);
+      setActiveSession(result?.session || null);
+      setClockNow(Date.now());
+      notify("Study timer resumed.");
+    } catch (err) { notify(err?.message || "Could not resume the session.", "coral"); }
+    finally { setBusy(""); }
+  }
+
+  async function cancelTask(task) {
+    if (!task || !window.confirm("Cancel this revision task? Its study history will be preserved.")) return;
+    setBusy("cancel-" + task.id);
+    try {
+      await cancelPlannerTask(task.id);
+      await load();
+      await refreshDashboard?.();
+      notify("Task cancelled. Its history was preserved.");
+    } catch (err) { notify(err?.message || "Could not cancel the task.", "coral"); }
+    finally { setBusy(""); }
+  }
+
   async function stopSession() {
     if (!activeSession?.session_id) return;
     setBusy("stop");
@@ -309,7 +344,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
         <div className="rp-header-actions"><span className="rp-date-chip">{new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span><button className="rp-btn secondary" onClick={() => { setShowCreate((v) => !v); setDraftDate(toInputDateTime(new Date(Date.now() + 3600000))); }}>＋ Add task</button><button className="rp-btn primary" disabled={busy === "generate"} onClick={generatePlan}>{busy === "generate" ? "Building plan…" : "✦ Generate / Update Plan"}</button></div>
       </header>
 
-      {activeSession && <section className="rp-session-banner"><span className="rp-live-dot"/><div><b>Study session active{activeSession.topic ? ` · ${activeSession.topic}` : ""}</b><small>Recorded time uses the server's persisted session intervals, not the planned duration.</small></div><button className="rp-btn primary" disabled={busy === "stop"} onClick={stopSession}>{busy === "stop" ? "Saving…" : "Finish session"}</button></section>}
+      {activeSession && <section className="rp-session-banner"><span className="rp-live-dot"/><div><b>Study session active{activeSession.topic ? ` · ${activeSession.topic}` : ""}</b><small>{activeSession.status === "paused" ? "Paused" : "Timer running"} · {formatMinutes(Math.floor(displayedSessionSeconds / 60))} measured so far · paused time is excluded.</small></div>{activeSession.status === "paused" ? <button className="rp-btn secondary" disabled={busy === "resume"} onClick={resumeSession}>{busy === "resume" ? "Resuming…" : "Resume"}</button> : <button className="rp-btn secondary" disabled={busy === "pause"} onClick={pauseSession}>{busy === "pause" ? "Pausing…" : "Pause"}</button>}<button className="rp-btn primary" disabled={busy === "stop"} onClick={stopSession}>{busy === "stop" ? "Saving…" : "Finish session"}</button></section>}
 
       <section className="rp-metrics">
         <Metric label="Planned sessions" value={plannedCount} helper={currentLabel} glyph="▦"/>
@@ -366,7 +401,8 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
                 {!isDone(selectedTask) && <button className="rp-btn primary" disabled={busy === `start-${selectedTask.id}`} onClick={() => startTask(selectedTask)}>{busy === `start-${selectedTask.id}` ? "Starting…" : "▶ Start session"}</button>}
                 {!isDone(selectedTask) && <button className="rp-btn secondary" disabled={busy === `task-${selectedTask.id}`} onClick={() => completeTask(selectedTask)}>✓ Mark complete</button>}
                 <button className="rp-btn secondary" disabled={busy === `edit-${selectedTask.id}`} onClick={() => editTask(selectedTask)}>Edit task</button>
-                {!isDone(selectedTask) && <button className="rp-btn secondary" onClick={() => setEditDate((current) => current ? "" : toInputDateTime(getScheduled(selectedTask) || new Date()))}>Reschedule</button>}
+                {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" onClick={() => setEditDate((current) => current ? "" : toInputDateTime(getScheduled(selectedTask) || new Date()))}>Reschedule</button>}
+                {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" disabled={busy === "cancel-" + selectedTask.id} onClick={() => cancelTask(selectedTask)}>{busy === "cancel-" + selectedTask.id ? "Cancelling…" : "Cancel task"}</button>}
                 {editDate && <form className="rp-reschedule" onSubmit={saveTaskEdit}><label>New date and time<input type="datetime-local" value={editDate} onChange={(e) => setEditDate(e.target.value)} required/></label><button className="rp-btn primary" disabled={busy === "reschedule"}>{busy === "reschedule" ? "Saving…" : "Save schedule"}</button></form>}
               </div>
             </> : <div className="rp-empty-inline"><b>Select a revision task</b><span>Task details will appear here once you select a saved task.</span></div>}
