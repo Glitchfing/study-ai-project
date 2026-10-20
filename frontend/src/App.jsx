@@ -10,7 +10,7 @@ import ChatInterface from "./pages/ChatInterface";
 import RevisionPlanner from "./pages/RevisionPlanner";
 import LearningJourney from "./pages/LearningJourney";
 import { useToast } from "./hooks/useToast";
-import { getDashboard, logActivity } from "./services/api";
+import { getActiveStudySession, getDashboard, heartbeatStudySession, logActivity } from "./services/api";
 
 const FALLBACK_USER = { name: "RUTU", initials: "RU", role: "Individual Learning", streak: 0 };
 const initialView = () => window.location.pathname === "/learning-journey" ? "journey" : "dashboard";
@@ -34,6 +34,45 @@ export default function App() {
   }, []);
 
   useEffect(() => { refreshDashboard(); }, [refreshDashboard]);
+
+  // Keep the server-owned study session alive while the learner navigates between
+  // planner, notes, quiz, chat, and dashboard views. Missing heartbeats auto-pause
+  // the session on the backend rather than counting unobserved time.
+  useEffect(() => {
+    let sessionId = null;
+    let inFlight = false;
+    let mounted = true;
+
+    async function heartbeat() {
+      if (inFlight || !mounted) return;
+      inFlight = true;
+      try {
+        if (sessionId) {
+          try {
+            await heartbeatStudySession(sessionId);
+            return;
+          } catch {
+            sessionId = null;
+          }
+        }
+        const result = await getActiveStudySession();
+        sessionId = result?.active?.status === "active" ? result.active.session_id : null;
+      } catch {
+        // Timer recovery is best effort; the backend's stale-session guard
+        // remains authoritative if the client is offline.
+        sessionId = null;
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 45_000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const onPopState = (event) => {
