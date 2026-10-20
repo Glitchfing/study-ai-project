@@ -37,5 +37,36 @@ class RadialMindMapAggregationTests(unittest.TestCase):
         self.assertTrue(all(len(label.split()) >= 2 or label.isupper() for label in child_labels))
 
 
+    def test_sentence_length_is_compacted_for_radial_layout(self):
+        result = _aggregate_mindmap(
+            [{
+                "title": "Business Intelligence and Data Analytics",
+                "key_points": [
+                    "The business intelligence platform enables organizations to monitor business performance through analytical dashboards.",
+                    "A data warehouse provides an integrated, cleaned, standardized view of organizational data from multiple sources.",
+                    "Business performance management links business metrics to strategy, objectives, and action planning.",
+                ],
+                "definitions": [
+                    "Business intelligence: techniques for transforming raw data into actionable insights.",
+                ],
+            }],
+            "BIDA",
+        )
+
+        labels = [branch["name"] for branch in result["branches"]]
+        labels.extend(
+            child["name"]
+            for branch in result["branches"]
+            for child in branch["sub_branches"]
+        )
+        self.assertTrue(labels)
+        self.assertTrue(all(len(label) <= 38 for label in labels))
+        self.assertFalse(any(
+            action in label.casefold()
+            for label in labels
+            for action in (" enables ", " provides ", " links ")
+        ))
+        self.assertTrue(any("data warehouse" in label.casefold() for label in labels))
+
 if __name__ == "__main__":
     unittest.main()
