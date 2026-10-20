@@ -33,6 +33,12 @@ class MindMapStructureTests(unittest.TestCase):
         self.assertTrue(any("bcnf" in label for label in labels))
         self.assertFalse(any(label in {"properties", "incorrectly", "common", "data", "then"} for label in labels))
         self.assertTrue(any(branch["sub_branches"] for branch in result["branches"]))
+        all_labels = labels + [
+            child.casefold()
+            for branch in result["branches"]
+            for child in branch["sub_branches"]
+        ]
+        self.assertTrue(all(len(label) <= 38 for label in all_labels))
         self.assertTrue(result["mermaid"].startswith("mindmap\n"))
         self.assertIn("root((", result["mermaid"])
 
