@@ -98,6 +98,8 @@ def _session_state(session_id: str) -> dict[str, Any] | None:
                 max(0, int((_dt(i.get("ended_at")) - _dt(i.get("started_at"))).total_seconds()))
                 for i in state["intervals"] if _dt(i.get("started_at")) and _dt(i.get("ended_at"))
             ))
+    if state.get("status") != "completed":
+        state["duration_seconds"] = sum(max(0, int(item.get("duration_seconds") or 0)) for item in state["intervals"])
     return state
 
 
