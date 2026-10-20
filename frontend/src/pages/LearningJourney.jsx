@@ -32,14 +32,17 @@ const isCancelled = (task) => task?.status === "cancelled" || task?.status === "
 const eventIsOverdue = (event, tasks) => {
   const task = tasks.find((item) => String(item.id) === String(event.task_id || "").replace(/^task-/, ""));
   if (!task || isCompleted(task) || isCancelled(task)) return false;
-  const raw = task.due_date || task.original_due_date || task.scheduled_at;
-  const when = parseDate(raw);
-  if (!when) return false;
-  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const localDay = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
-    return localDay(when) < localDay(new Date());
-  }
-  return when.getTime() < Date.now();
+  const now = new Date();
+  const scheduled = parseDate(task.scheduled_at);
+  const raw = task.original_due_date || task.due_date;
+  const deadline = parseDate(raw);
+  const deadlinePassed = deadline && (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? (() => {
+        const key = (value) => String(value.getFullYear()) + "-" + String(value.getMonth() + 1).padStart(2, "0") + "-" + String(value.getDate()).padStart(2, "0");
+        return key(deadline) < key(now);
+      })()
+    : deadline.getTime() < now.getTime());
+  return Boolean((scheduled && scheduled.getTime() < now.getTime()) || deadlinePassed);
 };
 function periodBounds(anchor, range) {
   const start = new Date(anchor);
