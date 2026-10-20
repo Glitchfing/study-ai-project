@@ -137,6 +137,7 @@ class PlannerPreferences(BaseModel):
     planning_days: int = Field(default=DEFAULT_PLANNING_DAYS, ge=1, le=60)
     preferred_start_hour: int = Field(default=DEFAULT_START_HOUR, ge=0, le=23)
     preferred_end_hour: int = Field(default=DEFAULT_END_HOUR, ge=1, le=24)
+    available_days: list[int] = Field(default_factory=lambda: list(range(7)))
     topic_importance: dict[str, float] = Field(default_factory=dict)
     deadlines: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -162,6 +163,23 @@ def _task_timestamp(task: dict[str, Any]) -> datetime | None:
 def _deadline_timestamp(task: dict[str, Any]) -> datetime | None:
     """Prioritize the original due date when reporting overdue work."""
     return _parse_datetime(task.get("original_due_date") or task.get("due_date") or task.get("scheduled_at"))
+
+
+def _task_overdue(task: dict[str, Any], now: datetime | None = None) -> bool:
+    """A pending task is overdue when its scheduled session or actual deadline has passed."""
+    if _task_done(task) or task.get("status") in {"cancelled", "skipped"}:
+        return False
+    current = now or _utc_now()
+    scheduled = _parse_datetime(task.get("scheduled_at"))
+    deadline_raw = task.get("original_due_date") or task.get("due_date")
+    deadline = _parse_datetime(deadline_raw)
+    deadline_passed = False
+    if deadline is not None:
+        if isinstance(deadline_raw, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", deadline_raw):
+            deadline_passed = deadline.astimezone(STUDY_TZ).date() < current.astimezone(STUDY_TZ).date()
+        else:
+            deadline_passed = deadline < current
+    return bool((scheduled is not None and scheduled < current) or deadline_passed)
 
 
 def _duration(task: dict[str, Any]) -> int:
@@ -226,9 +244,9 @@ def _candidate_topics() -> list[dict[str, Any]]:
         overdue_task = next((
             task for task in TASKS
             if not _task_done(task)
+            and task.get("status") not in {"cancelled", "skipped"}
             and re.sub(r"[^a-z0-9]+", "-", str(task.get("topic") or "").lower()).strip("-") == topic_key
-            and _deadline_timestamp(task) is not None
-            and _deadline_timestamp(task) < now
+            and _task_overdue(task, now)
         ), None)
         priority, factors = calculate_priority(
             stats, now=now, due_at=due_at, importance=float(importance_map.get(name, .5)),
@@ -271,8 +289,11 @@ def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[
         end_hour = min(24, start_hour + 2)
     slots: list[datetime] = []
     local_now = now.astimezone(STUDY_TZ)
+    available_days = {int(value) for value in prefs.get("available_days", range(7)) if str(value).lstrip("-").isdigit() and 0 <= int(value) <= 6}
     for offset in range(horizon):
         day = (local_now + timedelta(days=offset)).date()
+        if day.weekday() not in available_days:
+            continue
         cursor = datetime.combine(day, time(hour=start_hour), tzinfo=local_now.tzinfo)
         end_day = day + timedelta(days=1) if end_hour == 24 else day
         end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=local_now.tzinfo)
@@ -307,6 +328,61 @@ def _overlap(start: datetime, duration: int, task: dict[str, Any]) -> bool:
     return start < other + timedelta(minutes=other_duration) and other < start + timedelta(minutes=duration)
 
 
+def _validate_schedule_slot(
+    scheduled_value: Any,
+    duration_minutes: int,
+    exclude_task_id: Any = None,
+) -> None:
+    """Validate a manually selected slot against saved availability and commitments."""
+    new_time = _parse_datetime(scheduled_value)
+    if new_time is None:
+        raise HTTPException(status_code=400, detail="scheduled_at must be a valid ISO date or datetime.")
+    if new_time <= _utc_now():
+        raise HTTPException(status_code=409, detail="Choose a future date and time. Overdue tasks should be rescheduled into an available future slot.")
+    prefs = {
+        "daily_minutes": DEFAULT_DAILY_MINUTES,
+        "preferred_start_hour": DEFAULT_START_HOUR,
+        "preferred_end_hour": DEFAULT_END_HOUR,
+        "available_days": list(range(7)),
+        **_read_preferences(),
+    }
+    local_new = new_time.astimezone(STUDY_TZ)
+    available_days = {
+        int(value) for value in prefs.get("available_days", range(7))
+        if str(value).lstrip("-").isdigit() and 0 <= int(value) <= 6
+    }
+    if local_new.weekday() not in available_days:
+        raise HTTPException(status_code=409, detail="That date is outside your selected study days. Update availability or choose another date.")
+
+    start_hour = int(prefs.get("preferred_start_hour", DEFAULT_START_HOUR))
+    end_hour = int(prefs.get("preferred_end_hour", DEFAULT_END_HOUR))
+    if end_hour <= start_hour:
+        raise HTTPException(status_code=409, detail="Your configured study window is invalid. Update planner preferences first.")
+    end_day = local_new.date() + timedelta(days=1) if end_hour == 24 else local_new.date()
+    window_start = datetime.combine(local_new.date(), time(hour=start_hour), tzinfo=STUDY_TZ)
+    window_end = datetime.combine(end_day, time(hour=end_hour % 24), tzinfo=STUDY_TZ)
+    if local_new < window_start or local_new + timedelta(minutes=duration_minutes) > window_end:
+        raise HTTPException(status_code=409, detail="That time is outside your configured study window or the session does not fit.")
+
+    for other in TASKS:
+        if (exclude_task_id is not None and str(other.get("id")) == str(exclude_task_id)) or _task_done(other) or other.get("status") in {"cancelled", "skipped"}:
+            continue
+        if _overlap(new_time, duration_minutes, other):
+            raise HTTPException(status_code=409, detail="That time overlaps another pending revision task. Choose another slot.")
+
+    day_key = local_new.date().isoformat()
+    booked_minutes = sum(
+        _duration(other) for other in TASKS
+        if (exclude_task_id is None or str(other.get("id")) != str(exclude_task_id))
+        and not _task_done(other)
+        and other.get("status") not in {"cancelled", "skipped"}
+        and (other_time := _scheduled_timestamp(other)) is not None
+        and other_time.astimezone(STUDY_TZ).date().isoformat() == day_key
+    )
+    if booked_minutes + duration_minutes > int(prefs.get("daily_minutes", DEFAULT_DAILY_MINUTES)):
+        raise HTTPException(status_code=409, detail="This would exceed your daily study budget. Increase the budget or choose another date.")
+
+
 @router.get("")
 def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
     with _LOCK:
@@ -315,6 +391,14 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
         task.setdefault("status", "completed" if _task_done(task) else "planned")
         task.setdefault("duration_minutes", _duration(task))
         task.setdefault("topic_id", re.sub(r"[^a-z0-9]+", "-", str(task.get("topic") or "").lower()).strip("-") or None)
+        linked_sessions = [
+            item for item in ACTIVITY_LOG
+            if item.get("kind") == "study_session_completed"
+            and str(item.get("revision_task_id") or "") == str(task.get("id"))
+        ]
+        actual_seconds = sum(max(0, int(item.get("duration_seconds") or 0)) for item in linked_sessions)
+        task["actual_duration_seconds"] = actual_seconds
+        task["actual_duration_minutes"] = round(actual_seconds / 60) if linked_sessions else None
     if start or end:
         def in_range(task: dict[str, Any]) -> bool:
             stamp = _task_timestamp(task)
@@ -330,7 +414,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
             continue
         kind = str(item.get("kind") or "")
         if kind in {"quiz_completed", "note_view", "study_session_completed", "planner_task_done", "planner_task_edited"}:
-            events.append({"id": str(item.get("id") or uuid4()), "type": kind, "title": item.get("title") or item.get("topic_label") or kind.replace("_", " ").title(), "topic": item.get("topic") or item.get("topic_label"), "timestamp": item.get("created_at") or item.get("timestamp") or item.get("ended_at"), "status": "completed", "source": "activity"})
+            events.append({"id": str(item.get("id") or uuid4()), "type": kind, "title": item.get("title") or item.get("topic_label") or kind.replace("_", " ").title(), "topic": item.get("topic") or item.get("topic_label"), "timestamp": item.get("created_at") or item.get("timestamp") or item.get("ended_at"), "status": "completed", "source": "activity", "task_id": item.get("revision_task_id") or item.get("task_id"), "duration_seconds": item.get("duration_seconds"), "duration_minutes": round(int(item.get("duration_seconds") or 0) / 60) if item.get("duration_seconds") is not None else None})
     for attempt in attempts:
         if not isinstance(attempt, dict):
             continue
@@ -385,12 +469,12 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
     events.sort(key=lambda item: str(item.get("timestamp") or ""))
     return {
         "tasks": tasks, "deadlines": deadlines, "topics": topics, "events": events,
-        "preferences": {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "topic_importance": {}}, **preferences},
+        "preferences": {**{"daily_minutes": DEFAULT_DAILY_MINUTES, "planning_days": DEFAULT_PLANNING_DAYS, "preferred_start_hour": DEFAULT_START_HOUR, "preferred_end_hour": DEFAULT_END_HOUR, "available_days": list(range(7)), "topic_importance": {}}, **preferences},
         "summary": {
             "topics_tracked": len(topics),
             "topics_needing_revision": sum(1 for topic in topics if (isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7) or topic.get("trend_label") == "declining"),
-            "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and _scheduled_timestamp(task) and _scheduled_timestamp(task) >= _utc_now()),
-            "overdue_tasks": sum(1 for task in tasks if not _task_done(task) and _deadline_timestamp(task) and _deadline_timestamp(task) < _utc_now()),
+            "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"} and _scheduled_timestamp(task) and _scheduled_timestamp(task) >= _utc_now()),
+            "overdue_tasks": sum(1 for task in tasks if _task_overdue(task, _utc_now())),
             "completed_milestones": sum(1 for task in tasks if _task_done(task)),
         },
     }
@@ -407,6 +491,8 @@ def update_preferences(body: PlannerPreferences):
     values = body.model_dump()
     if values["preferred_end_hour"] <= values["preferred_start_hour"]:
         raise HTTPException(status_code=400, detail="Preferred end hour must be after preferred start hour.")
+    if not values["available_days"] or any(day < 0 or day > 6 for day in values["available_days"]):
+        raise HTTPException(status_code=400, detail="Select at least one valid study day (Monday=0 through Sunday=6).")
     for deadline in values.get("deadlines") or []:
         if not isinstance(deadline, dict) or not str(deadline.get("topic") or "").strip():
             raise HTTPException(status_code=400, detail="Each deadline must include a related topic.")
@@ -427,11 +513,11 @@ def auto_schedule():
         # Prefer to reuse existing generated tasks with a matching topic. Preserve manual tasks.
         pending_generated: dict[str, dict[str, Any]] = {}
         for task in existing:
-            if task.get("origin") == "auto" and not _task_done(task) and task.get("status") != "in_progress":
+            if task.get("origin") == "auto" and not _task_done(task) and task.get("status") != "in_progress" and task.get("status") != "cancelled" and task.get("status") != "skipped" and not task.get("schedule_locked"):
                 pending_generated.setdefault(str(task.get("topic_id") or task.get("topic") or "").lower(), task)
         slots = _eligible_slots(prefs, now, int(prefs["planning_days"]))
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
-        current = [task for task in existing if not _task_done(task)]
+        current = [task for task in existing if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"}]
         candidate_topic_ids = {re.sub(r"[^a-z0-9]+", "-", str(item["topic"]).lower()).strip("-") for item in topics}
         pending_ids = {task.get("id") for key, task in pending_generated.items() if key in candidate_topic_ids}
         occupied = [task for task in current if task.get("id") not in pending_ids]
@@ -461,7 +547,7 @@ def auto_schedule():
                 # but never create a duplicate automatic task or overwrite its chosen slot.
                 manual_match = next((
                     item for item in current
-                    if (item.get("origin") != "auto" or item.get("status") == "in_progress")
+                    if (item.get("origin") != "auto" or item.get("status") == "in_progress" or item.get("schedule_locked"))
                     and re.sub(r"[^a-z0-9]+", "-", str(item.get("topic") or "").lower()).strip("-") == topic_id
                 ), None)
                 if manual_match:
@@ -564,6 +650,8 @@ def toggle_task(body: TaskToggle):
         task = next((item for item in TASKS if str(item.get("id")) == str(body.task_id)), None)
         if task is None:
             raise HTTPException(status_code=404, detail="Revision task not found.")
+        if task.get("status") == "cancelled":
+            raise HTTPException(status_code=409, detail="Cancelled tasks cannot be completed or reopened. Create a new task to restart this revision.")
         previous = _task_done(task)
         if previous != body.done:
             task["done"] = body.done
@@ -585,17 +673,25 @@ def update_task(task_id: str, changes: TaskEdit):
         task = next((item for item in TASKS if str(item.get("id")) == str(task_id)), None)
         if task is None:
             raise HTTPException(status_code=404, detail="Revision task not found.")
+        if task.get("status") == "cancelled":
+            raise HTTPException(status_code=409, detail="Cancelled tasks are archived. Create a new task to restart this revision.")
         updates = changes.model_dump(exclude_unset=True, exclude_none=True)
         now = _utc_now()
         now_text = now.isoformat(timespec="seconds")
         for date_key in ("scheduled_at", "due_date"):
             if date_key in updates and updates[date_key] and _parse_datetime(updates[date_key]) is None:
                 raise HTTPException(status_code=400, detail=f"{date_key} must be an ISO date or datetime.")
+        old_schedule = _scheduled_timestamp(task)
         if "scheduled_at" in updates:
-            old = _scheduled_timestamp(task)
             new_time = _parse_datetime(updates["scheduled_at"])
-            if old and new_time and old != new_time:
-                task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": new_time.isoformat(timespec="seconds"), "at": now_text, "reason": "User rescheduled task."})
+            if updates["scheduled_at"] and new_time and old_schedule != new_time:
+                effective_duration = int(updates.get("duration_minutes") or _duration(task))
+                _validate_schedule_slot(new_time, effective_duration, exclude_task_id=task_id)
+                task["schedule_locked"] = True
+                if old_schedule and new_time:
+                    task.setdefault("reschedule_history", []).append({"from": old_schedule.isoformat(timespec="seconds"), "to": new_time.isoformat(timespec="seconds"), "at": now_text, "reason": "User rescheduled task."})
+        elif "duration_minutes" in updates and old_schedule and old_schedule > _utc_now():
+            _validate_schedule_slot(old_schedule, int(updates["duration_minutes"]), exclude_task_id=task_id)
         if "status" in updates:
             new_status = updates["status"]
             if _task_done(task) and new_status != "completed":
@@ -618,15 +714,44 @@ def update_task(task_id: str, changes: TaskEdit):
         return {"task": dict(task), "updated": bool(updates)}
 
 
+@router.delete("/tasks/{task_id}")
+def cancel_task(task_id: str):
+    """Soft-cancel a revision task while keeping its timeline and session history."""
+    with _LOCK:
+        task = next((item for item in TASKS if str(item.get("id")) == str(task_id)), None)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Revision task not found.")
+        if task.get("status") == "completed" or _task_done(task):
+            raise HTTPException(status_code=409, detail="Completed tasks cannot be cancelled.")
+        if task.get("status") == "cancelled":
+            return {"task": dict(task), "cancelled": True, "already_cancelled": True}
+        now_text = _utc_now().isoformat(timespec="seconds")
+        old_status = task.get("status") or "planned"
+        task.setdefault("status_history", []).append({"from": old_status, "to": "cancelled", "at": now_text})
+        task["status"] = "cancelled"
+        task["done"] = False
+        task["cancelled_at"] = now_text
+        task["updated_at"] = now_text
+        _persist_tasks()
+        record_activity("planner_task_cancelled", task_id=task_id, title=task.get("title"), topic=str(task.get("topic") or "").lower() or None)
+        return {"task": dict(task), "cancelled": True}
+
+
 @router.post("/tasks")
 def create_task(payload: TaskEdit):
     data = payload.model_dump(exclude_none=True)
     if not data.get("title") or not data.get("topic"):
         raise HTTPException(status_code=400, detail="A task title and topic are required.")
+    for date_key in ("scheduled_at", "due_date"):
+        if data.get(date_key) and _parse_datetime(data[date_key]) is None:
+            raise HTTPException(status_code=400, detail=f"{date_key} must be an ISO date or datetime.")
     with _LOCK:
+        duration = int(data.get("duration_minutes", _duration(data)))
+        if data.get("scheduled_at"):
+            _validate_schedule_slot(data["scheduled_at"], duration)
         max_id = max([int(t.get("id")) for t in TASKS if str(t.get("id", "")).isdigit()] or [0])
         now = _utc_now().isoformat(timespec="seconds")
-        task = {"id": max_id + 1, "title": data["title"], "topic": data["topic"], "priority": data.get("priority", "med"), "est": data.get("est", "20 min"), "duration_minutes": data.get("duration_minutes", 20), "done": False, "status": "planned", "origin": "manual", "created_at": now, "scheduled_at": data.get("scheduled_at"), "due_date": data.get("due_date"), "day": data.get("day", "upcoming"), "date": data.get("date")}
+        task = {"id": max_id + 1, "title": data["title"], "topic": data["topic"], "priority": data.get("priority", "med"), "est": data.get("est", f"{duration} min"), "duration_minutes": duration, "done": False, "status": "planned", "origin": "manual", "created_at": now, "scheduled_at": data.get("scheduled_at"), "due_date": data.get("due_date"), "day": data.get("day", "upcoming"), "date": data.get("date")}
         TASKS.append(task)
         _persist_tasks()
         return {"task": dict(task), "created": True}

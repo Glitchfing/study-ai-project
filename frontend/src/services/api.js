@@ -97,6 +97,8 @@ export const toggleTask = (task_id, done) =>
   request("POST", "/planner/toggle", { task_id, done });
 export const updatePlannerTask = (task_id, changes) =>
   request("PATCH", `/planner/tasks/${encodeURIComponent(task_id)}`, changes);
+export const cancelPlannerTask = (task_id) =>
+  request("DELETE", `/planner/tasks/${encodeURIComponent(task_id)}`);
 export const createPlannerTask = (task) => request("POST", "/planner/tasks", task);
 export const autoSchedule = () => request("POST", "/planner/auto-schedule");
 export const getPlannerPreferences = () => request("GET", "/planner/preferences");
@@ -104,8 +106,8 @@ export const savePlannerPreferences = (preferences) => request("PUT", "/planner/
 
 // Measured study-session timer. The server owns timestamps and persistence.
 export const getActiveStudySession = () => request("GET", "/activity/study-sessions/active");
-export const startStudySession = (topic = null) =>
-  request("POST", "/activity/study-sessions/start", { topic });
+export const startStudySession = (topic = null, revision_task_id = null) =>
+  request("POST", "/activity/study-sessions/start", { topic, revision_task_id });
 export const completeStudySession = (session_id) =>
   request("POST", "/activity/study-sessions/complete", { session_id });
 export const pauseStudySession = (session_id) =>

@@ -6,7 +6,7 @@ import {
 } from "../services/api";
 import "../styles/learning-journey.css";
 
-const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 7, preferred_start_hour: 18, preferred_end_hour: 22, topic_importance: {}, deadlines: [] };
+const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 7, preferred_start_hour: 18, preferred_end_hour: 22, available_days: [0, 1, 2, 3, 4, 5, 6], topic_importance: {}, deadlines: [] };
 const TYPE_LABELS = {
   quiz_completed: "Quiz completed", note_view: "Note reviewed", deadline: "Upcoming deadline",
   study_session_completed: "Study session", planner_task_done: "Revision completed",
@@ -28,11 +28,21 @@ const formatDateTime = (value) => {
 const topicSlug = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const eventLabel = (event) => TYPE_LABELS[event.type] || String(event.type || "Learning event").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const isCompleted = (task) => Boolean(task?.done) || task?.status === "completed";
+const isCancelled = (task) => task?.status === "cancelled" || task?.status === "skipped";
 const eventIsOverdue = (event, tasks) => {
   const task = tasks.find((item) => String(item.id) === String(event.task_id || "").replace(/^task-/, ""));
-  if (!task || isCompleted(task)) return false;
-  const when = parseDate(task.due_date || task.original_due_date || task.scheduled_at);
-  return Boolean(when && when.getTime() < Date.now());
+  if (!task || isCompleted(task) || isCancelled(task)) return false;
+  const now = new Date();
+  const scheduled = parseDate(task.scheduled_at);
+  const raw = task.original_due_date || task.due_date;
+  const deadline = parseDate(raw);
+  const deadlinePassed = deadline && (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? (() => {
+        const key = (value) => String(value.getFullYear()) + "-" + String(value.getMonth() + 1).padStart(2, "0") + "-" + String(value.getDate()).padStart(2, "0");
+        return key(deadline) < key(now);
+      })()
+    : deadline.getTime() < now.getTime());
+  return Boolean((scheduled && scheduled.getTime() < now.getTime()) || deadlinePassed);
 };
 function periodBounds(anchor, range) {
   const start = new Date(anchor);
@@ -151,7 +161,7 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     if (eventFilter === "completed" && !String(event.status).includes("completed")) return false;
     if (eventFilter === "overdue" && !eventIsOverdue(event, tasks)) return false;
     if (eventFilter === "weak" && !topics.some((topic) => String(topic.topic || "").toLowerCase() === String(event.topic || "").toLowerCase() && ((topic.mastery_pct ?? 100) < 70 || topic.trend_label === "declining"))) return false;
-    if (statusFilter === "planned" && (!["planner", "deadline"].includes(event.source) || String(event.status).includes("completed"))) return false;
+    if (statusFilter === "planned" && (!["planner", "deadline"].includes(event.source) || String(event.status).includes("completed") || event.status === "cancelled" || event.status === "skipped")) return false;
     if (statusFilter === "completed" && !String(event.status).includes("completed")) return false;
     if (statusFilter === "overdue" && !eventIsOverdue(event, tasks)) return false;
     return true;
@@ -212,11 +222,13 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     }
     setBusy("start");
     try {
-      const result = await startStudySession(topic);
+      const result = await startStudySession(topic, selectedTask?.id || null);
       const session = result?.session || result?.active || null;
       setActiveSession(session);
-      if (result?.already_active && session?.topic && session.topic.toLowerCase() !== topic.toLowerCase()) {
-        toast?.("A study session is already active for " + session.topic + ". Finish it before starting another topic.", "coral");
+      if (result?.already_active) {
+        toast?.(String(session?.revision_task_id ?? "") === String(selectedTask?.id ?? "") && selectedTask
+          ? "A study session is already active for this task. Use the session controls to resume or finish it."
+          : "A study session is already active" + (session?.topic ? " for " + session.topic : "") + ". Finish it before starting another session.", "coral");
         return;
       }
       if (selectedTask) {
@@ -434,12 +446,13 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
                 {group.events.map((event) => {
                   const overdue = eventIsOverdue(event, tasks);
                   const completed = String(event.status || "").includes("completed");
+                  const cancelled = event.status === "cancelled" || event.status === "skipped";
                   const selectedNode = String(selected?.id) === String(event.id);
                   const eventKind = event.type === "quiz_completed" ? "quiz" : event.type === "note_view" ? "note" : event.source === "deadline" ? "deadline" : event.source === "planner" ? "revision" : "study";
                   const task = tasks.find((item) => String(item.id) === String(event.task_id || "").replace(/^task-/, ""));
-                  return <button key={event.id} type="button" className={"lj-journey-event-card " + eventKind + (selectedNode ? " selected" : "") + (completed ? " completed" : "") + (overdue ? " overdue" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
+                  return <button key={event.id} type="button" className={"lj-journey-event-card " + eventKind + (selectedNode ? " selected" : "") + (completed ? " completed" : "") + (cancelled ? " cancelled" : "") + (overdue ? " overdue" : "")} onClick={() => { setSelectedId(event.id); setRescheduleAt(""); }} aria-pressed={selectedNode}>
                     <span className="lj-card-connector" aria-hidden="true"/><span className="lj-card-icon">{completed ? "✓" : eventKind === "quiz" ? "Q" : eventKind === "note" ? "N" : eventKind === "revision" ? "↻" : eventKind === "deadline" ? "!" : "◷"}</span>
-                    <span className="lj-card-content"><small className="lj-card-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}{event.timestamp ? " · " + formatDateTime(event.timestamp).split(",").slice(-1)[0].trim() : ""}</small><b>{event.title || eventLabel(event)}</b><span>{event.topic || event.reason || eventLabel(event)}</span><small className={"lj-card-status " + (overdue ? "late" : completed ? "done" : "planned")}>{overdue ? "Overdue" : completed ? "Completed" : task?.status === "in_progress" ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</small></span>
+                    <span className="lj-card-content"><small className="lj-card-date">{formatDate(event.timestamp, { day: "numeric", month: "short" })}{event.timestamp ? " · " + formatDateTime(event.timestamp).split(",").slice(-1)[0].trim() : ""}</small><b>{event.title || eventLabel(event)}</b><span>{event.topic || event.reason || eventLabel(event)}</span><small className={"lj-card-status " + (overdue ? "late" : completed ? "done" : cancelled ? "cancelled" : "planned")}>{overdue ? "Overdue" : completed ? "Completed" : cancelled ? "Cancelled" : task?.status === "in_progress" ? "In progress" : (event.source === "planner" || event.source === "deadline") ? "Planned" : "Recorded"}</small></span>
                     <span className="lj-card-open" aria-hidden="true">↗</span>
                   </button>;
                 })}
@@ -457,17 +470,17 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
             <div className="lj-detail-facts">
               <div><small>Topic</small><b>{selected.topic || "Not linked"}</b></div>
               <div><small>Date / time</small><b>{formatDateTime(selected.timestamp)}</b></div>
-              <div><small>Status</small><b>{selectedTask ? (isCompleted(selectedTask) ? "Completed" : selectedTask.status === "in_progress" ? "In progress" : (eventIsOverdue(selected, tasks) ? "Overdue" : "Planned")) : selected.source === "deadline" ? "Upcoming deadline" : "Recorded activity"}</b></div>
+              <div><small>Status</small><b>{selectedTask ? (isCompleted(selectedTask) ? "Completed" : isCancelled(selectedTask) ? "Cancelled" : selectedTask.status === "in_progress" ? "In progress" : (eventIsOverdue(selected, tasks) ? "Overdue" : "Planned")) : selected.source === "deadline" ? "Upcoming deadline" : "Recorded activity"}</b></div>
               <div><small>Duration</small><b>{selected.duration_minutes ? selected.duration_minutes + " min estimated" : selectedTask ? (selectedTask.est || "Not specified") + " estimated" : "Not recorded"}</b></div>
               {selectedTask?.priority && <div><small>Priority</small><b className={"lj-priority " + selectedTask.priority}>{selectedTask.priority.toUpperCase()}</b></div>}
               {selectedTask?.original_due_date && <div><small>Original deadline</small><b>{formatDateTime(selectedTask.original_due_date)}</b></div>}
             </div>
             {selectedTask?.evidence && <div className="lj-evidence"><b>Evidence used</b><p>{selectedTask.evidence.mastery == null ? "No measured topic mastery; this task is a diagnostic recommendation." : "Latest weighted mastery: " + Math.round(selectedTask.evidence.mastery * 100) + "%."} {selectedTask.evidence.trend === "declining" ? "Recent performance is declining." : ""}</p><small>Priority factors: {Object.entries(selectedTask.evidence.factors || {}).map(([key, value]) => key + " " + Math.round(Number(value) * 100) + "%").join(" · ")}</small></div>}
             {selectedTask && <div className="lj-detail-actions">
-              {!isCompleted(selectedTask) && <button className="lj-btn primary" disabled={busy === "start" || busy === "task-" + selectedTask.id} onClick={() => startRevision(selected)}><Icon name="spark"/> Start revision</button>}
-              {!isCompleted(selectedTask) && <button className="lj-btn" disabled={busy === "task-" + selectedTask.id} onClick={() => markComplete(selectedTask)}>{busy === "task-" + selectedTask.id ? "Saving…" : "✓ Mark complete"}</button>}
+              {!isCompleted(selectedTask) && !isCancelled(selectedTask) && <button className="lj-btn primary" disabled={busy === "start" || busy === "task-" + selectedTask.id} onClick={() => startRevision(selected)}><Icon name="spark"/> Start revision</button>}
+              {!isCompleted(selectedTask) && !isCancelled(selectedTask) && <button className="lj-btn" disabled={busy === "task-" + selectedTask.id} onClick={() => markComplete(selectedTask)}>{busy === "task-" + selectedTask.id ? "Saving…" : "✓ Mark complete"}</button>}
               {selectedTask.note_id && <button className="lj-btn" onClick={() => onNavigate?.("notes", { noteId: selectedTask.note_id })}><Icon name="notes"/> Open note</button>}
-              <button className="lj-btn" onClick={() => { const base = parseDate(selectedTask.scheduled_at || selectedTask.due_date); const date = base || new Date(Date.now() + 86400000); const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); setRescheduleAt(local); }}>Reschedule</button>
+              {!isCancelled(selectedTask) && <button className="lj-btn" onClick={() => { const base = parseDate(selectedTask.scheduled_at || selectedTask.due_date); const date = base || new Date(Date.now() + 86400000); const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); setRescheduleAt(local); }}>Reschedule</button>}
               {rescheduleAt && <div className="lj-reschedule"><label htmlFor="lj-reschedule">New date and time</label><input id="lj-reschedule" type="datetime-local" value={rescheduleAt} onChange={(event) => setRescheduleAt(event.target.value)}/><button className="lj-btn primary" disabled={busy === "reschedule"} onClick={saveReschedule}>{busy === "reschedule" ? "Saving…" : "Save time"}</button></div>}
               <button className="lj-btn subtle" onClick={() => { const title = window.prompt("Task title", selectedTask.title); if (title === null || !title.trim()) return; updatePlannerTask(selectedTask.id, { title: title.trim() }).then(() => { toast?.("Task updated.", "teal"); load(); }).catch((err) => toast?.(err.message || "Could not update task.", "coral")); }}>Edit title</button>
             </div>}
@@ -480,8 +493,8 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
     <section className="lj-bottom-grid">
       <div className="lj-panel">
         <div className="lj-section-heading"><div><span className="lj-section-icon"><Icon name="calendar"/></span><div><h2>Upcoming revision plan</h2><p>Pending tasks from the same persistent planner used by the dashboard.</p></div></div><button className="lj-btn subtle" onClick={() => onNavigate?.("planner")}>Full planner <Icon name="arrow"/></button></div>
-        <div className="lj-upcoming-list">{tasks.filter((task) => !isCompleted(task)).sort((a, b) => (parseDate(a.scheduled_at)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (parseDate(b.scheduled_at)?.getTime() ?? Number.MAX_SAFE_INTEGER)).slice(0, 6).map((task, index) => <button className="lj-upcoming-row" key={task.id} onClick={() => setSelectedId("task-" + task.id)}><span className="lj-upcoming-number">{String(index + 1).padStart(2, "0")}</span><span><b>{task.title}</b><small>{task.topic} · {task.est || "Duration not set"}</small></span><span className={"lj-state " + (task.priority === "high" ? "critical" : task.priority === "med" ? "practice" : "strong")}>{task.priority || "planned"}</span><span className="lj-upcoming-date">{formatDateTime(task.scheduled_at || task.due_date)}</span></button>)}
-          {!tasks.some((task) => !isCompleted(task)) && <div className="lj-empty-inline"><span><b>No pending revision tasks</b><p>Generate a schedule after completing topic quizzes, or add a manual revision task.</p></span></div>}
+        <div className="lj-upcoming-list">{tasks.filter((task) => !isCompleted(task) && !isCancelled(task)).sort((a, b) => (parseDate(a.scheduled_at)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (parseDate(b.scheduled_at)?.getTime() ?? Number.MAX_SAFE_INTEGER)).slice(0, 6).map((task, index) => <button className="lj-upcoming-row" key={task.id} onClick={() => setSelectedId("task-" + task.id)}><span className="lj-upcoming-number">{String(index + 1).padStart(2, "0")}</span><span><b>{task.title}</b><small>{task.topic} · {task.est || "Duration not set"}</small></span><span className={"lj-state " + (task.priority === "high" ? "critical" : task.priority === "med" ? "practice" : "strong")}>{task.priority || "planned"}</span><span className="lj-upcoming-date">{formatDateTime(task.scheduled_at || task.due_date)}</span></button>)}
+          {!tasks.some((task) => !isCompleted(task) && !isCancelled(task)) && <div className="lj-empty-inline"><span><b>No pending revision tasks</b><p>Generate a schedule after completing topic quizzes, or add a manual revision task.</p></span></div>}
         </div>
       </div>
 

@@ -97,3 +97,9 @@
 .rf-study-controls .rf-link-button{margin:0}
 .rf-study-controls .rf-link-button.secondary{border:1px solid var(--rf-border,rgba(255,255,255,.14));background:transparent;color:var(--rf-text,#e7ffff)}
 .rf-study-controls .rf-link-button:disabled{opacity:.6;cursor:wait}
+
+.rf-plan-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 10px}
+.rf-plan-summary>div{min-width:0;display:grid;gap:3px;padding:8px 9px;border:1px solid var(--rf-border,#1b4b4d);border-radius:8px;background:linear-gradient(145deg,#102526,#08191a)}
+.rf-plan-summary small{font-size:8px;color:#92b2b0}.rf-plan-summary b{font:700 14px/1.2 "Syne",sans-serif;color:#e8f8f6;overflow-wrap:anywhere}
+.rf-plan-summary .warning{border-color:#88533f;background:#35221d}.rf-plan-summary .warning b{color:#ffd0bc}
+@media(max-width:620px){.rf-plan-summary{gap:5px}.rf-plan-summary>div{padding:7px 6px}.rf-plan-summary b{font-size:12px}}
