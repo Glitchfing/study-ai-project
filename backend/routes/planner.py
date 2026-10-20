@@ -520,6 +520,7 @@ def auto_schedule():
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
         current = [task for task in existing if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"}]
         candidate_topic_ids = {re.sub(r"[^a-z0-9]+", "-", str(item["topic"]).lower()).strip("-") for item in topics}
+        updated_tasks = [dict(task) for task in existing]
         # Retire stale auto-generated tasks that no longer map to a saved note.
         # Keep completed, in-progress, manually-created, and user-locked tasks untouched.
         for task in updated_tasks:
@@ -542,7 +543,6 @@ def auto_schedule():
         pending_ids = {task.get("id") for key, task in pending_generated.items() if key in candidate_topic_ids}
         occupied = [task for task in current if task.get("id") not in pending_ids]
         planned_today: dict[str, int] = {}
-        updated_tasks = [dict(task) for task in existing]
         for reserved_task in occupied:
             reserved_at = _scheduled_timestamp(reserved_task)
             if reserved_at:
