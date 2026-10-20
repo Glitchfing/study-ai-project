@@ -103,3 +103,8 @@
 .rf-plan-summary small{font-size:8px;color:#92b2b0}.rf-plan-summary b{font:700 14px/1.2 "Syne",sans-serif;color:#e8f8f6;overflow-wrap:anywhere}
 .rf-plan-summary .warning{border-color:#88533f;background:#35221d}.rf-plan-summary .warning b{color:#ffd0bc}
 @media(max-width:620px){.rf-plan-summary{gap:5px}.rf-plan-summary>div{padding:7px 6px}.rf-plan-summary b{font-size:12px}}
+
+/* Keep the timer controls visible below the Study time KPI only. */
+.rf-metric-card.rf-study-time-card{min-height:174px;height:auto;overflow:visible;z-index:2}
+.rf-study-time-card .rf-study-timer-controls{position:relative;z-index:3}
+.rf-study-time-card .rf-study-timer-controls button{line-height:1.2;white-space:nowrap}
