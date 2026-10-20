@@ -34,6 +34,7 @@ class ActivityEvent(BaseModel):
 
 class StudySessionStart(BaseModel):
     topic: Optional[str] = Field(default=None, max_length=120)
+    revision_task_id: Optional[int] = Field(default=None, ge=1)
 
 
 class StudySessionAction(BaseModel):
@@ -69,7 +70,7 @@ def _session_state(session_id: str) -> dict[str, Any] | None:
     if not started:
         return None
     state: dict[str, Any] = {
-        "session_id": session_id, "topic": started.get("topic"), "started_at": started.get("started_at"),
+        "session_id": session_id, "topic": started.get("topic"), "revision_task_id": started.get("revision_task_id"), "started_at": started.get("started_at"),
         "status": "active", "intervals": [], "active_interval_started_at": started.get("started_at"),
         "last_heartbeat_at": started.get("last_heartbeat_at") or started.get("started_at"),
         "duration_seconds": 0,
@@ -209,7 +210,7 @@ def start_study_session(payload: StudySessionStart):
         record_activity(
             "study_session_started", session_id=session_id, started_at=now,
             last_heartbeat_at=now, topic=payload.topic.strip() if payload.topic and payload.topic.strip() else None,
-            status="active", intervals=[],
+            revision_task_id=payload.revision_task_id, status="active", intervals=[],
         )
         return {"session": _session_state(session_id), "already_active": False}
 
@@ -291,6 +292,7 @@ def complete_study_session(payload: StudySessionAction):
         record_activity(
             "study_session_completed", session_id=payload.session_id, event_id=str(uuid4()),
             started_at=state.get("started_at"), ended_at=completed_at, completed_at=completed_at,
-            intervals=normalized, duration_seconds=duration, topic=state.get("topic"), status="completed",
+            intervals=normalized, duration_seconds=duration, topic=state.get("topic"),
+            revision_task_id=state.get("revision_task_id"), status="completed",
         )
         return {"session": _session_state(payload.session_id), "already_completed": False}
