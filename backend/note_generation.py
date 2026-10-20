@@ -377,6 +377,8 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
 
     for section in sections:
         section_name = _mindmap_label(section.get("title"), "Section")
+        if len(section_name) > 38:
+            section_name = section_name[:35].rsplit(" ", 1)[0].rstrip(" ,;:-") or section_name[:35]
         section_key = section_name.casefold()
         if section_key in seen_sections:
             continue
