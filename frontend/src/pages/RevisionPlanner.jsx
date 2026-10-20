@@ -319,7 +319,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
   }, [tasks]);
 
   const daysWithTasks = weekDays.map((day) => ({ date: day, key: localDay(day), tasks: (taskByDay.get(localDay(day)) || []).slice().sort((a, b) => (a.priority === "high" ? -1 : 0) - (b.priority === "high" ? -1 : 0)) }));
-  const topics = planner.topics || [];
+  const monthCells = view === "month" ? [...Array((daysWithTasks[0]?.date.getDay() + 6) % 7).fill(null), ...daysWithTasks] : daysWithTasks;
   const recommended = tasks.filter((task) => !isDone(task) && !isCancelled(task)).sort((a, b) => {
     if (isOverdue(a) !== isOverdue(b)) return isOverdue(a) ? -1 : 1;
     const p = { high: 0, med: 1, low: 2 };
@@ -356,9 +356,10 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
         <section className="rp-calendar-panel">
           <div className="rp-section-heading"><div><h2>Study calendar</h2><p>Select a date to see its sessions and open a task's details.</p></div><div className="rp-calendar-controls"><button className="rp-btn secondary" onClick={() => setAnchor(new Date())}>Today</button><div className="rp-view-tabs">{[["today","Today"],["week","Week"],["month","Month"]].map(([value,label]) => <button key={value} className={view === value ? "active" : ""} aria-pressed={view === value} onClick={() => { setView(value); setSelectedDay(localDay(new Date())); }}>{label}</button>)}</div></div></div>
           <div className="rp-period-nav"><button aria-label="Previous period" onClick={() => navigatePeriod(-1)}>‹</button><b>{currentLabel}</b><button aria-label="Next period" onClick={() => navigatePeriod(1)}>›</button></div>
+          {view === "month" && <div className="rp-weekday-row">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day) => <span key={day}>{day}</span>)}</div>}
           <div className={`rp-calendar-grid ${view === "month" ? "month" : view === "today" ? "one-day" : ""}`}>
             {view !== "month" && daysWithTasks.map(({date,key, tasks: dayTasks}) => <button key={key} className={`rp-day ${selectedDay === key ? "selected" : ""} ${localDay(date) === localDay(new Date()) ? "is-today" : ""}`} onClick={() => setSelectedDay(key)} aria-pressed={selectedDay === key}><span>{date.toLocaleDateString(undefined,{weekday:"short"})}</span><b>{date.getDate()}</b><small>{dayTasks.length ? `${dayTasks.length} session${dayTasks.length === 1 ? "" : "s"}` : "No sessions"}</small><span className="rp-day-dots">{dayTasks.slice(0,4).map((task) => <i key={task.id} className={isDone(task) ? "done" : isOverdue(task) ? "overdue" : task.priority || "med"}/>)}</span></button>)}
-            {view === "month" && weekDays.map(({date,key, tasks: dayTasks}) => <button key={key} className={`rp-month-day ${selectedDay === key ? "selected" : ""} ${localDay(date) === localDay(new Date()) ? "is-today" : ""}`} onClick={() => setSelectedDay(key)} aria-pressed={selectedDay === key}><b>{date.getDate()}</b>{dayTasks.slice(0,2).map((task) => <span key={task.id} className={`rp-month-task ${isDone(task) ? "done" : isOverdue(task) ? "overdue" : task.priority || "med"}`}>{task.title}</span>)}{dayTasks.length > 2 && <small>+{dayTasks.length - 2} more</small>}</button>)}
+            {view === "month" && monthCells.map((cell, index) => cell ? <button key={cell.key} className={`rp-month-day ${selectedDay === cell.key ? "selected" : ""} ${localDay(cell.date) === localDay(new Date()) ? "is-today" : ""}`} onClick={() => setSelectedDay(cell.key)} aria-pressed={selectedDay === cell.key}><b>{cell.date.getDate()}</b>{cell.tasks.slice(0,2).map((task) => <span key={task.id} className={`rp-month-task ${isDone(task) ? "done" : isOverdue(task) ? "overdue" : task.priority || "med"}`}>{task.title}</span>)}{cell.tasks.length > 2 && <small>+{cell.tasks.length - 2} more</small>}</button> : <div key={`month-blank-${index}`} className="rp-month-blank" aria-hidden="true"/>)}
           </div>
           <div className="rp-selected-day"><div className="rp-section-heading"><div><h2>{formatDate(selectedDay + "T12:00:00", { weekday: "long", day: "numeric", month: "long" })}</h2><p>{(taskByDay.get(selectedDay) || []).length} saved revision task(s)</p></div><button className="rp-btn secondary" onClick={() => { setDraftDate(selectedDay + "T18:00"); setShowCreate(true); }}>＋ Add to this day</button></div>
             {(taskByDay.get(selectedDay) || []).length ? <div className="rp-day-task-list">{(taskByDay.get(selectedDay) || []).map((task) => <TaskCard key={task.id} task={task} selected={String(task.id) === String(selectedTaskId)} onSelect={() => setSelectedTaskId(task.id)}/>)}</div> : <div className="rp-empty-inline"><b>No revision sessions scheduled for this date</b><span>Generate a plan or add a task for this day.</span></div>}
@@ -374,7 +375,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
           <aside className="rp-panel rp-detail">
             <div className="rp-section-heading"><div><h2>Task details</h2><p>Evidence, session controls and schedule edits.</p></div></div>
             {selectedTask ? <>
-              <div className="rp-detail-kicker"><span className={`rp-status-dot ${isDone(selectedTask) ? "done" : isOverdue(selectedTask) ? "overdue" : ""}`}/>{isDone(selectedTask) ? "Completed" : isOverdue(selectedTask) ? "Overdue" : selectedTask.status === "in_progress" ? "In progress" : "Scheduled"}</div>
+              <div className="rp-detail-kicker"><span className={`rp-status-dot ${isDone(selectedTask) ? "done" : isOverdue(selectedTask) ? "overdue" : ""}`}/>{isDone(selectedTask) ? "Completed" : isCancelled(selectedTask) ? "Cancelled" : isOverdue(selectedTask) ? "Overdue" : selectedTask.status === "in_progress" ? "In progress" : "Scheduled"}</div>
               <h3>{selectedTask.title}</h3><p className="rp-topic">{selectedTask.topic}</p>
               <p className="rp-reason">{selectedTask.priority_reason || (selectedTask.evidence?.mastery == null ? "Not enough performance data yet. This task is based on the available note/activity record." : "Recommended from topic performance and scheduling rules.")}</p>
               <div className="rp-detail-facts">
@@ -387,8 +388,8 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
               </div>
               {selectedTask.note_id && <button className="rp-link" onClick={() => onNavigate?.("notes", { noteId: selectedTask.note_id })}>Open linked study notes ↗</button>}
               <div className="rp-actions">
-                {!isDone(selectedTask) && <button className="rp-btn primary" disabled={busy === `start-${selectedTask.id}`} onClick={() => startTask(selectedTask)}>{busy === `start-${selectedTask.id}` ? "Starting…" : "▶ Start session"}</button>}
-                {!isDone(selectedTask) && <button className="rp-btn secondary" disabled={busy === `task-${selectedTask.id}`} onClick={() => completeTask(selectedTask)}>✓ Mark complete</button>}
+                {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn primary" disabled={busy === `start-${selectedTask.id}`} onClick={() => startTask(selectedTask)}>{busy === `start-${selectedTask.id}` ? "Starting…" : "▶ Start session"}</button>}
+                {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" disabled={busy === `task-${selectedTask.id}`} onClick={() => completeTask(selectedTask)}>✓ Mark complete</button>}
                 <button className="rp-btn secondary" disabled={busy === `edit-${selectedTask.id}`} onClick={() => editTask(selectedTask)}>Edit task</button>
                 {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" onClick={() => setEditDate((current) => current ? "" : toInputDateTime(getScheduled(selectedTask) || new Date()))}>Reschedule</button>}
                 {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" disabled={busy === "cancel-" + selectedTask.id} onClick={() => cancelTask(selectedTask)}>{busy === "cancel-" + selectedTask.id ? "Cancelling…" : "Cancel task"}</button>}
