@@ -6,7 +6,7 @@ import {
 } from "../services/api";
 import "../styles/learning-journey.css";
 
-const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 7, preferred_start_hour: 18, preferred_end_hour: 22, topic_importance: {}, deadlines: [] };
+const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 7, preferred_start_hour: 18, preferred_end_hour: 22, available_days: [0, 1, 2, 3, 4, 5, 6], topic_importance: {}, deadlines: [] };
 const TYPE_LABELS = {
   quiz_completed: "Quiz completed", note_view: "Note reviewed", deadline: "Upcoming deadline",
   study_session_completed: "Study session", planner_task_done: "Revision completed",
@@ -216,8 +216,10 @@ export default function LearningJourney({ onNavigate, toast, refreshDashboard })
       const result = await startStudySession(topic, selectedTask?.id || null);
       const session = result?.session || result?.active || null;
       setActiveSession(session);
-      if (result?.already_active && session?.topic && session.topic.toLowerCase() !== topic.toLowerCase()) {
-        toast?.("A study session is already active for " + session.topic + ". Finish it before starting another topic.", "coral");
+      if (result?.already_active) {
+        toast?.(String(session?.revision_task_id ?? "") === String(selectedTask?.id ?? "") && selectedTask
+          ? "A study session is already active for this task. Use the session controls to resume or finish it."
+          : "A study session is already active" + (session?.topic ? " for " + session.topic : "") + ". Finish it before starting another session.", "coral");
         return;
       }
       if (selectedTask) {
