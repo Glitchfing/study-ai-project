@@ -219,7 +219,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
         <div className="rp-simple-meta">{nextTask.topic} · {durationOf(nextTask)} min · {isOverdue(nextTask) ? "Overdue" : formatDate(nextTask.scheduled_at || nextTask.due_date)}</div>
         <div className="rp-simple-actions">
           <button className="rp-btn primary" onClick={() => startSession(nextTask)} disabled={Boolean(activeSession) || busy === "start-" + nextTask.id}>{activeSession ? "Session active" : "Start study session"}</button>
-          <button className="rp-btn secondary" onClick={() => openNote(nextTask)}>Open note</button>
+          <button className="rp-btn secondary" onClick={() => openNote(nextTask)} disabled={!nextTask.note_id} title={nextTask.note_id ? "Open the linked saved note" : "No saved note is linked to this task"}>{nextTask.note_id ? "Open note" : "No linked note"}</button>
           <button className="rp-btn secondary" onClick={() => openQuiz(nextTask)}>Practice quiz</button>
         </div>
       </section>}
@@ -227,7 +227,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
       <section className="rp-panel rp-simple-list-panel">
         <div className="rp-section-heading"><div><h2>Upcoming revisions</h2><p>Saved tasks, updated from the backend.</p></div></div>
         {pending.length ? <div className="rp-simple-list">{pending.map((task) => <article className="rp-simple-task" key={task.id}>
-          <div className="rp-simple-task-main"><b>{task.title || task.topic}</b><span>{task.topic} · {durationOf(task)} min</span><small>{task.priority_reason || (task.priority === "high" ? "High priority based on the saved revision plan." : "Scheduled from your learning activity.")}</small><small className={isOverdue(task) ? "rp-simple-overdue" : ""}>{isOverdue(task) ? "Overdue · " : ""}{formatDate(task.scheduled_at || task.due_date)}</small></div>
+          <div className="rp-simple-task-main"><b>{task.title || task.topic}</b><span>{task.topic} · {durationOf(task)} min</span><small>{task.priority_reason || (task.priority === "high" ? "High priority based on the saved revision plan." : "Scheduled from your learning activity.")}</small>{!task.note_id && <small className="rp-simple-overdue">No matching saved note is linked.</small>}<small className={isOverdue(task) ? "rp-simple-overdue" : ""}>{isOverdue(task) ? "Overdue · " : ""}{formatDate(task.scheduled_at || task.due_date)}</small></div>
           <div className="rp-simple-task-actions">
             <button className="rp-btn secondary" onClick={() => { setRescheduleId(rescheduleId === task.id ? null : task.id); setRescheduleAt(localInput(task.scheduled_at || new Date(Date.now() + 86400000))); }}>Reschedule</button>
             <button className="rp-btn secondary" onClick={() => openQuiz(task)}>Quiz</button>
