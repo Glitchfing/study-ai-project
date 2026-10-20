@@ -605,46 +605,104 @@ def _merge_study_aids(
 def _mindmap(
     title: str,
     keywords: list[str],
+    *,
+    study_aids: dict[str, Any] | None = None,
+    source_content: str = "",
 ) -> dict[str, Any]:
-
-    useful_keywords = [
-        keyword
-        for keyword in keywords
-        if keyword.lower()
-        not in {
-            "object",
-            "instance",
-            "used",
-            "page",
-            "request",
-            "response",
-            "method",
-        }
-    ][:4]
-
-    branches = [
-        {
-            "name": keyword.title(),
-            "sub_branches": [],
-        }
-        for keyword in useful_keywords
-    ]
-
-    lines = [
-        "mindmap",
-        f"  root(({_clean_label(title)}))",
-    ]
-
-    for branch in branches:
-        lines.append(
-            f"    {_clean_label(branch['name'])}"
-        )
-
-    return {
-        "root": title,
-        "mermaid": "\n".join(lines),
-        "branches": branches,
+    """Build a radial, source-grounded concept map instead of single-word keyword spokes."""
+    aids = study_aids or {}
+    stop_labels = {
+        "object", "instance", "used", "page", "request", "response", "method",
+        "then", "common", "incorrectly", "therefore", "thus", "also", "using",
+        "data", "key", "major", "various", "following", "example", "examples",
+        "concept", "concepts", "topic", "topics", "important", "different",
+        "based", "related", "new", "one", "two", "three", "first", "second",
     }
+
+    def clean_concept(value: Any, max_words: int = 9) -> str:
+        text = _clean_label(str(value or ""))
+        text = re.sub(r"^(?:[-•*\d.)]+\s*)+", "", text).strip(" .:;,-")
+        text = re.sub(r"\s+", " ", text)
+        words = text.split()
+        return " ".join(words[:max_words])
+
+    def meaningful(value: Any) -> bool:
+        text = clean_concept(value)
+        words = re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", text)
+        if len(words) < 2 or len(text) < 7:
+            return False
+        if text.casefold() in stop_labels:
+            return False
+        if len(words) == 2 and all(word.casefold() in stop_labels for word in words):
+            return False
+        return bool(re.search(r"[A-Za-z]{3,}", text))
+
+    def dedupe_concepts(values: list[Any], limit: int = 6) -> list[str]:
+        seen: set[str] = set()
+        output: list[str] = []
+        for raw in values or []:
+            candidate = clean_concept(raw)
+            key = candidate.casefold()
+            if not meaningful(candidate) or key in seen:
+                continue
+            seen.add(key)
+            output.append(candidate)
+            if len(output) >= limit:
+                break
+        return output
+
+    key_points = dedupe_concepts(aids.get("key_points") or [], 6)
+    definitions = dedupe_concepts(aids.get("definitions") or [], 5)
+    examples = dedupe_concepts(aids.get("examples") or aids.get("use_cases") or [], 5)
+    important = dedupe_concepts(aids.get("important_notes") or [], 4)
+    main_labels = key_points[:5]
+
+    if not main_labels:
+        phrase_keywords = [clean_concept(keyword) for keyword in keywords or []
+                           if meaningful(keyword) and len(clean_concept(keyword).split()) >= 2]
+        main_labels = dedupe_concepts(phrase_keywords, 5)
+
+    if not main_labels:
+        sentences = [
+            item.strip(" •-\t")
+            for item in re.split(r"(?<=[.!?])\s+|\n+", source_content or "")
+            if item.strip()
+        ]
+        main_labels = dedupe_concepts(sentences, 5)
+
+    if not main_labels:
+        main_labels = [clean_concept(title) or "Main Topic"]
+
+    supporting = dedupe_concepts(definitions + examples + important, 10)
+    branches = []
+    used_support: set[str] = set()
+    for label in main_labels:
+        label_tokens = {word.casefold() for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", label)
+                        if word.casefold() not in stop_labels and len(word) > 2}
+        children = []
+        for detail in supporting:
+            detail_tokens = {word.casefold() for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", detail)
+                             if word.casefold() not in stop_labels and len(word) > 2}
+            detail_key = detail.casefold()
+            if detail_key not in used_support and (label_tokens & detail_tokens) and detail_key != label.casefold():
+                children.append(detail)
+                used_support.add(detail_key)
+            if len(children) >= 2:
+                break
+        branches.append({"name": label, "sub_branches": children})
+
+    remaining = [detail for detail in supporting if detail.casefold() not in used_support]
+    if branches and remaining:
+        for detail in remaining[:2]:
+            branches[0]["sub_branches"].append(detail)
+
+    lines = ["mindmap", f"  root(({_clean_label(clean_concept(title) or 'Main Topic')}))"]
+    for branch in branches:
+        lines.append(f"    {_clean_label(branch['name'])}")
+        for child in branch["sub_branches"]:
+            lines.append(f"      {_clean_label(child)}")
+
+    return {"root": title, "mermaid": "\n".join(lines), "branches": branches}
 
 
 def _humanize_source(
@@ -765,6 +823,8 @@ def _compat_note_payload(
         "mindmap": _mindmap(
             title,
             keywords,
+            study_aids=study_aids,
+            source_content=content,
         ),
 
         "chart": [
