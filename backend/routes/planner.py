@@ -165,6 +165,23 @@ def _deadline_timestamp(task: dict[str, Any]) -> datetime | None:
     return _parse_datetime(task.get("original_due_date") or task.get("due_date") or task.get("scheduled_at"))
 
 
+def _task_overdue(task: dict[str, Any], now: datetime | None = None) -> bool:
+    """A pending task is overdue when its scheduled session or actual deadline has passed."""
+    if _task_done(task) or task.get("status") in {"cancelled", "skipped"}:
+        return False
+    current = now or _utc_now()
+    scheduled = _parse_datetime(task.get("scheduled_at"))
+    deadline_raw = task.get("original_due_date") or task.get("due_date")
+    deadline = _parse_datetime(deadline_raw)
+    deadline_passed = False
+    if deadline is not None:
+        if isinstance(deadline_raw, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", deadline_raw):
+            deadline_passed = deadline.astimezone(STUDY_TZ).date() < current.astimezone(STUDY_TZ).date()
+        else:
+            deadline_passed = deadline < current
+    return bool((scheduled is not None and scheduled < current) or deadline_passed)
+
+
 def _duration(task: dict[str, Any]) -> int:
     explicit = task.get("duration_minutes")
     if isinstance(explicit, (int, float)) and not isinstance(explicit, bool) and explicit > 0:
@@ -229,8 +246,7 @@ def _candidate_topics() -> list[dict[str, Any]]:
             if not _task_done(task)
             and task.get("status") not in {"cancelled", "skipped"}
             and re.sub(r"[^a-z0-9]+", "-", str(task.get("topic") or "").lower()).strip("-") == topic_key
-            and _deadline_timestamp(task) is not None
-            and _deadline_timestamp(task) < now
+            and _task_overdue(task, now)
         ), None)
         priority, factors = calculate_priority(
             stats, now=now, due_at=due_at, importance=float(importance_map.get(name, .5)),
@@ -458,7 +474,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
             "topics_tracked": len(topics),
             "topics_needing_revision": sum(1 for topic in topics if (isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7) or topic.get("trend_label") == "declining"),
             "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"} and _scheduled_timestamp(task) and _scheduled_timestamp(task) >= _utc_now()),
-            "overdue_tasks": sum(1 for task in tasks if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"} and _deadline_timestamp(task) and _deadline_timestamp(task) < _utc_now()),
+            "overdue_tasks": sum(1 for task in tasks if _task_overdue(task, _utc_now())),
             "completed_milestones": sum(1 for task in tasks if _task_done(task)),
         },
     }
