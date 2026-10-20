@@ -129,7 +129,7 @@ class TaskEdit(BaseModel):
     scheduled_at: str | None = None
     due_date: str | None = None
     duration_minutes: int | None = Field(default=None, ge=5, le=240)
-    status: Literal["planned", "in_progress", "completed", "skipped", "missed"] | None = None
+    status: Literal["planned", "in_progress", "completed", "skipped", "missed", "cancelled"] | None = None
 
 
 class PlannerPreferences(BaseModel):
@@ -389,8 +389,8 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
         "summary": {
             "topics_tracked": len(topics),
             "topics_needing_revision": sum(1 for topic in topics if (isinstance(topic.get("mastery"), (int, float)) and topic["mastery"] < .7) or topic.get("trend_label") == "declining"),
-            "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and _scheduled_timestamp(task) and _scheduled_timestamp(task) >= _utc_now()),
-            "overdue_tasks": sum(1 for task in tasks if not _task_done(task) and _deadline_timestamp(task) and _deadline_timestamp(task) < _utc_now()),
+            "upcoming_sessions": sum(1 for task in tasks if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"} and _scheduled_timestamp(task) and _scheduled_timestamp(task) >= _utc_now()),
+            "overdue_tasks": sum(1 for task in tasks if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"} and _deadline_timestamp(task) and _deadline_timestamp(task) < _utc_now()),
             "completed_milestones": sum(1 for task in tasks if _task_done(task)),
         },
     }
@@ -427,11 +427,11 @@ def auto_schedule():
         # Prefer to reuse existing generated tasks with a matching topic. Preserve manual tasks.
         pending_generated: dict[str, dict[str, Any]] = {}
         for task in existing:
-            if task.get("origin") == "auto" and not _task_done(task) and task.get("status") != "in_progress":
+            if task.get("origin") == "auto" and not _task_done(task) and task.get("status") != "in_progress" and task.get("status") != "cancelled" and task.get("status") != "skipped" and not task.get("schedule_locked"):
                 pending_generated.setdefault(str(task.get("topic_id") or task.get("topic") or "").lower(), task)
         slots = _eligible_slots(prefs, now, int(prefs["planning_days"]))
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
-        current = [task for task in existing if not _task_done(task)]
+        current = [task for task in existing if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"}]
         candidate_topic_ids = {re.sub(r"[^a-z0-9]+", "-", str(item["topic"]).lower()).strip("-") for item in topics}
         pending_ids = {task.get("id") for key, task in pending_generated.items() if key in candidate_topic_ids}
         occupied = [task for task in current if task.get("id") not in pending_ids]
@@ -461,7 +461,7 @@ def auto_schedule():
                 # but never create a duplicate automatic task or overwrite its chosen slot.
                 manual_match = next((
                     item for item in current
-                    if (item.get("origin") != "auto" or item.get("status") == "in_progress")
+                    if (item.get("origin") != "auto" or item.get("status") == "in_progress" or item.get("schedule_locked"))
                     and re.sub(r"[^a-z0-9]+", "-", str(item.get("topic") or "").lower()).strip("-") == topic_id
                 ), None)
                 if manual_match:
@@ -592,6 +592,7 @@ def update_task(task_id: str, changes: TaskEdit):
             if date_key in updates and updates[date_key] and _parse_datetime(updates[date_key]) is None:
                 raise HTTPException(status_code=400, detail=f"{date_key} must be an ISO date or datetime.")
         if "scheduled_at" in updates:
+            task["schedule_locked"] = True
             old = _scheduled_timestamp(task)
             new_time = _parse_datetime(updates["scheduled_at"])
             if old and new_time and old != new_time:
@@ -616,6 +617,29 @@ def update_task(task_id: str, changes: TaskEdit):
         _persist_tasks()
         record_activity("planner_task_edited", task_id=task_id, title=task.get("title"), topic=str(task.get("topic") or "").lower() or None)
         return {"task": dict(task), "updated": bool(updates)}
+
+
+@router.delete("/tasks/{task_id}")
+def cancel_task(task_id: str):
+    """Soft-cancel a revision task while keeping its timeline and session history."""
+    with _LOCK:
+        task = next((item for item in TASKS if str(item.get("id")) == str(task_id)), None)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Revision task not found.")
+        if task.get("status") == "completed" or _task_done(task):
+            raise HTTPException(status_code=409, detail="Completed tasks cannot be cancelled.")
+        if task.get("status") == "cancelled":
+            return {"task": dict(task), "cancelled": True, "already_cancelled": True}
+        now_text = _utc_now().isoformat(timespec="seconds")
+        old_status = task.get("status") or "planned"
+        task.setdefault("status_history", []).append({"from": old_status, "to": "cancelled", "at": now_text})
+        task["status"] = "cancelled"
+        task["done"] = False
+        task["cancelled_at"] = now_text
+        task["updated_at"] = now_text
+        _persist_tasks()
+        record_activity("planner_task_cancelled", task_id=task_id, title=task.get("title"), topic=str(task.get("topic") or "").lower() or None)
+        return {"task": dict(task), "cancelled": True}
 
 
 @router.post("/tasks")
