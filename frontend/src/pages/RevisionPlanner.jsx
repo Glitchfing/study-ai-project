@@ -36,7 +36,7 @@ const isOverdue = (task, now = new Date()) => {
   if (!date) return false;
   // Date-only deadlines are due by end-of-day; scheduled datetimes become overdue
   // as soon as their planned time has passed.
-  if (typeof raw === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) return localDay(date) < localDay(now);
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return localDay(date) < localDay(now);
   return date.getTime() < now.getTime();
 };
 const toInputDateTime = (value) => {
