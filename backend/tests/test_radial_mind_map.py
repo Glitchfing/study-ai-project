@@ -68,5 +68,30 @@ class RadialMindMapAggregationTests(unittest.TestCase):
         ))
         self.assertTrue(any("data warehouse" in label.casefold() for label in labels))
 
+    def test_main_branch_titles_remove_component_prefixes_acronym_duplicates_and_placeholders(self):
+        result = _aggregate_mindmap(
+            [
+                {"title": "Component 1: Data Warehouse", "topics": ["data", "warehouse"]},
+                {"title": "Component 2: not specified in source", "topics": ["source"]},
+                {
+                    "title": "Component 3: Business Performance Management BPM",
+                    "key_points": ["Business performance management links business metrics to strategy."],
+                },
+                {
+                    "title": "Business Intelligence With Data Analytics BIDA",
+                    "key_points": ["The business intelligence platform enables useful decisions."],
+                },
+            ],
+            "BIDA",
+        )
+
+        labels = [branch["name"] for branch in result["branches"]]
+        self.assertIn("Data Warehouse", labels)
+        self.assertIn("Business Performance Management", labels)
+        self.assertIn("Business Intelligence Data Analytics", labels)
+        self.assertFalse(any("not specified" in label.casefold() for label in labels))
+        self.assertTrue(all(len(label) <= 38 for label in labels))
+
+
 if __name__ == "__main__":
     unittest.main()
