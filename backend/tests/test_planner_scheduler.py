@@ -1,7 +1,8 @@
 import unittest
+from fastapi import HTTPException
 from datetime import datetime, timedelta, timezone
 
-from routes.planner import calculate_priority, _duration, _overlap
+from routes.planner import calculate_priority, _duration, _overlap, _eligible_slots, STUDY_TZ
 
 
 class RevisionSchedulerUnitTests(unittest.TestCase):
@@ -111,6 +112,64 @@ class RevisionSchedulerUnitTests(unittest.TestCase):
         self.assertEqual(second["created_count"], 0)
         self.assertEqual(len(second["tasks"]), 1)
         self.assertEqual(first_snapshot, second_snapshot)
+
+
+    def test_eligible_slots_respect_selected_weekdays(self):
+        now = datetime(2026, 10, 16, 10, 0, tzinfo=timezone.utc)
+        slots = _eligible_slots({
+            "preferred_start_hour": 18,
+            "preferred_end_hour": 20,
+            "available_days": [0, 2, 4],
+        }, now, 14)
+        self.assertTrue(slots)
+        self.assertTrue(all(slot.astimezone(STUDY_TZ).weekday() in {0, 2, 4} for slot in slots))
+
+    def test_rescheduling_rejects_overlapping_revision_tasks(self):
+        from contextlib import ExitStack
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from routes import planner
+
+        fixed = "2030-04-11T18:00:00+05:30"
+        tasks = [
+            {"id": 1, "title": "First", "topic": "A", "status": "planned", "done": False, "scheduled_at": "2030-04-11T12:30:00+00:00", "duration_minutes": 30},
+            {"id": 2, "title": "Second", "topic": "B", "status": "planned", "done": False, "scheduled_at": "2030-04-11T12:45:00+00:00", "duration_minutes": 30},
+        ]
+        with TemporaryDirectory() as temp:
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(planner, "TASKS", tasks))
+                stack.enter_context(patch.object(planner, "TASKS_PATH", Path(temp) / "revision_tasks.json"))
+                stack.enter_context(patch.object(planner, "DATA_DIR", Path(temp)))
+                stack.enter_context(patch.object(planner, "_read_preferences", return_value={
+                    "daily_minutes": 180, "preferred_start_hour": 9, "preferred_end_hour": 23, "available_days": list(range(7)),
+                }))
+                stack.enter_context(patch.object(planner, "record_activity"))
+                with self.assertRaises(HTTPException) as raised:
+                    planner.update_task("1", planner.TaskEdit(scheduled_at=fixed))
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("overlaps", raised.exception.detail)
+
+    def test_cancel_task_is_a_soft_cancel_and_idempotent(self):
+        from contextlib import ExitStack
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from routes import planner
+
+        task = {"id": 1, "title": "Review topic", "topic": "Topic A", "status": "planned", "done": False}
+        with TemporaryDirectory() as temp:
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(planner, "TASKS", [task]))
+                stack.enter_context(patch.object(planner, "TASKS_PATH", Path(temp) / "revision_tasks.json"))
+                stack.enter_context(patch.object(planner, "DATA_DIR", Path(temp)))
+                stack.enter_context(patch.object(planner, "record_activity"))
+                first = planner.cancel_task("1")
+                second = planner.cancel_task("1")
+                self.assertEqual(first["task"]["status"], "cancelled")
+                self.assertTrue(second["already_cancelled"])
+                self.assertTrue((Path(temp) / "revision_tasks.json").exists())
+
 
 
 if __name__ == "__main__":
