@@ -414,7 +414,7 @@ def get_planner(start: str | None = Query(None), end: str | None = Query(None)):
             continue
         kind = str(item.get("kind") or "")
         if kind in {"quiz_completed", "note_view", "study_session_completed", "planner_task_done", "planner_task_edited"}:
-            events.append({"id": str(item.get("id") or uuid4()), "type": kind, "title": item.get("title") or item.get("topic_label") or kind.replace("_", " ").title(), "topic": item.get("topic") or item.get("topic_label"), "timestamp": item.get("created_at") or item.get("timestamp") or item.get("ended_at"), "status": "completed", "source": "activity", "task_id": item.get("revision_task_id") or item.get("task_id"), "note_id": item.get("note_id") or item.get("extra", {}).get("note_id"), "duration_seconds": item.get("duration_seconds"), "duration_minutes": round(int(item.get("duration_seconds") or 0) / 60) if item.get("duration_seconds") is not None else None})
+            events.append({"id": str(item.get("id") or uuid4()), "type": kind, "title": item.get("title") or item.get("topic_label") or kind.replace("_", " ").title(), "topic": item.get("topic") or item.get("topic_label"), "timestamp": item.get("created_at") or item.get("timestamp") or item.get("ended_at"), "status": "completed", "source": "activity", "task_id": item.get("revision_task_id") or item.get("task_id"), "note_id": item.get("note_id") or (item.get("extra") or {}).get("note_id"), "duration_seconds": item.get("duration_seconds"), "duration_minutes": round(int(item.get("duration_seconds") or 0) / 60) if item.get("duration_seconds") is not None else None})
     for attempt in attempts:
         if not isinstance(attempt, dict):
             continue
