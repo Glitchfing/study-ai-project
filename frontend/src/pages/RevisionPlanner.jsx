@@ -6,7 +6,7 @@ import {
 } from "../services/api";
 import "../styles/revision-planner.css";
 
-const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 14, preferred_start_hour: 18, preferred_end_hour: 22, topic_importance: {}, deadlines: [] };
+const DEFAULT_PREFS = { daily_minutes: 60, planning_days: 14, preferred_start_hour: 18, preferred_end_hour: 22, available_days: [0, 1, 2, 3, 4, 5, 6], topic_importance: {}, deadlines: [] };
 const localDay = (date) => {
   const d = new Date(date);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -30,7 +30,7 @@ const isDone = (task) => Boolean(task?.done) || task?.status === "completed";
 const isCancelled = (task) => task?.status === "cancelled" || task?.status === "skipped";
 const getScheduled = (task) => task?.scheduled_at || task?.due_date || null;
 const isOverdue = (task, now = new Date()) => {
-  if (isDone(task)) return false;
+  if (isDone(task) || isCancelled(task)) return false;
   const date = parseDate(task?.original_due_date || task?.due_date || task?.scheduled_at);
   return Boolean(date && date.getTime() < dayStart(now).getTime());
 };
@@ -74,7 +74,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
       setDashboard(dash);
       setActiveSession(sessionResult?.active || null);
       const nextTasks = plan?.tasks || [];
-      setSelectedTaskId((current) => current && nextTasks.some((t) => String(t.id) === String(current)) ? current : (nextTasks.find((t) => !isDone(t))?.id ?? nextTasks[0]?.id ?? null));
+      setSelectedTaskId((current) => current && nextTasks.some((t) => String(t.id) === String(current)) ? current : (nextTasks.find((t) => !isDone(t) && !isCancelled(t))?.id ?? nextTasks[0]?.id ?? null));
     } catch (err) {
       setError(err?.message || "Could not load your revision plan.");
     } finally {
@@ -93,7 +93,6 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
   const deadlines = planner.deadlines || preferences.deadlines || [];
   const selectedTask = tasks.find((task) => String(task.id) === String(selectedTaskId)) || null;
   const displayedSessionSeconds = activeSession ? Math.max(0, Number(activeSession.duration_seconds) || 0) + (activeSession.status === "active" && activeSession.active_interval_started_at ? Math.max(0, Math.floor((clockNow - (parseDate(activeSession.active_interval_started_at)?.getTime() || clockNow)) / 1000)) : 0) : 0;
-  const today = dayStart(new Date());
   const period = useMemo(() => {
     if (view === "today") return { start: dayStart(anchor), end: plusDays(dayStart(anchor), 1) };
     if (view === "month") {
@@ -104,16 +103,6 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
     start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
     return { start, end: plusDays(start, 7) };
   }, [anchor, view]);
-  const visibleTasks = useMemo(() => tasks.filter((task) => {
-    const stamp = parseDate(getScheduled(task));
-    if (view === "today") return (stamp ? localDay(stamp) : task.day === "today") === localDay(period.start);
-    if (!stamp) return task.day === "today" && localDay(period.start) === localDay(today);
-    return stamp >= period.start && stamp < period.end;
-  }).sort((a, b) => {
-    const p = { high: 0, med: 1, low: 2 };
-    return (p[a.priority] ?? 3) - (p[b.priority] ?? 3) || (parseDate(getScheduled(a))?.getTime() ?? Infinity) - (parseDate(getScheduled(b))?.getTime() ?? Infinity);
-  }), [tasks, view, period, today]);
-
   const weekDays = useMemo(() => {
     const first = view === "today" ? dayStart(anchor) : view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth(), 1) : (() => {
       const start = dayStart(anchor); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); return start;
@@ -127,7 +116,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
     return stamp && stamp >= period.start && stamp < period.end;
   });
   const plannedCount = metricTasks.filter((task) => !isDone(task) && ["planned", "in_progress", "missed"].includes(task.status || "planned")).length;
-  const remainingMinutes = metricTasks.filter((task) => !isDone(task)).reduce((sum, task) => sum + Math.max(0, Number(task.duration_minutes) || parseEstimate(task.est)), 0);
+  const remainingMinutes = metricTasks.filter((task) => !isDone(task) && !isCancelled(task)).reduce((sum, task) => sum + Math.max(0, Number(task.duration_minutes) || parseEstimate(task.est)), 0);
   const completedCount = metricTasks.filter(isDone).length;
   const overdueTasks = tasks.filter((task) => isOverdue(task));
   const studyMinutesToday = Number(dashboard?.analytics?.study_minutes_today) || 0;
@@ -416,6 +405,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
             <label>Plan ahead (days)<input type="number" min="1" max="60" value={preferences.planning_days} onChange={(e) => setPreferences((v) => ({ ...v, planning_days: Number(e.target.value) }))} required/></label>
             <label>Available from (hour)<input type="number" min="0" max="23" value={preferences.preferred_start_hour} onChange={(e) => setPreferences((v) => ({ ...v, preferred_start_hour: Number(e.target.value) }))} required/></label>
             <label>Available until (hour)<input type="number" min="1" max="24" value={preferences.preferred_end_hour} onChange={(e) => setPreferences((v) => ({ ...v, preferred_end_hour: Number(e.target.value) }))} required/></label>
+            <div className="rp-available-days"><b>Available study days</b><div>{[["Mon",0],["Tue",1],["Wed",2],["Thu",3],["Fri",4],["Sat",5],["Sun",6]].map(([label,day]) => <label key={day}><input type="checkbox" checked={(preferences.available_days || [0,1,2,3,4,5,6]).includes(day)} onChange={(event) => setPreferences((v) => ({ ...v, available_days: event.target.checked ? [...new Set([...(v.available_days || [0,1,2,3,4,5,6]), day])].sort() : (v.available_days || [0,1,2,3,4,5,6]).filter((item) => item !== day) }))}/>{label}</label>)}</div></div>
             <div className="rp-deadlines"><b>User-provided deadlines</b>{deadlines.map((deadline, index) => <div className="rp-deadline-row" key={deadline.topic + deadline.date + index}><span>{deadline.text || deadline.topic}<small>{deadline.topic} · {formatDate(deadline.date, { day: "numeric", month: "short", year: "numeric" })}</small></span><button type="button" className="rp-btn secondary" onClick={() => { const next = [...deadlines]; next.splice(index, 1); setPreferences((v) => ({ ...v, deadlines: next })); }}>Remove</button></div>)}<DeadlineAdder onAdd={(item) => setPreferences((v) => ({ ...v, deadlines: [...(v.deadlines || []), item] }))}/></div>
             <button className="rp-btn primary" disabled={busy === "preferences"}>{busy === "preferences" ? "Saving…" : "Save preferences"}</button>
           </form>}
