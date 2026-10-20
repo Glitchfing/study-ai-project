@@ -123,7 +123,7 @@ export default function Dashboard({data,loading,onNavigate,onRefresh,toast,onTog
   const noteCount=Number(a.notes_count??notes.filter(note=>note.source==="generated").length)||0;
   const completedActivities=Number(a.completed_activities)||0;
   const liveStudySeconds=activeStudySeconds(activeStudySession);
-  const liveStudyMinutes=studyMins+Math.floor(liveStudySeconds/60);
+  const liveStudyMinutes=activeStudySession?Math.floor(liveStudySeconds/60):studyMins;
   const stats=[
     {title:"Notes created",value:String(noteCount),pct:Math.min(100,noteCount*10),note:noteCount?"Saved generated notes":"Upload or create a note to begin",icon:"notes",tone:"peach",view:"notes"},
     {title:"Study time",value:prettyMinutes(liveStudyMinutes),pct:liveStudyMinutes?Math.min(100,liveStudyMinutes/12):0,note:studyMins?"From recorded study-session durations":"Start a timer to record study time",icon:"clock",tone:"mint"},
