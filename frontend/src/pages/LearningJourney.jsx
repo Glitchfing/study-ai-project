@@ -35,7 +35,7 @@ const eventIsOverdue = (event, tasks) => {
   const raw = task.due_date || task.original_due_date || task.scheduled_at;
   const when = parseDate(raw);
   if (!when) return false;
-  if (typeof raw === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) {
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     const localDay = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
     return localDay(when) < localDay(new Date());
   }
