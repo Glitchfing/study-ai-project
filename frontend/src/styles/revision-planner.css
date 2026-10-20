@@ -14,3 +14,23 @@
 
 .rp-available-days{grid-column:1/-1;display:grid;gap:7px;padding:10px;border:1px solid #173f40;border-radius:9px}.rp-available-days>b{font-size:10px}.rp-available-days>div{display:flex;flex-wrap:wrap;gap:7px}.rp-available-days label{display:flex;align-items:center;gap:6px;border:1px solid #245657;border-radius:7px;padding:7px 9px;background:#0a2223;color:var(--rp-muted);font-size:9px}.rp-available-days input{accent-color:#64b6ac}.rp-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:1050px){.rp-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:680px){.rp-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .rp-weekday-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:0 0 6px}.rp-weekday-row span{text-align:center;font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:var(--rp-muted);padding:3px}.rp-month-blank{min-height:85px;pointer-events:none}@media(max-width:680px){.rp-weekday-row{gap:3px}.rp-month-blank{min-height:66px}}
+
+/* Minimal, functional Revision Planner */
+.rp-simple{background:var(--bg,#071314);padding:24px clamp(14px,3vw,32px);max-width:1180px;margin:0 auto}
+.rp-simple .rp-header{align-items:center;padding-bottom:16px}
+.rp-simple .rp-header h1{font-size:clamp(23px,2vw,29px);margin:6px 0}
+.rp-simple .rp-header p{max-width:620px}
+.rp-simple-summary{display:flex;gap:20px;flex-wrap:wrap;padding:12px 0 16px;color:var(--rp-muted);font-size:12px}
+.rp-simple-summary b{color:var(--rp-text);font-size:15px;margin-right:4px}
+.rp-simple-session,.rp-simple-next,.rp-simple-list-panel{border:1px solid var(--rp-border);border-radius:12px;background:var(--rp-panel);padding:16px;margin:12px 0}
+.rp-simple-session{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.rp-simple-session>div{display:grid;gap:5px}.rp-simple-session span,.rp-simple-muted{color:var(--rp-muted)}
+.rp-simple-next h2{font-size:19px;margin:7px 0}.rp-simple-next p{color:var(--rp-muted);margin:6px 0}
+.rp-simple-meta{font-size:11px;color:var(--rp-muted);margin:10px 0}
+.rp-simple-actions,.rp-simple-task-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.rp-simple-list{display:grid;gap:0}
+.rp-simple-task{padding:14px 0;border-top:1px solid var(--rp-border);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+.rp-simple-task-main{display:grid;gap:5px;min-width:0}.rp-simple-task-main>span,.rp-simple-task-main small{color:var(--rp-muted);font-size:11px}.rp-simple-task-main small.rp-simple-overdue{color:var(--rp-coral)}
+.rp-simple-reschedule{grid-column:1/-1;display:flex;align-items:end;gap:8px;flex-wrap:wrap}.rp-simple-reschedule label{display:grid;gap:5px;color:var(--rp-muted);font-size:11px}.rp-simple-reschedule input{border:1px solid var(--rp-border);border-radius:7px;background:#071718;color:var(--rp-text);padding:8px}
+.rp-simple-message{margin:12px 0;padding:12px;border:1px solid var(--rp-coral);border-radius:9px;color:var(--rp-text)}
+@media(max-width:680px){.rp-simple{padding:16px 12px}.rp-simple .rp-header{align-items:flex-start;flex-direction:column}.rp-simple-session{align-items:flex-start;flex-direction:column}.rp-simple-task{grid-template-columns:1fr}.rp-simple-task-actions{margin-top:4px}.rp-simple-reschedule{align-items:stretch;flex-direction:column}.rp-simple-reschedule label,.rp-simple-reschedule input{width:100%}}
