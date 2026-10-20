@@ -152,3 +152,5 @@
 .lj-detail-panel{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto}
 @media(max-width:1000px){.lj-timeline-layout{grid-template-columns:minmax(0,1fr)}.lj-detail-panel{position:relative;top:auto;max-height:none}.lj-month-lane{flex-basis:280px;width:280px}}
 @media(max-width:600px){.lj-journey-board-track{padding:20px 12px 22px}.lj-journey-board-track:before{left:45px;right:45px}.lj-month-lane{flex-basis:265px;width:265px;padding:0 13px 8px}.lj-month-heading b{font-size:13px}}
+
+.lj-journey-event-card.cancelled{opacity:.65;border-style:dashed}.lj-card-status.cancelled{color:#a8bfbc;border-color:#425b5a;background:#182b2a}
