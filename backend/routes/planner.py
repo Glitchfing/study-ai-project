@@ -279,7 +279,7 @@ def _candidate_topics() -> list[dict[str, Any]]:
             "due_at": due_at,
             "note_id": stats.get("note_id"),
         })
-    return sorted(candidates, key=lambda item: (-item["priority_score"], item["due_at"] or datetime.max.replace(tzinfo=timezone.utc)))
+    # Only schedule topics that can open a real saved note. Quiz-only topics without a matching note\n    # must not appear as note-backed revision tasks.\n    candidates = [item for item in candidates if item.get("note_id")]\n    return sorted(candidates, key=lambda item: (-item["priority_score"], item["due_at"] or datetime.max.replace(tzinfo=timezone.utc)))
 
 
 def _eligible_slots(prefs: dict[str, Any], now: datetime, horizon: int) -> list[datetime]:
@@ -520,6 +520,25 @@ def auto_schedule():
         retained, created, rescheduled, unscheduled = 0, 0, 0, []
         current = [task for task in existing if not _task_done(task) and task.get("status") not in {"cancelled", "skipped"}]
         candidate_topic_ids = {re.sub(r"[^a-z0-9]+", "-", str(item["topic"]).lower()).strip("-") for item in topics}
+        # Retire stale auto-generated tasks that no longer map to a saved note.
+        # Keep completed, in-progress, manually-created, and user-locked tasks untouched.
+        for task in updated_tasks:
+            topic_key = re.sub(r"[^a-z0-9]+", "-", str(task.get("topic_id") or task.get("topic") or "").lower()).strip("-")
+            if (
+                task.get("origin") == "auto"
+                and not _task_done(task)
+                and task.get("status") not in {"in_progress", "cancelled", "skipped"}
+                and not task.get("schedule_locked")
+                and topic_key not in candidate_topic_ids
+            ):
+                task["status"] = "skipped"
+                task["done"] = False
+                task["updated_at"] = now.isoformat(timespec="seconds")
+                task["status_history"] = task.get("status_history") or []
+                task["status_history"].append({
+                    "from": "planned", "to": "skipped", "at": now.isoformat(timespec="seconds"),
+                    "reason": "No matching saved note is available for this generated revision task.",
+                })
         pending_ids = {task.get("id") for key, task in pending_generated.items() if key in candidate_topic_ids}
         occupied = [task for task in current if task.get("id") not in pending_ids]
         planned_today: dict[str, int] = {}
