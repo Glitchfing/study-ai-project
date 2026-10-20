@@ -131,7 +131,7 @@ class RevisionSchedulerUnitTests(unittest.TestCase):
         from unittest.mock import patch
         from routes import planner
 
-        fixed = "2030-04-11T18:00:00+05:30"
+        fixed = "2030-04-11T18:15:00+05:30"
         tasks = [
             {"id": 1, "title": "First", "topic": "A", "status": "planned", "done": False, "scheduled_at": "2030-04-11T12:30:00+00:00", "duration_minutes": 30},
             {"id": 2, "title": "Second", "topic": "B", "status": "planned", "done": False, "scheduled_at": "2030-04-11T12:45:00+00:00", "duration_minutes": 30},
