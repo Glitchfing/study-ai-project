@@ -619,17 +619,67 @@ def _mindmap(
         "based", "related", "new", "one", "two", "three", "first", "second",
     }
 
-    def clean_concept(value: Any, max_words: int = 9) -> str:
+    filler_words = {
+        "a", "an", "the", "and", "or", "of", "for", "to", "into", "in", "on",
+        "with", "without", "from", "that", "this", "these", "those", "it", "is",
+        "are", "was", "were", "be", "being", "been", "by", "as", "can", "will",
+        "which", "their", "its", "they", "also", "then", "therefore", "thus",
+        "direct", "actual", "following", "various", "common", "incorrectly",
+    }
+    action_verbs = re.compile(
+        r"\b(provides?|produces?|enables?|supports?|tracks?|compares?|integrates?|"
+        r"transforms?|links?|contains?|includes?|brings?|stores?|creates?|helps?|"
+        r"allows?|reduces?|prevents?|ensures?|uses?|delivers?|offers?|presents?|"
+        r"collects?|organizes?|represents?|means?|refers to|consists of|is|are|"
+        r"serves as|acts as|displays?|shows?|generates?|measures?|requires?)\b",
+        re.IGNORECASE,
+    )
+
+    def clean_concept(value: Any, max_words: int = 5) -> str:
         text = _clean_label(str(value or ""))
         text = re.sub(r"^(?:[-•*\d.)]+\s*)+", "", text).strip(" .:;,-")
-        text = re.sub(r"\s+", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        if ":" in text:
+            prefix, detail = (part.strip() for part in text.split(":", 1))
+            if detail and len(prefix.split()) <= 4:
+                text = detail
+        match = action_verbs.search(text)
+        if match:
+            subject = text[:match.start()].strip(" .:;,-")
+            subject_words = [
+                word for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", subject)
+                if word.casefold() not in filler_words
+            ]
+            is_acronym_subject = len(subject_words) == 1 and subject_words[0].isupper() and len(subject_words[0]) >= 2
+            if len(subject_words) >= 2 or is_acronym_subject:
+                text = " ".join(subject_words)
+            else:
+                complement = text[match.end():].strip(" .:;,-")
+                parts = [
+                    part.strip(" .:;,-")
+                    for part in re.split(r",|;|\band\b", complement, flags=re.IGNORECASE)
+                ]
+                parts = [part for part in parts if part and part.casefold() not in filler_words]
+                text = ", ".join(parts[:3]) if len(parts) >= 2 else " ".join(
+                    word for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", complement)
+                    if word.casefold() not in filler_words
+                )
+        if not match:
+            text = " ".join(
+                word for word in re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", text)
+                if word.casefold() not in filler_words
+            )
         words = text.split()
-        return " ".join(words[:max_words])
+        text = " ".join(words[:max_words]).strip(" .:;,-")
+        if len(text) > 38:
+            text = text[:35].rsplit(" ", 1)[0].rstrip(" ,;:-")
+        return text
 
     def meaningful(value: Any) -> bool:
         text = clean_concept(value)
         words = re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", text)
-        if len(words) < 2 or len(text) < 7:
+        is_acronym = len(words) == 1 and words[0].isupper() and len(words[0]) >= 2
+        if (len(words) < 2 and not is_acronym) or len(text) < 3:
             return False
         if text.casefold() in stop_labels:
             return False

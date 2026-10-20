@@ -266,7 +266,7 @@ def _aggregate_outline(sections: list[dict[str, Any]], title: str) -> dict[str, 
 
 
 def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, Any]:
-    """Create a radial mind map from section concepts, not isolated high-frequency words."""
+    """Create a radial mind map with short, scannable concept labels."""
     branches = []
     lines = ["mindmap", f"  root(({_mindmap_label(title, 'Study Document')}))"]
     seen_sections: set[str] = set()
@@ -277,71 +277,142 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
         "following", "important", "different", "related", "based", "using",
         "therefore", "thus", "also", "first", "second", "example", "examples",
     }
+    category_prefixes = {
+        "activities", "indicators", "dashboard content", "forms", "features",
+        "objectives", "key indicators", "performance indicators", "source data types",
+        "definition", "example", "examples", "key point", "key points", "important note",
+        "important notes", "use case", "use cases", "revision note", "revision notes",
+        "benefits", "limitations", "advantages", "disadvantages", "components",
+    }
+    filler_words = {
+        "a", "an", "the", "and", "or", "of", "for", "to", "into", "in", "on",
+        "with", "without", "from", "that", "this", "these", "those", "it", "is",
+        "are", "was", "were", "be", "being", "been", "by", "as", "can", "will",
+        "which", "their", "its", "they", "also", "then", "therefore", "thus",
+        "direct", "actual", "following", "various", "common", "incorrectly",
+    }
+    action_verbs = re.compile(
+        r"\b(provides?|produces?|enables?|supports?|tracks?|compares?|integrates?|"
+        r"transforms?|links?|contains?|includes?|brings?|stores?|creates?|helps?|"
+        r"allows?|reduces?|prevents?|ensures?|uses?|delivers?|offers?|presents?|"
+        r"collects?|organizes?|represents?|means?|refers to|consists of|is|are|"
+        r"serves as|acts as|displays?|shows?|generates?|measures?|requires?)\b",
+        re.IGNORECASE,
+    )
 
-    def concept_label(value: Any) -> str:
+    def words_in(value: str) -> list[str]:
+        return re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", value)
+
+    def compact_list(value: str) -> str:
+        items = [
+            part.strip(" .:;,-")
+            for part in re.split(r",|;|\band\b", value, flags=re.IGNORECASE)
+        ]
+        items = [part for part in items if part and part.casefold() not in filler_words]
+        if len(items) >= 2:
+            return ", ".join(items[:3])
+        tokens = [word for word in words_in(value) if word.casefold() not in filler_words]
+        return " ".join(tokens[:5])
+
+    def concept_label(value: Any, parent_name: str = "") -> str:
         if isinstance(value, dict):
             value = value.get("name") or value.get("heading") or value.get("title") or value.get("content") or ""
         text = re.sub(r"^[\s•*\-\d.)]+", "", str(value or ""))
         text = re.sub(r"\s+", " ", text).strip(" .:;,-")
-        return _mindmap_label(_shorten(text, sentences=1, chars=62), "")
+        text = re.sub(r"\s*\.{2,}\s*$", "", text).strip()
 
-    def is_meaningful(value: Any) -> bool:
-        label = concept_label(value)
+        if ":" in text:
+            prefix, detail = (part.strip() for part in text.split(":", 1))
+            if prefix.casefold() in category_prefixes and detail:
+                text = compact_list(detail)
+            elif prefix and len(words_in(prefix)) <= 5 and len(prefix) <= 42:
+                text = prefix
+
+        verb = action_verbs.search(text)
+        if verb:
+            subject = text[:verb.start()].strip(" .:;,-")
+            subject_words = words_in(subject)
+            clean_subject = " ".join(word for word in subject_words if word.casefold() not in filler_words)
+            parent_key = " ".join(word.casefold() for word in words_in(parent_name) if word.casefold() not in filler_words)
+            subject_key = " ".join(word.casefold() for word in words_in(clean_subject))
+            # Prefer the concise subject, even when it repeats the section's main topic.
+            # If it duplicates the entire parent label, use the sentence complement instead.
+            if len(words_in(clean_subject)) >= 2 and subject_key != parent_key:
+                text = clean_subject
+            else:
+                detail = text[verb.end():].strip(" .:;,-")
+                detail = re.split(r"\b(?:because|so that|which|while|whereas|although)\b", detail, maxsplit=1, flags=re.IGNORECASE)[0]
+                text = compact_list(detail)
+        else:
+            # Remove prepositions/filler from noun-phrase labels such as
+            # "Business Intelligence With Data Analytics" without losing the terms.
+            text = " ".join(
+                word for word in words_in(text)
+                if word.casefold() not in filler_words
+            )
+
+        text = _shorten(text, sentences=1, chars=120)
+        tokens = words_in(text)
+        if len(tokens) > 5:
+            text = " ".join(tokens[:5])
+        if len(text) > 38:
+            text = text[:35].rsplit(" ", 1)[0].rstrip(" ,;:-")
+        return _mindmap_label(text, "") if text else ""
+
+    def is_meaningful(value: Any, parent_name: str = "") -> bool:
+        label = concept_label(value, parent_name)
         if not label:
             return False
-        words = re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", label)
+        words = words_in(label)
         lowered = label.casefold()
-        if lowered in weak_labels or len(label) < 6:
-            return False
-        # Multi-word concepts and actual acronyms are useful; one-word keyword noise isn't.
         is_acronym = len(words) == 1 and words[0].isupper() and len(words[0]) >= 2
+        if lowered in weak_labels or (len(label) < 6 and not is_acronym):
+            return False
         if len(words) < 2 and not is_acronym:
             return False
         if len(words) >= 2 and all(word.casefold() in weak_labels for word in words):
             return False
         return True
 
-    def add_candidate(output: list[str], seen: set[str], value: Any) -> None:
-        label = concept_label(value)
+    def add_candidate(output: list[str], seen: set[str], value: Any, parent_name: str) -> None:
+        label = concept_label(value, parent_name)
         key = label.casefold()
-        if not is_meaningful(label) or key in seen:
+        if not label or not is_meaningful(label, parent_name) or key in seen:
             return
         seen.add(key)
         output.append(label)
 
     for section in sections:
         section_name = _mindmap_label(section.get("title"), "Section")
+        if len(section_name) > 38:
+            section_name = section_name[:35].rsplit(" ", 1)[0].rstrip(" ,;:-") or section_name[:35]
         section_key = section_name.casefold()
         if section_key in seen_sections:
             continue
         seen_sections.add(section_key)
-
         section_seen: set[str] = set()
         child_names: list[str] = []
 
-        # Use explanatory facts first. topics/concept_keywords often contain isolated TF-IDF words.
         for field in ("key_points", "definitions", "examples", "use_cases", "important_notes", "revision_notes"):
             for value in section.get(field) or []:
-                add_candidate(child_names, section_seen, value)
+                add_candidate(child_names, section_seen, value, section_name)
                 if len(child_names) >= 3:
                     break
             if len(child_names) >= 3:
                 break
 
-        # Structured note content is another source of meaningful concepts.
         note_data = section.get("notes") or {}
         structure = section.get("note_structure") or {}
         for block in structure.get("blocks") or []:
             candidates = [block.get("heading"), block.get("content")]
             candidates.extend(block.get("items") or [])
             for value in candidates:
-                add_candidate(child_names, section_seen, value)
+                add_candidate(child_names, section_seen, value, section_name)
                 if len(child_names) >= 3:
                     break
             if len(child_names) >= 3:
                 break
 
-        # Keep only meaningful phrases from older keyword-oriented records.
         if len(child_names) < 3:
             old_branches = note_data.get("mindmap", {}).get("branches", []) if isinstance(note_data, dict) else []
             fallback_values = []
@@ -349,7 +420,7 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
             fallback_values.extend(section.get("topics") or [])
             fallback_values.extend(section.get("concept_keywords") or [])
             for value in fallback_values:
-                add_candidate(child_names, section_seen, value)
+                add_candidate(child_names, section_seen, value, section_name)
                 if len(child_names) >= 3:
                     break
 
