@@ -163,8 +163,11 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
       const result = await startStudySession(task.topic, task.id);
       const session = result?.session || result?.active;
       setActiveSession(session || null);
-      if (result?.already_active && session?.topic && session.topic.toLowerCase() !== task.topic.toLowerCase()) {
-        notify(`A study session is already active for ${session.topic}. Finish it first.`, "coral");
+      if (result?.already_active) {
+        const sameTaskSession = String(session?.revision_task_id ?? "") === String(task.id);
+        notify(sameTaskSession
+          ? "A study session is already active for this task. Use the session controls above."
+          : "A study session is already active" + (session?.topic ? " for " + session.topic : "") + ". Finish it before starting another session.", "coral");
         return;
       }
       if (!isDone(task)) await updatePlannerTask(task.id, { status: "in_progress" });
@@ -391,7 +394,7 @@ export default function RevisionPlanner({ toast, refreshDashboard, onNavigate })
               <div className="rp-actions">
                 {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn primary" disabled={busy === `start-${selectedTask.id}`} onClick={() => startTask(selectedTask)}>{busy === `start-${selectedTask.id}` ? "Starting…" : "▶ Start session"}</button>}
                 {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" disabled={busy === `task-${selectedTask.id}`} onClick={() => completeTask(selectedTask)}>✓ Mark complete</button>}
-                <button className="rp-btn secondary" disabled={busy === `edit-${selectedTask.id}`} onClick={() => editTask(selectedTask)}>Edit task</button>
+                {!isCancelled(selectedTask) && <button className="rp-btn secondary" disabled={busy === `edit-${selectedTask.id}`} onClick={() => editTask(selectedTask)}>Edit task</button>}
                 {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" onClick={() => setEditDate((current) => current ? "" : toInputDateTime(getScheduled(selectedTask) || new Date()))}>Reschedule</button>}
                 {!isDone(selectedTask) && !isCancelled(selectedTask) && <button className="rp-btn secondary" disabled={busy === "cancel-" + selectedTask.id} onClick={() => cancelTask(selectedTask)}>{busy === "cancel-" + selectedTask.id ? "Cancelling…" : "Cancel task"}</button>}
                 {editDate && <form className="rp-reschedule" onSubmit={saveTaskEdit}><label>New date and time<input type="datetime-local" value={editDate} onChange={(e) => setEditDate(e.target.value)} required/></label><button className="rp-btn primary" disabled={busy === "reschedule"}>{busy === "reschedule" ? "Saving…" : "Save schedule"}</button></form>}
