@@ -231,10 +231,19 @@ def heartbeat_study_session(payload: StudySessionAction):
         state = _session_state(payload.session_id)
         if not state:
             raise HTTPException(status_code=404, detail="Study session not found.")
+
+        # Recover stale sessions before updating the heartbeat. Otherwise, reopening
+        # a dashboard could keep an abandoned session alive and inflate study time.
+        state = _recover_stale(state)
         if state.get("status") != "active":
-            raise HTTPException(status_code=409, detail="Only an active study session can send a heartbeat.")
+            return {"session": state, "server_time": _iso(_utc_now())}
+
         now = _iso(_utc_now())
-        started = next(e for e in ACTIVITY_LOG if e.get("kind") == "study_session_started" and e.get("session_id") == payload.session_id)
+        started = next(
+            e for e in ACTIVITY_LOG
+            if e.get("kind") == "study_session_started"
+            and e.get("session_id") == payload.session_id
+        )
         started["last_heartbeat_at"] = now
         _save_activity()
         return {"session": _session_state(payload.session_id), "server_time": now}
