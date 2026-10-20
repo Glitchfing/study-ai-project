@@ -70,7 +70,7 @@ def _session_state(session_id: str) -> dict[str, Any] | None:
         return None
     state: dict[str, Any] = {
         "session_id": session_id, "topic": started.get("topic"), "started_at": started.get("started_at"),
-        "status": "active", "intervals": [], "active_interval_started_at": started.get("started_at"),
+        "status": "active", "intervals": [], "active_interval_started_at": started.get("tracking_started_at") or started.get("started_at"),
         "last_heartbeat_at": started.get("last_heartbeat_at") or started.get("started_at"),
         "duration_seconds": 0,
     }
@@ -155,6 +155,17 @@ def get_active_study_session():
     with ACTIVITY_LOCK:
         active = _active_session()
         if active:
+            # Legacy sessions created before live tracking could be restored with a start
+            # timestamp from days ago. Do not count that unverified time: establish a new
+            # tracking baseline the first time the upgraded timer sees such a session.
+            started = next((event for event in ACTIVITY_LOG if event.get("kind") == "study_session_started" and event.get("session_id") == active.get("session_id")), None)
+            if started and not started.get("tracking_started_at"):
+                started_at = _dt(started.get("started_at"))
+                if started_at and _utc_now() - started_at > STALE_AFTER:
+                    started["tracking_started_at"] = _iso(_utc_now())
+                    started["last_heartbeat_at"] = started["tracking_started_at"]
+                    _save_activity()
+            active = _session_state(active["session_id"]) or active
             active = _recover_stale(active)
         return {"active": active}
 
