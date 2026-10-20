@@ -303,6 +303,32 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
     def words_in(value: str) -> list[str]:
         return re.findall(r"[A-Za-z][A-Za-z0-9+#-]*", value)
 
+    def clean_section_name(value: Any) -> str:
+        label = _mindmap_label(value, "Section")
+        label = re.sub(r"^(?:component|section)\s*\d+\s*[:.)-]\s*", "", label, flags=re.IGNORECASE).strip()
+        if re.search(r"\b(?:not specified|not provided|not available|unknown|unspecified|n/?a|not applicable)\b", label, re.IGNORECASE):
+            return ""
+
+        # Remove duplicate acronym suffixes such as "Business Performance Management BPM".
+        acronym_match = re.search(r"\s+([A-Z]{2,8})$", label)
+        if acronym_match:
+            phrase = label[:acronym_match.start()].strip()
+            initials = "".join(
+                word[0].upper()
+                for word in words_in(phrase)
+                if word.casefold() not in filler_words
+            )
+            if initials == acronym_match.group(1):
+                label = phrase
+
+        # If a heading is still too wide, remove connector words before truncating it.
+        if len(label) > 38:
+            label = re.sub(r"\b(?:with|of|a|an|the)\b", " ", label, flags=re.IGNORECASE)
+            label = re.sub(r"\s+", " ", label).strip()
+        if len(label) > 38:
+            label = label[:35].rsplit(" ", 1)[0].rstrip(" ,;:-") or label[:35]
+        return label
+
     def compact_list(value: str) -> str:
         items = [
             part.strip(" .:;,-")
@@ -383,9 +409,9 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
         output.append(label)
 
     for section in sections:
-        section_name = _mindmap_label(section.get("title"), "Section")
-        if len(section_name) > 38:
-            section_name = section_name[:35].rsplit(" ", 1)[0].rstrip(" ,;:-") or section_name[:35]
+        section_name = clean_section_name(section.get("title"))
+        if not section_name:
+            continue
         section_key = section_name.casefold()
         if section_key in seen_sections:
             continue
