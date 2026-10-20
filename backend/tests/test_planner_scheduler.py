@@ -171,6 +171,33 @@ class RevisionSchedulerUnitTests(unittest.TestCase):
                 self.assertTrue((Path(temp) / "revision_tasks.json").exists())
 
 
+    def test_create_task_rejects_overlapping_slot(self):
+        from contextlib import ExitStack
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from routes import planner
+
+        fixed = "2030-04-11T18:15:00+05:30"
+        existing = [{
+            "id": 1, "title": "Existing", "topic": "Topic A", "status": "planned",
+            "done": False, "scheduled_at": "2030-04-11T12:45:00+00:00", "duration_minutes": 30,
+        }]
+        with TemporaryDirectory() as temp:
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(planner, "TASKS", existing))
+                stack.enter_context(patch.object(planner, "TASKS_PATH", Path(temp) / "revision_tasks.json"))
+                stack.enter_context(patch.object(planner, "DATA_DIR", Path(temp)))
+                stack.enter_context(patch.object(planner, "_read_preferences", return_value={
+                    "daily_minutes": 180, "preferred_start_hour": 9, "preferred_end_hour": 23, "available_days": list(range(7)),
+                }))
+                with self.assertRaises(HTTPException) as raised:
+                    planner.create_task(planner.TaskEdit(
+                        title="New task", topic="Topic B", duration_minutes=20, scheduled_at=fixed,
+                    ))
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("overlaps", raised.exception.detail)
+
 
 if __name__ == "__main__":
     unittest.main()
