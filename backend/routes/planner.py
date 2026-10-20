@@ -321,6 +321,8 @@ def _validate_schedule_slot(
     new_time = _parse_datetime(scheduled_value)
     if new_time is None:
         raise HTTPException(status_code=400, detail="scheduled_at must be a valid ISO date or datetime.")
+    if new_time <= _utc_now():
+        raise HTTPException(status_code=409, detail="Choose a future date and time. Overdue tasks should be rescheduled into an available future slot.")
     prefs = {
         "daily_minutes": DEFAULT_DAILY_MINUTES,
         "preferred_start_hour": DEFAULT_START_HOUR,
@@ -663,14 +665,17 @@ def update_task(task_id: str, changes: TaskEdit):
         for date_key in ("scheduled_at", "due_date"):
             if date_key in updates and updates[date_key] and _parse_datetime(updates[date_key]) is None:
                 raise HTTPException(status_code=400, detail=f"{date_key} must be an ISO date or datetime.")
+        old_schedule = _scheduled_timestamp(task)
         if "scheduled_at" in updates:
             new_time = _parse_datetime(updates["scheduled_at"])
-            old = _scheduled_timestamp(task)
-            if updates["scheduled_at"] and new_time and old != new_time:
-                _validate_schedule_slot(new_time, _duration(task), exclude_task_id=task_id)
-            task["schedule_locked"] = True
-            if old and new_time and old != new_time:
-                task.setdefault("reschedule_history", []).append({"from": old.isoformat(timespec="seconds"), "to": new_time.isoformat(timespec="seconds"), "at": now_text, "reason": "User rescheduled task."})
+            if updates["scheduled_at"] and new_time and old_schedule != new_time:
+                effective_duration = int(updates.get("duration_minutes") or _duration(task))
+                _validate_schedule_slot(new_time, effective_duration, exclude_task_id=task_id)
+                task["schedule_locked"] = True
+                if old_schedule and new_time:
+                    task.setdefault("reschedule_history", []).append({"from": old_schedule.isoformat(timespec="seconds"), "to": new_time.isoformat(timespec="seconds"), "at": now_text, "reason": "User rescheduled task."})
+        elif "duration_minutes" in updates and old_schedule and old_schedule > _utc_now():
+            _validate_schedule_slot(old_schedule, int(updates["duration_minutes"]), exclude_task_id=task_id)
         if "status" in updates:
             new_status = updates["status"]
             if _task_done(task) and new_status != "completed":
