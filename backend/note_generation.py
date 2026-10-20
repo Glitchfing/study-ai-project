@@ -343,6 +343,13 @@ def _aggregate_mindmap(sections: list[dict[str, Any]], title: str) -> dict[str, 
                 detail = text[verb.end():].strip(" .:;,-")
                 detail = re.split(r"\b(?:because|so that|which|while|whereas|although)\b", detail, maxsplit=1, flags=re.IGNORECASE)[0]
                 text = compact_list(detail)
+        else:
+            # Remove prepositions/filler from noun-phrase labels such as
+            # "Business Intelligence With Data Analytics" without losing the terms.
+            text = " ".join(
+                word for word in words_in(text)
+                if word.casefold() not in filler_words
+            )
 
         text = _shorten(text, sentences=1, chars=120)
         tokens = words_in(text)
